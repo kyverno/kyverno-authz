@@ -12,7 +12,7 @@ import (
 func NewControlPlane[POLICY any](
 	compiler engine.Compiler[POLICY],
 ) (core.Source[POLICY], error) {
-	listener := NewListener()
+	listener := NewListener("")
 	cache := sources.NewCache(
 		listener,
 		func(_ context.Context, in *v1alpha1.ValidatingPolicy) (string, error) {
