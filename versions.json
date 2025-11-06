@@ -3,7 +3,8 @@
     "version": "main",
     "title": "main",
     "aliases": [
-      "dev"
+      "dev",
+      "latest"
     ]
   }
 ]
