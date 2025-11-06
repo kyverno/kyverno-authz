@@ -60,10 +60,8 @@ func NewPolicySender(
  */
 
 type clientConn struct {
-	cancelFunc       context.CancelFunc
-	lastAckedVersion int64
-	stream           grpc.BidiStreamingServer[protov1alpha1.ValidatingPolicyStreamRequest, protov1alpha1.ValidatingPolicyStreamResponse]
-	lastSent         time.Time
+	cancelFunc context.CancelFunc
+	stream     grpc.BidiStreamingServer[protov1alpha1.ValidatingPolicyStreamRequest, protov1alpha1.ValidatingPolicyStreamResponse]
 }
 
 func (s *PolicySender) StartHealthCheckMonitor(ctx context.Context) {
@@ -163,15 +161,14 @@ func (s *PolicySender) ValidatingPoliciesStream(stream grpc.BidiStreamingServer[
 			ctrl.LoggerFrom(nil).Info(fmt.Sprintf("Received validating policy stream request from: %s", req.ClientAddress))
 
 			if conn, ok := s.cxnsMap[req.ClientAddress]; ok {
-				if req.CurrentVersion == s.currentVersion && conn.cancelFunc != nil {
+				if conn.cancelFunc != nil {
 					conn.cancelFunc()
 					conn.cancelFunc = nil
-					continue
 				}
 			}
 
 			ctx, cancel := context.WithCancel(context.Background())
-			conn := &clientConn{stream: stream, lastAckedVersion: 0, cancelFunc: cancel}
+			conn := &clientConn{stream: stream, cancelFunc: cancel}
 			s.cxnMu.Lock()
 			s.cxnsMap[req.ClientAddress] = conn
 			s.cxnMu.Unlock()
@@ -189,28 +186,27 @@ func (s *PolicySender) ValidatingPoliciesStream(stream grpc.BidiStreamingServer[
 		}
 	}
 }
-
-func (s *PolicySender) sendWithBackoff(ctx context.Context, stream grpc.BidiStreamingServer[protov1alpha1.ValidatingPolicyStreamRequest, protov1alpha1.ValidatingPolicyStreamResponse], pol *protov1alpha1.ValidatingPolicyStreamResponse) error {
-	operation := func() error {
-		if err := stream.Send(pol); err != nil {
-			return err
-		}
-		return nil
-	}
-
-	notify := func(err error, next time.Duration) {
-		fmt.Printf("Error: %v (retrying in %s)\n", err, next)
-	}
-
+func (s *PolicySender) sendWithBackoff(
+	ctx context.Context,
+	stream grpc.BidiStreamingServer[
+		protov1alpha1.ValidatingPolicyStreamRequest,
+		protov1alpha1.ValidatingPolicyStreamResponse,
+	],
+	pol *protov1alpha1.ValidatingPolicyStreamResponse,
+) error {
 	b := backoff.NewExponentialBackOff()
 	b.InitialInterval = s.initialSendPolicyWait
 	b.MaxInterval = s.maxSendPolicyInterval
 	b.MaxElapsedTime = 0
+
 	backoffCtx := backoff.WithContext(b, ctx)
+
 	return backoff.RetryNotify(
-		operation,
+		func() error { return stream.Send(pol) },
 		backoffCtx,
-		notify,
+		func(err error, d time.Duration) {
+			fmt.Printf("failed to send policy: %v, retrying in %v", err, d)
+		},
 	)
 }
 
