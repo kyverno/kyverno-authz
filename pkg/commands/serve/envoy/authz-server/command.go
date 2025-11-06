@@ -15,6 +15,7 @@ import (
 	"github.com/hairyhenderson/go-fsimpl/gitfs"
 	"github.com/kyverno/kyverno-authz/apis/v1alpha1"
 	"github.com/kyverno/kyverno-authz/pkg/authz/envoy"
+	"github.com/kyverno/kyverno-authz/pkg/control-plane/listener"
 	"github.com/kyverno/kyverno-authz/pkg/engine"
 	vpolcompiler "github.com/kyverno/kyverno-authz/pkg/engine/compiler"
 	"github.com/kyverno/kyverno-authz/pkg/engine/sources"
@@ -59,7 +60,7 @@ func Command() *cobra.Command {
 			// setup signals aware context
 			return signals.Do(context.Background(), func(ctx context.Context) error {
 				// track errors
-				var probesErr, grpcErr, envoyMgrErr error
+				var connErr, probesErr, grpcErr, envoyMgrErr error
 				err := func(ctx context.Context) error {
 					// create a rest config
 					kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
@@ -111,6 +112,38 @@ func Command() *cobra.Command {
 						return err
 					}
 					envoyProvider := sdksources.NewComposite(extForEnvoy...)
+					if controlPlaneAddr != "" {
+						clientAddr := os.Getenv("POD_IP")
+						if clientAddr == "" {
+							panic("can't start auth server, no POD_IP has been passed")
+						}
+						policyListener := listener.NewPolicyListener(
+							controlPlaneAddr,
+							clientAddr,
+							sources.NewListener(v1alpha1.EvaluationModeEnvoy),
+							controlPlaneReconnectWait,
+							controlPlaneMaxDialInterval,
+							healthCheckInterval,
+						)
+						if err := policyListener.InitialSync(ctx); err != nil {
+							return err
+						}
+						group.StartWithContext(ctx, func(ctx context.Context) {
+							for {
+								select {
+								case <-ctx.Done():
+									return
+								default:
+									if connErr = policyListener.Start(ctx); connErr != nil {
+										ctrl.LoggerFrom(ctx).Error(connErr, "error connecting to the control plane, sleeping 10 seconds then retrying")
+										time.Sleep(time.Second * 10)
+									}
+									continue
+								}
+							}
+						})
+					}
+
 					// if kube policy source is enabled
 					if kubePolicySource && controlPlaneAddr == "" {
 						// create a controller manager
