@@ -129,44 +129,11 @@ func (s *PolicySender) HealthCheck(ctx context.Context, r *protov1alpha1.HealthC
 	if r.ClientAddress == "" || r.Time == nil {
 		return nil, nil // invalid request, do nothing
 	}
-	status, ok := s.healthCheckMap[r.ClientAddress]
-	if !ok {
-		s.healthCheckMap[r.ClientAddress] = &clientStatus{
-			lastSent: r.Time.AsTime(),
-		}
-		return &protov1alpha1.HealthCheckResponse{}, nil
+	// s.logger.Debugf("got health check message from %s, time: %s", r.ClientAddress, r.Time.AsTime().Format(time.RFC3339))
+	t, ok := s.healthCheckMap[r.ClientAddress]
+	if !ok || r.Time.AsTime().After(t) {
+		s.healthCheckMap[r.ClientAddress] = r.Time.AsTime()
 	}
-	if r.Time.AsTime().After(status.lastSent.Local()) {
-		status.lastSent = r.Time.AsTime()
-	}
-
-	if r.CurrentVersion == s.currentVersion && status.cancelFunc != nil {
-		status.cancelFunc()
-		status.cancelFunc = nil
-	}
-
-	if r.CurrentVersion != s.currentVersion && status.cancelFunc == nil {
-		ctx, cancelFunc := context.WithCancel(context.Background())
-		go func(ctx context.Context) {
-			polResp := protov1alpha1.ValidatingPolicyStreamResponse{
-				CurrentVersion: s.currentVersion,
-				Policies:       utils.ToSortedSlice(s.policies),
-			}
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				default:
-					if err := s.cxnsMap[r.ClientAddress].Send(&polResp); err != nil {
-						fmt.Printf("error sending, trying again %s", err)
-					}
-					time.Sleep(time.Second * 5) // ammar: make it the same as the client health check interval
-				}
-			}
-		}(ctx)
-		status.cancelFunc = cancelFunc
-	}
-
 	return &protov1alpha1.HealthCheckResponse{}, nil
 }
 

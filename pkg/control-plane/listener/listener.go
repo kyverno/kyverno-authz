@@ -30,6 +30,7 @@ type policyListener struct {
 	controlPlaneReconnectWait   time.Duration
 	controlPlaneMaxDialInterval time.Duration
 	healthCheckInterval         time.Duration
+	stream                      grpc.BidiStreamingClient[protov1alpha1.ValidatingPolicyStreamRequest, protov1alpha1.ValidatingPolicyStreamResponse]
 }
 
 func NewPolicyListener(
@@ -53,7 +54,8 @@ func (l *policyListener) Start(ctx context.Context) error {
 	b := backoff.NewExponentialBackOff()
 	b.InitialInterval = l.controlPlaneReconnectWait
 	b.MaxInterval = l.controlPlaneReconnectWait
-	if err := backoff.Retry(l.dial, b); err != nil {
+	bCtx := backoff.WithContext(b, ctx)
+	if err := backoff.Retry(l.dial, bCtx); err != nil {
 		return err
 	}
 	go l.sendHealthChecks(ctx) // start sending health checks
@@ -73,25 +75,33 @@ func (l *policyListener) dial() error {
 
 	l.conn = conn
 	l.client = protov1alpha1.NewValidatingPolicyServiceClient(conn)
+	stream, err := l.client.ValidatingPoliciesStream(context.Background()) // doesn't matter which context we pass here because the context is being controller by the backoff
+	if err != nil {
+		return err
+	}
+	l.stream = stream
 	return nil
 }
 
-func (l *policyListener) listen(ctx context.Context) error {
+func (l *policyListener) InitialSync(ctx context.Context) error {
 	ctrl.LoggerFrom(nil).Info("Establishing validation channel...")
-
 	// Establish the stream
 	stream, err := l.client.ValidatingPoliciesStream(ctx)
 	if err != nil {
 		return err
 	}
+	l.stream = stream
+	return nil
+}
 
+func (l *policyListener) listen(ctx context.Context) error {
 	var wg sync.WaitGroup
 	wg.Go(func() {
 		for {
 			select {
 			case <-ctx.Done():
 				ctrl.LoggerFrom(nil).Info("Stopping policy listener due to context cancellation")
-				if err := stream.CloseSend(); err != nil {
+				if err := l.stream.CloseSend(); err != nil {
 					ctrl.LoggerFrom(nil).Error(err, "Error closing stream")
 				}
 
@@ -103,13 +113,13 @@ func (l *policyListener) listen(ctx context.Context) error {
 				return
 			default:
 				if !l.connEstablished {
-					if err := stream.Send(&protov1alpha1.ValidatingPolicyStreamRequest{ClientAddress: l.clientAddr}); err != nil {
+					if err := l.stream.Send(&protov1alpha1.ValidatingPolicyStreamRequest{ClientAddress: l.clientAddr}); err != nil {
 						ctrl.LoggerFrom(nil).Error(err, "Error sending to stream")
 						return
 					}
 					l.connEstablished = true
 				}
-				req, err := stream.Recv()
+				req, err := l.stream.Recv()
 				if err == io.EOF {
 					ctrl.LoggerFrom(nil).Error(err, "Policy sender closed the stream")
 					return
