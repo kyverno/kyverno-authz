@@ -1,15 +1,15 @@
 ---
-title: "kyverno-envoy-plugin serve control-plane"
-slug: "kyverno-envoy-plugin_serve_control-plane"
-description: "CLI reference for kyverno-envoy-plugin serve control-plane"
+title: "kyverno-authz serve control-plane"
+slug: "kyverno-authz_serve_control-plane"
+description: "CLI reference for kyverno-authz serve control-plane"
 ---
 
-## kyverno-envoy-plugin serve control-plane
+## kyverno-authz serve control-plane
 
 Start the Kyverno authorizer control plane
 
 ```
-kyverno-envoy-plugin serve control-plane [flags]
+kyverno-authz serve control-plane [flags]
 ```
 
 ### Options
@@ -49,5 +49,5 @@ kyverno-envoy-plugin serve control-plane [flags]
 
 ### SEE ALSO
 
-* [kyverno-envoy-plugin serve](kyverno-envoy-plugin_serve.md)	 - Run Kyverno Authz servers
+* [kyverno-authz serve](kyverno-authz_serve.md)	 - Run Kyverno Authz servers
 

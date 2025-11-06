@@ -3,7 +3,7 @@ package policy
 import (
 	"context"
 
-	"github.com/kyverno/kyverno-envoy-plugin/sdk/core"
+	"github.com/kyverno/kyverno-authz/sdk/core"
 )
 
 // EvaluatorFactory creates a type-safe adapter that integrates policy evaluation

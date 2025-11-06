@@ -147,7 +147,7 @@ Now deploy the Kyverno Authz Server.
 helm install kyverno-authz-server \
   --namespace kyverno --create-namespace \
   --wait \
-  --repo https://kyverno.github.io/kyverno-envoy-plugin kyverno-authz-server \
+  --repo https://kyverno.github.io/kyverno-authz kyverno-authz-server \
   --values - <<EOF
 service:
   appProtocol: kubernetes.io/h2c

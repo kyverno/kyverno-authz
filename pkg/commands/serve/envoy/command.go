@@ -1,8 +1,8 @@
 package envoy
 
 import (
-	authzserver "github.com/kyverno/kyverno-envoy-plugin/pkg/commands/serve/envoy/authz-server"
-	validationwebhook "github.com/kyverno/kyverno-envoy-plugin/pkg/commands/serve/envoy/validation-webhook"
+	authzserver "github.com/kyverno/kyverno-authz/pkg/commands/serve/envoy/authz-server"
+	validationwebhook "github.com/kyverno/kyverno-authz/pkg/commands/serve/envoy/validation-webhook"
 	"github.com/spf13/cobra"
 )
 

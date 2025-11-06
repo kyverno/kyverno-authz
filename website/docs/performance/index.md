@@ -196,7 +196,7 @@ k6 run --out json=report.json k6-script.js
     For this run this command to apply the sample applicaition and then test with k6
 
     ```bash
-    $ kubectl apply -f https://raw.githubusercontent.com/kyverno/kyverno-envoy-plugin/main/tests/performance-test/manifest/app.yaml
+    $ kubectl apply -f https://raw.githubusercontent.com/kyverno/kyverno-authz/main/tests/performance-test/manifest/app.yaml
     ```
 
     Results of the k6 when only application is applied
@@ -250,7 +250,7 @@ k6 run --out json=report.json k6-script.js
     For this run this command to apply the sample application with envoy.
 
     ```bash
-    $ kubectl apply -f https://raw.githubusercontent.com/kyverno/kyverno-envoy-plugin/main/tests/performance-test/manifest/app-envoy.yaml
+    $ kubectl apply -f https://raw.githubusercontent.com/kyverno/kyverno-authz/main/tests/performance-test/manifest/app-envoy.yaml
     ```
 
     Results of k6 after applying sample-application with envoy.
@@ -305,7 +305,7 @@ k6 run --out json=report.json k6-script.js
     For this apply this command to apply sample-application, envoy and Kyverno Authz Server:
 
     ```bash
-    $ kubectl apply -f https://raw.githubusercontent.com/kyverno/kyverno-envoy-plugin/main/tests/performance-test/manifest/app-envoy-plugin.yaml
+    $ kubectl apply -f https://raw.githubusercontent.com/kyverno/kyverno-authz/main/tests/performance-test/manifest/app-envoy-plugin.yaml
     ```
 
     Results of k6 after applying sample-application, Envoy and the Kyverno Authz Server.

@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/kyverno/kyverno-envoy-plugin/pkg/commands/root"
+	"github.com/kyverno/kyverno-authz/pkg/commands/root"
 	"github.com/spf13/cobra/doc"
 )
 

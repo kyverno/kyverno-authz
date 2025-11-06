@@ -1,8 +1,8 @@
 package policy
 
 import (
-	"github.com/kyverno/kyverno-envoy-plugin/sdk/core"
-	"github.com/kyverno/kyverno-envoy-plugin/sdk/core/defaults"
+	"github.com/kyverno/kyverno-authz/sdk/core"
+	"github.com/kyverno/kyverno-authz/sdk/core/defaults"
 )
 
 // NewEngine constructs a new core.Engine instance for evaluating policies.

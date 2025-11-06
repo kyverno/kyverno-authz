@@ -2,7 +2,7 @@
 
 If you think you have discovered a bug, you can help us by submitting an issue in our public [issue tracker], following this guide.
 
-[issue tracker]: https://github.com/kyverno/kyverno-envoy-plugin/issues
+[issue tracker]: https://github.com/kyverno/kyverno-authz/issues
 
 ## Before Creating an Issue
 
@@ -24,7 +24,7 @@ If you're using customizations like additional configurations, remove them befor
 
 __Don't be shy to ask on our [discussion board] for help if you run into problems.__
 
-[discussion board]: https://github.com/kyverno/kyverno-envoy-plugin/discussions
+[discussion board]: https://github.com/kyverno/kyverno-authz/discussions
 
 ### Search for Solutions
 
@@ -39,8 +39,8 @@ Before creating a bug report, save time for us and yourself by doing some resear
 __Keep track of all search terms and relevant links; you'll need them in the bug report.__
 
 [Search our documentation]: ?q=
-[issue tracker]: https://github.com/kyverno/kyverno-envoy-plugin/issues
-[discussion board]: https://github.com/kyverno/kyverno-envoy-plugin/discussions
+[issue tracker]: https://github.com/kyverno/kyverno-authz/issues
+[discussion board]: https://github.com/kyverno/kyverno-authz/discussions
 
 ---
 

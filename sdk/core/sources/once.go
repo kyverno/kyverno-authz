@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/kyverno/kyverno-envoy-plugin/sdk/core"
+	"github.com/kyverno/kyverno-authz/sdk/core"
 )
 
 // once is a concurrency-safe wrapper around a core.Source that ensures

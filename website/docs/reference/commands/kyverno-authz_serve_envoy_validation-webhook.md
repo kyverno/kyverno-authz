@@ -1,15 +1,15 @@
 ---
-title: "kyverno-envoy-plugin serve envoy validation-webhook"
-slug: "kyverno-envoy-plugin_serve_envoy_validation-webhook"
-description: "CLI reference for kyverno-envoy-plugin serve envoy validation-webhook"
+title: "kyverno-authz serve envoy validation-webhook"
+slug: "kyverno-authz_serve_envoy_validation-webhook"
+description: "CLI reference for kyverno-authz serve envoy validation-webhook"
 ---
 
-## kyverno-envoy-plugin serve envoy validation-webhook
+## kyverno-authz serve envoy validation-webhook
 
 Start the validation webhook
 
 ```
-kyverno-envoy-plugin serve envoy validation-webhook [flags]
+kyverno-authz serve envoy validation-webhook [flags]
 ```
 
 ### Options
@@ -41,5 +41,5 @@ kyverno-envoy-plugin serve envoy validation-webhook [flags]
 
 ### SEE ALSO
 
-* [kyverno-envoy-plugin serve envoy](kyverno-envoy-plugin_serve_envoy.md)	 - Run Kyverno Envoy servers
+* [kyverno-authz serve envoy](kyverno-authz_serve_envoy.md)	 - Run Kyverno Envoy servers
 

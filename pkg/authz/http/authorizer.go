@@ -8,12 +8,12 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/google/cel-go/cel"
-	httpcel "github.com/kyverno/kyverno-envoy-plugin/pkg/cel/libs/authz/http"
-	httpserver "github.com/kyverno/kyverno-envoy-plugin/pkg/cel/libs/httpserver"
-	"github.com/kyverno/kyverno-envoy-plugin/pkg/cel/utils"
-	"github.com/kyverno/kyverno-envoy-plugin/pkg/metrics"
-	"github.com/kyverno/kyverno-envoy-plugin/sdk/core"
-	"github.com/kyverno/kyverno-envoy-plugin/sdk/extensions/policy"
+	httpcel "github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/http"
+	httpserver "github.com/kyverno/kyverno-authz/pkg/cel/libs/httpserver"
+	"github.com/kyverno/kyverno-authz/pkg/cel/utils"
+	"github.com/kyverno/kyverno-authz/pkg/metrics"
+	"github.com/kyverno/kyverno-authz/sdk/core"
+	"github.com/kyverno/kyverno-authz/sdk/extensions/policy"
 	"k8s.io/client-go/dynamic"
 	ctrl "sigs.k8s.io/controller-runtime"
 )

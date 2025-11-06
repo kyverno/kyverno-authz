@@ -1,8 +1,8 @@
 package defaults
 
 import (
-	"github.com/kyverno/kyverno-envoy-plugin/sdk/core"
-	"github.com/kyverno/kyverno-envoy-plugin/sdk/core/handlers"
+	"github.com/kyverno/kyverno-authz/sdk/core"
+	"github.com/kyverno/kyverno-authz/sdk/core/handlers"
 )
 
 func Handler[

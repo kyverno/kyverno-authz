@@ -2,7 +2,7 @@ apiVersion: v2
 name: kyverno-authz-server
 description: Kyverno policies based authorization plugin for Envoy ❤️
 icon: https://github.com/kyverno/kyverno/raw/main/img/logo.png
-home: https://kyverno.github.io/kyverno-envoy-plugin
+home: https://kyverno.github.io/kyverno-authz
 
 type: application
 version: 0.0.0
@@ -20,7 +20,7 @@ keywords:
   - security
 
 sources:
-  - https://github.com/kyverno/kyverno-envoy-plugin
+  - https://github.com/kyverno/kyverno-authz
 
 maintainers:
   - name: Kyverno

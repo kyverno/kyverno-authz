@@ -4,7 +4,7 @@ import (
 	"context"
 	"io/fs"
 
-	"github.com/kyverno/kyverno-envoy-plugin/sdk/core"
+	"github.com/kyverno/kyverno-authz/sdk/core"
 	"go.uber.org/multierr"
 )
 
@@ -52,7 +52,7 @@ type FsEntry struct {
 //	    "io/fs"
 //	    "os"
 //	    "strings"
-//	    "github.com/kyverno/kyverno-envoy-plugin/sdk/core/sources"
+//	    "github.com/kyverno/kyverno-authz/sdk/core/sources"
 //	)
 //
 //	func main() {

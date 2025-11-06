@@ -107,7 +107,7 @@ kubectl label namespace kyverno istio-injection=enabled
 helm install kyverno-authz-server \
   --namespace kyverno \
   --wait \
-  --repo https://kyverno.github.io/kyverno-envoy-plugin kyverno-authz-server \
+  --repo https://kyverno.github.io/kyverno-authz kyverno-authz-server \
   --values - <<EOF
 certificates:
   certManager:

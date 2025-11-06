@@ -189,7 +189,7 @@ Now we can deploy the Kyverno Authz Server.
 helm install kyverno-authz-server \
   --namespace kyverno --create-namespace \
   --wait  \
-  --repo https://kyverno.github.io/kyverno-envoy-plugin kyverno-sidecar-injector \
+  --repo https://kyverno.github.io/kyverno-authz kyverno-sidecar-injector \
   --values - <<EOF
 certificates:
   certManager:

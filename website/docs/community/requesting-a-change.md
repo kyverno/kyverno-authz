@@ -2,7 +2,7 @@
 
 We value every idea or contribution from our community. Please follow this guide before submitting your change request in our public [issue tracker]. This helps us better understand the proposed change and how it will benefit our community.
 
-[issue tracker]: https://github.com/kyverno/kyverno-envoy-plugin/issues
+[issue tracker]: https://github.com/kyverno/kyverno-authz/issues
 
 ## Before Creating an Issue
 
@@ -22,7 +22,7 @@ If your idea is implemented in another tool or framework, collect information on
 
 Our [discussion board] is the best place to connect with our community. Seeking input from other users helps implement features that benefit a larger number of users.
 
-[discussion board]: https://github.com/kyverno/kyverno-envoy-plugin/discussions
+[discussion board]: https://github.com/kyverno/kyverno-authz/discussions
 
 [:octicons-comment-discussion-16: Start a discussion][discussion board]{ .md-button .md-button--primary }
 

@@ -2,8 +2,8 @@ package engine
 
 import (
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
-	"github.com/kyverno/kyverno-envoy-plugin/pkg/cel/libs/authz/http"
-	"github.com/kyverno/kyverno-envoy-plugin/sdk/extensions/policy"
+	"github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/http"
+	"github.com/kyverno/kyverno-authz/sdk/extensions/policy"
 	"k8s.io/client-go/dynamic"
 )
 

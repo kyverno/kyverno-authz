@@ -36,7 +36,7 @@ This flag is often used in **sidecar** or **local development** environments.
 
 Run the server without using in-cluster policies:
 
-    kyverno-envoy-plugin serve authz-server \
+    kyverno-authz serve authz-server \
       --kube-policy-source=false \
       --external-policy-source=file://policies
 
@@ -68,7 +68,7 @@ This is the **default configuration** used by injected sidecars.
 
 Run the Authz Server with only local policies:
 
-    kyverno-envoy-plugin serve authz-server \
+    kyverno-authz serve authz-server \
       --kube-policy-source=false \
       --external-policy-source=file:///policies
 
@@ -86,7 +86,7 @@ You can reference specific **branches**, **tags**, **commits**, or **subdirector
 
 #### Example (with multiple sources)
 
-    kyverno-envoy-plugin serve authz-server \
+    kyverno-authz serve authz-server \
       --external-policy-source=file:///policies/team-a \
       --external-policy-source=git+https://github.com/acme/policies.git
 

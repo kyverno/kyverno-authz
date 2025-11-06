@@ -3,8 +3,8 @@ package dispatchers
 import (
 	"context"
 
-	"github.com/kyverno/kyverno-envoy-plugin/sdk/core"
-	"github.com/kyverno/kyverno-envoy-plugin/sdk/core/breakers"
+	"github.com/kyverno/kyverno-authz/sdk/core"
+	"github.com/kyverno/kyverno-authz/sdk/core/breakers"
 )
 
 func Sequential[

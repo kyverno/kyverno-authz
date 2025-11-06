@@ -3,8 +3,8 @@ package defaults
 import (
 	"context"
 
-	"github.com/kyverno/kyverno-envoy-plugin/sdk/core"
-	"github.com/kyverno/kyverno-envoy-plugin/sdk/core/resulters"
+	"github.com/kyverno/kyverno-authz/sdk/core"
+	"github.com/kyverno/kyverno-authz/sdk/core/resulters"
 )
 
 func Resulter[

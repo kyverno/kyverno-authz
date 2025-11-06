@@ -537,7 +537,7 @@ const file_validatingpolicy_proto_rawDesc = "" +
 	"\x13HealthCheckResponse2\xfe\x01\n" +
 	"\x17ValidatingPolicyService\x12}\n" +
 	"\x18ValidatingPoliciesStream\x124.kyverno.http.v1alpha1.ValidatingPolicyStreamRequest\x1a'.kyverno.http.v1alpha1.ValidatingPolicy(\x010\x01\x12d\n" +
-	"\vHealthCheck\x12).kyverno.http.v1alpha1.HealthCheckRequest\x1a*.kyverno.http.v1alpha1.HealthCheckResponseB=Z;github.com/kyverno/kyverno-envoy-plugin/apis/proto/v1alpha1b\x06proto3"
+	"\vHealthCheck\x12).kyverno.http.v1alpha1.HealthCheckRequest\x1a*.kyverno.http.v1alpha1.HealthCheckResponseB6Z4github.com/kyverno/kyverno-authz/apis/proto/v1alpha1b\x06proto3"
 
 var (
 	file_validatingpolicy_proto_rawDescOnce sync.Once

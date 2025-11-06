@@ -15,7 +15,7 @@ The Kyverno Authz Server supports the Envoy External Authorization protocol.
 
 ## Overview
 
-The [Kyverno Authz Server](https://github.com/kyverno/kyverno-envoy-plugin) is a gRPC server that implements [Envoy External Authorization API](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/ext_authz_filter.html).
+The [Kyverno Authz Server](https://github.com/kyverno/kyverno-authz) is a gRPC server that implements [Envoy External Authorization API](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/ext_authz_filter.html).
 
 Envoy sends authorization requests to the Kyverno Authz Server, which evaluates policies and returns allow/deny decisions.
 

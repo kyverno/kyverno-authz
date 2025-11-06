@@ -6,9 +6,9 @@ package sources_test
 // 	"testing/fstest"
 
 // 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
-// 	"github.com/kyverno/kyverno-envoy-plugin/apis/v1alpha1"
-// 	"github.com/kyverno/kyverno-envoy-plugin/pkg/engine"
-// 	"github.com/kyverno/kyverno-envoy-plugin/pkg/engine/generic/providers"
+// 	"github.com/kyverno/kyverno-authz/apis/v1alpha1"
+// 	"github.com/kyverno/kyverno-authz/pkg/engine"
+// 	"github.com/kyverno/kyverno-authz/pkg/engine/generic/providers"
 // 	"github.com/stretchr/testify/assert"
 // 	"k8s.io/apimachinery/pkg/util/validation/field"
 // )

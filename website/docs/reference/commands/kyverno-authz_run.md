@@ -1,21 +1,23 @@
 ---
-title: "kyverno-envoy-plugin serve http validation-webhook"
-slug: "kyverno-envoy-plugin_serve_http_validation-webhook"
-description: "CLI reference for kyverno-envoy-plugin serve http validation-webhook"
+title: "kyverno-authz run"
+slug: "kyverno-authz_run"
+description: "CLI reference for kyverno-authz run"
 ---
 
-## kyverno-envoy-plugin serve http validation-webhook
+## kyverno-authz run
 
-Start the validation webhook
+Run authz-server controller
 
 ```
-kyverno-envoy-plugin serve http validation-webhook [flags]
+kyverno-authz run [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help                                help for validation-webhook
+      --cert-file string                    File containing tls certificate
+  -h, --help                                help for run
+      --key-file string                     File containing tls private key
       --kube-as string                      Username to impersonate for the operation
       --kube-as-group stringArray           Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
       --kube-as-uid string                  UID to impersonate for the operation
@@ -35,11 +37,14 @@ kyverno-envoy-plugin serve http validation-webhook [flags]
       --kube-token string                   Bearer token for authentication to the API server
       --kube-user string                    The name of the kubeconfig user to use
       --kube-username string                Username for basic authentication to the API server
+      --leader-election                     Enable leader election
+      --leader-election-id string           Leader election ID
       --metrics-address string              Address to listen on for metrics (default ":9082")
+      --nested-request                      Expect the requests to validate to be in the body of the original request
       --probes-address string               Address to listen on for health checks (default ":9080")
 ```
 
 ### SEE ALSO
 
-* [kyverno-envoy-plugin serve http](kyverno-envoy-plugin_serve_http.md)	 - Run Kyverno HTTP servers
+* [kyverno-authz](kyverno-authz.md)	 - 
 

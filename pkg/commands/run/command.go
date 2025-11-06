@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/kyverno/kyverno-envoy-plugin/apis/v1alpha1"
-	"github.com/kyverno/kyverno-envoy-plugin/pkg/probes"
-	"github.com/kyverno/kyverno-envoy-plugin/pkg/signals"
+	"github.com/kyverno/kyverno-authz/apis/v1alpha1"
+	"github.com/kyverno/kyverno-authz/pkg/probes"
+	"github.com/kyverno/kyverno-authz/pkg/signals"
 	"github.com/spf13/cobra"
 	"go.uber.org/multierr"
 	"k8s.io/apimachinery/pkg/runtime"

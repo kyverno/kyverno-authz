@@ -4,8 +4,8 @@
 
 GIT_SHA                            := $(shell git rev-parse HEAD)
 ORG                                ?= kyverno
-PACKAGE                            ?= github.com/$(ORG)/kyverno-envoy-plugin
-CLI_BIN                            := kyverno-envoy-plugin
+PACKAGE                            ?= github.com/$(ORG)/kyverno-authz
+CLI_BIN                            := kyverno-authz
 CGO_ENABLED                        ?= 0
 GOOS                               ?= $(shell go env GOOS)
 CRDS_PATH                          := .crds
@@ -17,7 +17,7 @@ endif
 KIND_IMAGE                         ?= kindest/node:v1.34.0
 REGISTRY                           ?= ghcr.io
 REPO                               ?= kyverno
-IMAGE                              ?= kyverno-envoy-plugin
+IMAGE                              ?= kyverno-authz
 KO_REGISTRY                        ?= ko.local
 KO_TAGS                            ?= $(GIT_SHA)
 KO_PLATFORMS                       ?= all

@@ -3,7 +3,7 @@ package breakers
 import (
 	"context"
 
-	"github.com/kyverno/kyverno-envoy-plugin/sdk/core"
+	"github.com/kyverno/kyverno-authz/sdk/core"
 )
 
 type never[
