@@ -1,9 +1,9 @@
 package defaults
 
 import (
-	"github.com/kyverno/kyverno-envoy-plugin/sdk/core"
-	"github.com/kyverno/kyverno-envoy-plugin/sdk/core/breakers"
-	"github.com/kyverno/kyverno-envoy-plugin/sdk/core/dispatchers"
+	"github.com/kyverno/kyverno-authz/sdk/core"
+	"github.com/kyverno/kyverno-authz/sdk/core/breakers"
+	"github.com/kyverno/kyverno-authz/sdk/core/dispatchers"
 )
 
 func Dispatcher[

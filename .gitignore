@@ -6,5 +6,5 @@
 /charts/*/charts
 /website/site/
 __debug*
-kyverno-envoy-plugin
+kyverno-authz
 vendor/

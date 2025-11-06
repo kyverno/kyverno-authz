@@ -1,8 +1,8 @@
 package controlplane
 
 import (
-	"github.com/kyverno/kyverno-envoy-plugin/apis/v1alpha1"
-	protov1alpha1 "github.com/kyverno/kyverno-envoy-plugin/pkg/control-plane/proto/v1alpha1"
+	"github.com/kyverno/kyverno-authz/apis/v1alpha1"
+	protov1alpha1 "github.com/kyverno/kyverno-authz/pkg/control-plane/proto/v1alpha1"
 	vpol "github.com/kyverno/kyverno/api/policies.kyverno.io/v1alpha1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

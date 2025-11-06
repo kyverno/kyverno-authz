@@ -1,10 +1,10 @@
 package serve
 
 import (
-	controlplane "github.com/kyverno/kyverno-envoy-plugin/pkg/commands/serve/control-plane"
-	"github.com/kyverno/kyverno-envoy-plugin/pkg/commands/serve/envoy"
-	"github.com/kyverno/kyverno-envoy-plugin/pkg/commands/serve/http"
-	sidecarinjector "github.com/kyverno/kyverno-envoy-plugin/pkg/commands/serve/sidecar-injector"
+	controlplane "github.com/kyverno/kyverno-authz/pkg/commands/serve/control-plane"
+	"github.com/kyverno/kyverno-authz/pkg/commands/serve/envoy"
+	"github.com/kyverno/kyverno-authz/pkg/commands/serve/http"
+	sidecarinjector "github.com/kyverno/kyverno-authz/pkg/commands/serve/sidecar-injector"
 	"github.com/spf13/cobra"
 )
 

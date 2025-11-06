@@ -4,7 +4,7 @@
 
 Kyverno control plane for managing sidecar authorization servers
 
-**Homepage:** <https://kyverno.github.io/kyverno-envoy-plugin>
+**Homepage:** <https://kyverno.github.io/kyverno-authz>
 
 ## Maintainers
 
@@ -14,7 +14,7 @@ Kyverno control plane for managing sidecar authorization servers
 
 ## Source Code
 
-* <https://github.com/kyverno/kyverno-envoy-plugin>
+* <https://github.com/kyverno/kyverno-authz>
 
 ## Requirements
 
@@ -51,7 +51,7 @@ Kubernetes: `>=1.25.0-0`
 | pod.affinity | object | `{}` | Pod affinity constraints. |
 | pod.nodeAffinity | object | `{}` | Node affinity constraints. |
 | containers.controlPlane.image.registry | string | `"ghcr.io"` | Image registry |
-| containers.controlPlane.image.repository | string | `"kyverno/kyverno-envoy-plugin"` | Image repository |
+| containers.controlPlane.image.repository | string | `"kyverno/kyverno-authz"` | Image repository |
 | containers.controlPlane.image.tag | string | `nil` | Image tag Defaults to appVersion in Chart.yaml if omitted |
 | containers.controlPlane.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy |
 | containers.controlPlane.resources.limits | object | `{"memory":"384Mi"}` | Pod resource limits |

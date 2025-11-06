@@ -3,9 +3,9 @@ package sources
 import (
 	"context"
 
-	"github.com/kyverno/kyverno-envoy-plugin/pkg/engine"
-	"github.com/kyverno/kyverno-envoy-plugin/sdk/core"
-	"github.com/kyverno/kyverno-envoy-plugin/sdk/core/sources"
+	"github.com/kyverno/kyverno-authz/pkg/engine"
+	"github.com/kyverno/kyverno-authz/sdk/core"
+	"github.com/kyverno/kyverno-authz/sdk/core/sources"
 	"github.com/kyverno/kyverno/api/policies.kyverno.io/v1alpha1"
 )
 

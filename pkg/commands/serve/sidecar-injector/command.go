@@ -3,9 +3,9 @@ package sidecarinjector
 import (
 	"context"
 
-	"github.com/kyverno/kyverno-envoy-plugin/pkg/sidecar"
-	"github.com/kyverno/kyverno-envoy-plugin/pkg/signals"
-	"github.com/kyverno/kyverno-envoy-plugin/pkg/webhook/mutation"
+	"github.com/kyverno/kyverno-authz/pkg/sidecar"
+	"github.com/kyverno/kyverno-authz/pkg/signals"
+	"github.com/kyverno/kyverno-authz/pkg/webhook/mutation"
 	"github.com/spf13/cobra"
 )
 

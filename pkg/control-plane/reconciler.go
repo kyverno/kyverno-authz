@@ -3,9 +3,9 @@ package controlplane
 import (
 	"context"
 
-	policyapi "github.com/kyverno/kyverno-envoy-plugin/apis/v1alpha1"
-	protov1alpha1 "github.com/kyverno/kyverno-envoy-plugin/pkg/control-plane/proto/v1alpha1"
-	"github.com/kyverno/kyverno-envoy-plugin/pkg/control-plane/sender"
+	policyapi "github.com/kyverno/kyverno-authz/apis/v1alpha1"
+	protov1alpha1 "github.com/kyverno/kyverno-authz/pkg/control-plane/proto/v1alpha1"
+	"github.com/kyverno/kyverno-authz/pkg/control-plane/sender"
 	"github.com/kyverno/kyverno/api/policies.kyverno.io/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime"

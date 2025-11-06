@@ -1,10 +1,10 @@
 ---
-title: "kyverno-envoy-plugin completion bash"
-slug: "kyverno-envoy-plugin_completion_bash"
-description: "CLI reference for kyverno-envoy-plugin completion bash"
+title: "kyverno-authz completion bash"
+slug: "kyverno-authz_completion_bash"
+description: "CLI reference for kyverno-authz completion bash"
 ---
 
-## kyverno-envoy-plugin completion bash
+## kyverno-authz completion bash
 
 Generate the autocompletion script for bash
 
@@ -17,23 +17,23 @@ If it is not installed already, you can install it via your OS's package manager
 
 To load completions in your current shell session:
 
-	source <(kyverno-envoy-plugin completion bash)
+	source <(kyverno-authz completion bash)
 
 To load completions for every new session, execute once:
 
 #### Linux:
 
-	kyverno-envoy-plugin completion bash > /etc/bash_completion.d/kyverno-envoy-plugin
+	kyverno-authz completion bash > /etc/bash_completion.d/kyverno-authz
 
 #### macOS:
 
-	kyverno-envoy-plugin completion bash > $(brew --prefix)/etc/bash_completion.d/kyverno-envoy-plugin
+	kyverno-authz completion bash > $(brew --prefix)/etc/bash_completion.d/kyverno-authz
 
 You will need to start a new shell for this setup to take effect.
 
 
 ```
-kyverno-envoy-plugin completion bash
+kyverno-authz completion bash
 ```
 
 ### Options
@@ -45,5 +45,5 @@ kyverno-envoy-plugin completion bash
 
 ### SEE ALSO
 
-* [kyverno-envoy-plugin completion](kyverno-envoy-plugin_completion.md)	 - Generate the autocompletion script for the specified shell
+* [kyverno-authz completion](kyverno-authz_completion.md)	 - Generate the autocompletion script for the specified shell
 

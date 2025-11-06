@@ -20,7 +20,7 @@ Join our slack channel [#kyverno](https://kubernetes.slack.com/archives/CLGR9BJU
 
 ## RoadMap
 
-For detailed information on our planned features and upcoming updates, please [view our Roadmap](https://github.com/kyverno/kyverno-envoy-plugin/blob/main/ROADMAP.md).
+For detailed information on our planned features and upcoming updates, please [view our Roadmap](https://github.com/kyverno/kyverno-authz/blob/main/ROADMAP.md).
 
 ## Contributing
 
@@ -32,4 +32,4 @@ Please read the [contributing guide](https://github.com/kyverno/kyverno/blob/mai
 
 ## Adopters
 
-If you are using the Kyverno Authz Server and want to share it publicly we always appreciate a bit of support. Pull requests to the [ADOPTERS LIST](https://github.com/kyverno/kyverno-envoy-plugin/blob/main/ADOPTERS.md) will put a smile on our faces :smile:
+If you are using the Kyverno Authz Server and want to share it publicly we always appreciate a bit of support. Pull requests to the [ADOPTERS LIST](https://github.com/kyverno/kyverno-authz/blob/main/ADOPTERS.md) will put a smile on our faces :smile:

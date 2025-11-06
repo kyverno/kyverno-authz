@@ -19,7 +19,7 @@ openssl req -new -x509  \
 helm install kyverno-authz-server \
   --namespace kyverno --create-namespace \
   --wait \
-  --repo https://kyverno.github.io/kyverno-envoy-plugin kyverno-authz-server \
+  --repo https://kyverno.github.io/kyverno-authz kyverno-authz-server \
   --set-file certificates.static.crt=tls.crt \
   --set-file certificates.static.key=tls.key
 ```
@@ -53,7 +53,7 @@ EOF
 helm upgrade --install kyverno-authz-server \
   --namespace kyverno --create-namespace \
   --wait \
-  --repo https://kyverno.github.io/kyverno-envoy-plugin kyverno-authz-server \
+  --repo https://kyverno.github.io/kyverno-authz kyverno-authz-server \
   --values - <<EOF
 certificates:
   certManager:

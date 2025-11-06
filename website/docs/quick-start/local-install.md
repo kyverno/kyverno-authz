@@ -6,14 +6,14 @@ You can install the pre-compiled binary (in several ways), compile from sources,
 
 ### Manually
 
-Download the pre-compiled binaries for your system from the [releases page](https://github.com/kyverno/kyverno-envoy-plugin/releases) and copy them to the desired location.
+Download the pre-compiled binaries for your system from the [releases page](https://github.com/kyverno/kyverno-authz/releases) and copy them to the desired location.
 
 ### Install using `go install`
 
 You can install with `go install` with:
 
 ```bash
-go install github.com/kyverno/kyverno-envoy-plugin@latest
+go install github.com/kyverno/kyverno-authz@latest
 ```
 
 ## Run with Docker
@@ -21,7 +21,7 @@ go install github.com/kyverno/kyverno-envoy-plugin@latest
 The Kyverno Authz Server is also available as a Docker image which you can pull and run:
 
 ```bash
-docker pull ghcr.io/kyverno/kyverno-envoy-plugin:<version>
+docker pull ghcr.io/kyverno/kyverno-authz:<version>
 ```
 
 ```bash
@@ -29,7 +29,7 @@ docker run --rm                                     \
     -v ${HOME}/.kube/:/etc/kubeconfig/              \
     -e KUBECONFIG=/etc/kubeconfig/config            \
     --network=host                                  \
-    ghcr.io/kyverno/kyverno-envoy-plugin:<version>  \
+    ghcr.io/kyverno/kyverno-authz:<version>  \
     version
 ```
 
@@ -38,13 +38,13 @@ docker run --rm                                     \
 **clone:**
 
 ```bash
-git clone https://github.com/kyverno/kyverno-envoy-plugin.git
+git clone https://github.com/kyverno/kyverno-authz.git
 ```
 
 **build the binaries:**
 
 ```bash
-cd kyverno-envoy-plugin
+cd kyverno-authz
 go mod tidy
 make build
 ```
@@ -52,5 +52,5 @@ make build
 **verify it works:**
 
 ```bash
-./kyverno-envoy-plugin version
+./kyverno-authz version
 ```

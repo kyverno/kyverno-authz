@@ -1,11 +1,11 @@
 # site
 site_name: Kyverno Authz Server
-site_url: https://kyverno.github.io/kyverno-envoy-plugin/
+site_url: https://kyverno.github.io/kyverno-authz/
 site_description: Kyverno programmable, policy-based authz servers
 
 # repo
-repo_name: kyverno/kyverno-envoy-plugin
-repo_url: https://github.com/kyverno/kyverno-envoy-plugin
+repo_name: kyverno/kyverno-authz
+repo_url: https://github.com/kyverno/kyverno-authz
 
 # edit
 edit_uri: edit/main/website/docs/
@@ -31,7 +31,7 @@ extra:
     provider: mike
   social:
   - icon: fontawesome/brands/github
-    link: https://github.com/kyverno/kyverno-envoy-plugin
+    link: https://github.com/kyverno/kyverno-authz
   - icon: fontawesome/brands/slack
     link: https://kubernetes.slack.com/archives/CLGR9BJU9
   - icon: fontawesome/brands/x-twitter

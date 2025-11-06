@@ -1,15 +1,15 @@
 ---
-title: "kyverno-envoy-plugin serve http authz-server"
-slug: "kyverno-envoy-plugin_serve_http_authz-server"
-description: "CLI reference for kyverno-envoy-plugin serve http authz-server"
+title: "kyverno-authz serve http authz-server"
+slug: "kyverno-authz_serve_http_authz-server"
+description: "CLI reference for kyverno-authz serve http authz-server"
 ---
 
-## kyverno-envoy-plugin serve http authz-server
+## kyverno-authz serve http authz-server
 
 Start the Kyverno Authz Server
 
 ```
-kyverno-envoy-plugin serve http authz-server [flags]
+kyverno-authz serve http authz-server [flags]
 ```
 
 ### Options
@@ -55,5 +55,5 @@ kyverno-envoy-plugin serve http authz-server [flags]
 
 ### SEE ALSO
 
-* [kyverno-envoy-plugin serve http](kyverno-envoy-plugin_serve_http.md)	 - Run Kyverno HTTP servers
+* [kyverno-authz serve http](kyverno-authz_serve_http.md)	 - Run Kyverno HTTP servers
 

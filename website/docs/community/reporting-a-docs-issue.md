@@ -2,7 +2,7 @@
 
 The documentation includes extensive information on features, configurations, customizations, and more. If you have found an inconsistency or see room for improvement, please follow this guide to submit an issue on our [issue tracker].
 
-[issue tracker]: https://github.com/kyverno/kyverno-envoy-plugin/issues
+[issue tracker]: https://github.com/kyverno/kyverno-authz/issues
 
 ## Issue Template
 

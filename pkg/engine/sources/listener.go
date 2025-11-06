@@ -5,8 +5,8 @@ import (
 	"slices"
 	"sync"
 
-	controlplane "github.com/kyverno/kyverno-envoy-plugin/pkg/control-plane"
-	protov1alpha1 "github.com/kyverno/kyverno-envoy-plugin/pkg/control-plane/proto/v1alpha1"
+	controlplane "github.com/kyverno/kyverno-authz/pkg/control-plane"
+	protov1alpha1 "github.com/kyverno/kyverno-authz/pkg/control-plane/proto/v1alpha1"
 	"github.com/kyverno/kyverno/api/policies.kyverno.io/v1alpha1"
 	"golang.org/x/exp/maps"
 )

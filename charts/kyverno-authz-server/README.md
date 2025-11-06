@@ -12,16 +12,16 @@ A plugin to enforce kyverno policies with Envoy. This plugin allows applying Kyv
 
 ## Installing the Chart
 
-Add `kyverno-envoy-plugin` Helm repository:
+Add `kyverno-authz` Helm repository:
 
 ```shell
-helm repo add kyverno-json https://kyverno.github.io/kyverno-envoy-plugin/
+helm repo add kyverno-json https://kyverno.github.io/kyverno-authz/
 ```
 
 Install `kyverno-authz-server` Helm chart:
 
 ```shell
-helm install kyverno-authz-server --namespace kyverno --create-namespace kyverno-envoy-plugin/kyverno-authz-server
+helm install kyverno-authz-server --namespace kyverno --create-namespace kyverno-authz/kyverno-authz-server
 ```
 
 ## Values
@@ -66,7 +66,7 @@ helm install kyverno-authz-server --namespace kyverno --create-namespace kyverno
 | authzServer.pod.affinity | object | `{}` | Pod affinity constraints. |
 | authzServer.pod.nodeAffinity | object | `{}` | Node affinity constraints. |
 | authzServer.container.image.registry | string | `"ghcr.io"` | Image registry |
-| authzServer.container.image.repository | string | `"kyverno/kyverno-envoy-plugin"` | Image repository |
+| authzServer.container.image.repository | string | `"kyverno/kyverno-authz"` | Image repository |
 | authzServer.container.image.tag | string | `nil` | Image tag Defaults to appVersion in Chart.yaml if omitted |
 | authzServer.container.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy |
 | authzServer.container.resources.limits | object | `{"memory":"384Mi"}` | Pod resource limits |
@@ -103,7 +103,7 @@ helm install kyverno-authz-server --namespace kyverno --create-namespace kyverno
 | validatingWebhookConfiguration.pod.affinity | object | `{}` | Pod affinity constraints. |
 | validatingWebhookConfiguration.pod.nodeAffinity | object | `{}` | Node affinity constraints. |
 | validatingWebhookConfiguration.container.image.registry | string | `"ghcr.io"` | Image registry |
-| validatingWebhookConfiguration.container.image.repository | string | `"kyverno/kyverno-envoy-plugin"` | Image repository |
+| validatingWebhookConfiguration.container.image.repository | string | `"kyverno/kyverno-authz"` | Image repository |
 | validatingWebhookConfiguration.container.image.tag | string | `nil` | Image tag Defaults to appVersion in Chart.yaml if omitted |
 | validatingWebhookConfiguration.container.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy |
 | validatingWebhookConfiguration.container.resources.limits | object | `{"memory":"384Mi"}` | Pod resource limits |
@@ -117,7 +117,7 @@ helm install kyverno-authz-server --namespace kyverno --create-namespace kyverno
 
 ## Source Code
 
-* <https://github.com/kyverno/kyverno-envoy-plugin>
+* <https://github.com/kyverno/kyverno-authz>
 
 ## Requirements
 

@@ -3,7 +3,7 @@ package version
 import (
 	"fmt"
 
-	"github.com/kyverno/kyverno-envoy-plugin/pkg/version"
+	"github.com/kyverno/kyverno-authz/pkg/version"
 	"github.com/spf13/cobra"
 )
 

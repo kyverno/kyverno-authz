@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	httpcel "github.com/kyverno/kyverno-envoy-plugin/pkg/cel/libs/authz/http"
+	httpcel "github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/http"
 	"github.com/prometheus/client_golang/prometheus"
 	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 )

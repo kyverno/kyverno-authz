@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	mcpcel "github.com/kyverno/kyverno-envoy-plugin/pkg/cel/libs/mcp"
+	mcpcel "github.com/kyverno/kyverno-authz/pkg/cel/libs/mcp"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 

@@ -3,7 +3,7 @@ package sources
 import (
 	"context"
 
-	"github.com/kyverno/kyverno-envoy-plugin/sdk/core"
+	"github.com/kyverno/kyverno-authz/sdk/core"
 )
 
 // NewFlatten creates a new core.Source[DATA] that flattens a nested source of slices.

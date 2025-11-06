@@ -85,7 +85,7 @@ Now we can deploy the Kyverno Authz Server.
     helm install kyverno-authz-server                                             \
       --namespace kyverno --create-namespace                                      \
       --wait                                                                      \
-      --repo https://kyverno.github.io/kyverno-envoy-plugin kyverno-authz-server  \
+      --repo https://kyverno.github.io/kyverno-authz kyverno-authz-server  \
       --set config.type=envoy                                                     \
       --set-file validatingWebhookConfiguration.certificates.static.crt=tls.crt   \
       --set-file validatingWebhookConfiguration.certificates.static.key=tls.key
@@ -98,7 +98,7 @@ Now we can deploy the Kyverno Authz Server.
     helm install kyverno-authz-server                                             \
       --namespace kyverno --create-namespace                                      \
       --wait                                                                      \
-      --repo https://kyverno.github.io/kyverno-envoy-plugin kyverno-authz-server  \
+      --repo https://kyverno.github.io/kyverno-authz kyverno-authz-server  \
       --set config.type=http                                                      \
       --set-file validatingWebhookConfiguration.certificates.static.crt=tls.crt   \
       --set-file validatingWebhookConfiguration.certificates.static.key=tls.key
@@ -111,7 +111,7 @@ Now we can deploy the Kyverno Authz Server.
     helm install kyverno-authz-server                                                                 \
       --namespace kyverno --create-namespace                                                          \
       --wait                                                                                          \
-      --repo https://kyverno.github.io/kyverno-envoy-plugin kyverno-authz-server                      \
+      --repo https://kyverno.github.io/kyverno-authz kyverno-authz-server                      \
       --set config.type=envoy                                                                         \
       --set validatingWebhookConfiguration.certificates.certManager.issuerRef.group=cert-manager.io   \
       --set validatingWebhookConfiguration.certificates.certManager.issuerRef.kind=ClusterIssuer      \
@@ -125,7 +125,7 @@ Now we can deploy the Kyverno Authz Server.
     helm install kyverno-authz-server                                                                 \
       --namespace kyverno --create-namespace                                                          \
       --wait                                                                                          \
-      --repo https://kyverno.github.io/kyverno-envoy-plugin kyverno-authz-server                      \
+      --repo https://kyverno.github.io/kyverno-authz kyverno-authz-server                      \
       --set config.type=http                                                                          \
       --set validatingWebhookConfiguration.certificates.certManager.issuerRef.group=cert-manager.io   \
       --set validatingWebhookConfiguration.certificates.certManager.issuerRef.kind=ClusterIssuer      \

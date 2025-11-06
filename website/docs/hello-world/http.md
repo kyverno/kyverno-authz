@@ -50,7 +50,7 @@ docker run --rm                                                                 
     -v ${PWD}/quick-start.yaml/:/data/policies/quick-start.yaml                     \
     -e KUBECONFIG=/etc/kubeconfig/config                                            \
     -p 9083:9083                                                                    \
-    ghcr.io/kyverno/kyverno-envoy-plugin:a83ddce53efe0a35dfe239d3089bdefa19ca4f80   \
+    ghcr.io/kyverno/kyverno-authz:a83ddce53efe0a35dfe239d3089bdefa19ca4f80   \
     serve http authz-server --kube-policy-source=false                              \
     --external-policy-source file://data/policies
 ```

@@ -12,16 +12,16 @@ A plugin to enforce kyverno policies with Envoy. This plugin allows applying Kyv
 
 ## Installing the Chart
 
-Add `kyverno-envoy-plugin` Helm repository:
+Add `kyverno-authz` Helm repository:
 
 ```shell
-helm repo add kyverno-json https://kyverno.github.io/kyverno-envoy-plugin/
+helm repo add kyverno-json https://kyverno.github.io/kyverno-authz/
 ```
 
 Install `kyverno-sidecar-injector` Helm chart:
 
 ```shell
-helm install kyverno-sidecar-injector --namespace kyverno --create-namespace kyverno-envoy-plugin/kyverno-sidecar-injector
+helm install kyverno-sidecar-injector --namespace kyverno --create-namespace kyverno-authz/kyverno-sidecar-injector
 ```
 
 ## Values
@@ -53,7 +53,7 @@ helm install kyverno-sidecar-injector --namespace kyverno --create-namespace kyv
 | pod.affinity | object | `{}` | Pod affinity constraints. |
 | pod.nodeAffinity | object | `{}` | Node affinity constraints. |
 | containers.injector.image.registry | string | `"ghcr.io"` | Image registry |
-| containers.injector.image.repository | string | `"kyverno/kyverno-envoy-plugin"` | Image repository |
+| containers.injector.image.repository | string | `"kyverno/kyverno-authz"` | Image repository |
 | containers.injector.image.tag | string | `nil` | Image tag Defaults to appVersion in Chart.yaml if omitted |
 | containers.injector.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy |
 | containers.injector.resources.limits | object | `{"memory":"384Mi"}` | Pod resource limits |
@@ -74,7 +74,7 @@ helm install kyverno-sidecar-injector --namespace kyverno --create-namespace kyv
 | webhook.namespaceSelector | object | `{"matchExpressions":[{"key":"kyverno-injection","operator":"In","values":["enabled"]}]}` | Webhook namespace selector |
 | sidecar.name | string | `"kyverno-authz-server"` | Sidecar container name |
 | sidecar.image.registry | string | `"ghcr.io"` | Image registry |
-| sidecar.image.repository | string | `"kyverno/kyverno-envoy-plugin"` | Image repository |
+| sidecar.image.repository | string | `"kyverno/kyverno-authz"` | Image repository |
 | sidecar.image.tag | string | `nil` | Image tag Defaults to appVersion in Chart.yaml if omitted |
 | sidecar.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy |
 | sidecar.externalPolicySources | list | `[]` | External policy sources |
@@ -93,7 +93,7 @@ helm install kyverno-sidecar-injector --namespace kyverno --create-namespace kyv
 
 ## Source Code
 
-* <https://github.com/kyverno/kyverno-envoy-plugin>
+* <https://github.com/kyverno/kyverno-authz>
 
 ## Requirements
 

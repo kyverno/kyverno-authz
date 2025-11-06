@@ -114,7 +114,7 @@ containers:
       registry: ghcr.io
 
       # -- Image repository
-      repository: kyverno/kyverno-envoy-plugin
+      repository: kyverno/kyverno-authz
 
       # -- (string) Image tag
       # Defaults to appVersion in Chart.yaml if omitted

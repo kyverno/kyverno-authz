@@ -3,7 +3,7 @@ package impl
 import (
 	"encoding/json"
 
-	jsoncel "github.com/kyverno/kyverno-envoy-plugin/pkg/cel/libs/json"
+	jsoncel "github.com/kyverno/kyverno-authz/pkg/cel/libs/json"
 )
 
 type JsonImpl struct {

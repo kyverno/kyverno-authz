@@ -34,14 +34,14 @@ Invalid or non-policy documents are skipped. Compilation errors will make startu
 
 - Run the authz server with a local directory and without in-cluster policies:
 ```bash
-kyverno-envoy-plugin serve authz-server \
+kyverno-authz serve authz-server \
   --kube-policy-source=false \
   --external-policy-source=file:///policies
 ```
 
 - Run with multiple sources (a local mount and a git repo):
 ```bash
-kyverno-envoy-plugin serve authz-server \
+kyverno-authz serve authz-server \
   --external-policy-source=file:///policies/team-a \
   --external-policy-source=git+https://github.com/acme/policies.git
 ```

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package kyverno.http.v1alpha1;
 
-option go_package = "github.com/kyverno/kyverno-envoy-plugin/apis/proto/v1alpha1";
+option go_package = "github.com/kyverno/kyverno-authz/apis/proto/v1alpha1";
 
 import "google/protobuf/wrappers.proto";
 import "google/protobuf/timestamp.proto";

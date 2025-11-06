@@ -5,23 +5,23 @@ before:
     - go mod tidy
 
 builds:
-  - id: kyverno-envoy-plugin
+  - id: kyverno-authz
     env:
       - CGO_ENABLED=0
     goos:
       - linux
       - windows
       - darwin
-    binary: kyverno-envoy-plugin
+    binary: kyverno-authz
     flags:
       - -trimpath
     ldflags:
       - -s -w
 
 kos:
-  - build: kyverno-envoy-plugin
+  - build: kyverno-authz
     repositories:
-    - ghcr.io/kyverno/kyverno-envoy-plugin
+    - ghcr.io/kyverno/kyverno-authz
     tags:
       - '{{ .Tag }}'
       - '{{ if not .Prerelease }}latest{{ end }}' 
@@ -31,8 +31,8 @@ kos:
     platforms:
       - all
     labels:
-      org.opencontainers.image.source: https://github.com/kyverno/kyverno-envoy-plugin
-      org.opencontainers.image.description: Kyverno policies based authorization plugin for Envoy ❤️
+      org.opencontainers.image.source: https://github.com/kyverno/kyverno-authz
+      org.opencontainers.image.description: Kyverno policies based authorization ❤️
 
 signs:
   - cmd: cosign
