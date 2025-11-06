@@ -22,9 +22,9 @@ type PolicySender struct {
 	polMu                     *sync.Mutex
 	policies                  map[string]*protov1alpha1.ValidatingPolicy
 	currentVersion            int64
-	healthCheckMap            map[string]*clientStatus
+	healthCheckMap            map[string]time.Time
 	cxnMu                     *sync.Mutex
-	cxnsMap                   map[string]grpc.BidiStreamingServer[protov1alpha1.ValidatingPolicyStreamRequest, protov1alpha1.ValidatingPolicyStreamResponse]
+	cxnsMap                   map[string]*clientConn
 	ctx                       context.Context
 	initialSendPolicyWait     time.Duration // how long to wait before the second attempt of a failed policy send
 	maxSendPolicyInterval     time.Duration // the maximum duration to wait before stopping attempts of a policy send
@@ -45,8 +45,8 @@ func NewPolicySender(
 		ctx:                       ctx,
 		currentVersion:            1,
 		policies:                  make(map[string]*protov1alpha1.ValidatingPolicy),
-		healthCheckMap:            make(map[string]*clientStatus),
-		cxnsMap:                   make(map[string]grpc.BidiStreamingServer[protov1alpha1.ValidatingPolicyStreamRequest, protov1alpha1.ValidatingPolicyStreamResponse]),
+		healthCheckMap:            make(map[string]time.Time),
+		cxnsMap:                   make(map[string]*clientConn),
 		initialSendPolicyWait:     initialSendPolicyWait,
 		maxSendPolicyInterval:     maxSendPolicyInterval,
 		clientFlushInterval:       clientFlushInterval,
@@ -54,9 +54,16 @@ func NewPolicySender(
 	}
 }
 
-type clientStatus struct {
-	cancelFunc context.CancelFunc
-	lastSent   time.Time
+/*
+ * when a new policy comes, we spawn a sender per client,
+ * when the client sends a message with current version equal to the current version of the
+ */
+
+type clientConn struct {
+	cancelFunc       context.CancelFunc
+	lastAckedVersion int64
+	stream           grpc.BidiStreamingServer[protov1alpha1.ValidatingPolicyStreamRequest, protov1alpha1.ValidatingPolicyStreamResponse]
+	lastSent         time.Time
 }
 
 func (s *PolicySender) StartHealthCheckMonitor(ctx context.Context) {
@@ -76,19 +83,21 @@ func (s *PolicySender) SendPolicy(pol *protov1alpha1.ValidatingPolicy) {
 	wg.Add(len(s.cxnsMap))
 	s.currentVersion++
 	// send to clients, but don't wait on any of them
-	for _, state := range s.healthCheckMap {
+	for _, state := range s.cxnsMap {
 		if state.cancelFunc != nil {
 			state.cancelFunc() // stop all ongoing sync attempts
 		}
 	}
-	for _, stream := range s.cxnsMap {
+	for _, conn := range s.cxnsMap {
+		ctx, cancel := context.WithCancel(context.Background())
+		conn.cancelFunc = cancel
 		go func() {
 			defer wg.Done()
 			polResp := protov1alpha1.ValidatingPolicyStreamResponse{
 				CurrentVersion: s.currentVersion,
 				Policies:       utils.ToSortedSlice(s.policies),
 			}
-			errCh <- s.sendWithBackoff(stream, &polResp)
+			errCh <- s.sendWithBackoff(ctx, conn.stream, &polResp)
 		}()
 	}
 
@@ -185,38 +194,57 @@ func (s *PolicySender) ValidatingPoliciesStream(stream grpc.BidiStreamingServer[
 				return err
 			}
 			ctrl.LoggerFrom(nil).Info(fmt.Sprintf("Received validating policy stream request from: %s", req.ClientAddress))
-			go func() {
-				if req.CurrentVersion == s.currentVersion {
-					return
-				}
 
+			if conn, ok := s.cxnsMap[req.ClientAddress]; ok {
+				if req.CurrentVersion == s.currentVersion && conn.cancelFunc != nil {
+					conn.cancelFunc()
+					conn.cancelFunc = nil
+					continue
+				}
+			}
+
+			ctx, cancel := context.WithCancel(context.Background())
+			conn := &clientConn{stream: stream, lastAckedVersion: 0, cancelFunc: cancel}
+			s.cxnMu.Lock()
+			s.cxnsMap[req.ClientAddress] = conn
+			s.cxnMu.Unlock()
+
+			go func(conn *clientConn) {
 				polResp := protov1alpha1.ValidatingPolicyStreamResponse{
 					CurrentVersion: s.currentVersion,
 					Policies:       utils.ToSortedSlice(s.policies),
 				}
 
-				if err := s.sendWithBackoff(stream, &polResp); err != nil {
+				if err := s.sendWithBackoff(ctx, conn.stream, &polResp); err != nil {
 					ctrl.LoggerFrom(nil).Error(err, "Error sending policy with backoff")
 				}
-			}()
-			s.cxnMu.Lock()
-			s.cxnsMap[req.ClientAddress] = stream
-			s.cxnMu.Unlock()
+			}(conn)
 		}
 	}
 }
 
-func (s *PolicySender) sendWithBackoff(stream grpc.BidiStreamingServer[protov1alpha1.ValidatingPolicyStreamRequest, protov1alpha1.ValidatingPolicyStreamResponse], pol *protov1alpha1.ValidatingPolicyStreamResponse) error {
+func (s *PolicySender) sendWithBackoff(ctx context.Context, stream grpc.BidiStreamingServer[protov1alpha1.ValidatingPolicyStreamRequest, protov1alpha1.ValidatingPolicyStreamResponse], pol *protov1alpha1.ValidatingPolicyStreamResponse) error {
 	operation := func() error {
 		if err := stream.Send(pol); err != nil {
 			return err
 		}
 		return nil
 	}
+
+	notify := func(err error, next time.Duration) {
+		fmt.Printf("Error: %v (retrying in %s)\n", err, next)
+	}
+
 	b := backoff.NewExponentialBackOff()
 	b.InitialInterval = s.initialSendPolicyWait
 	b.MaxInterval = s.maxSendPolicyInterval
-	return backoff.Retry(operation, b)
+	b.MaxElapsedTime = 0
+	backoffCtx := backoff.WithContext(b, ctx)
+	return backoff.RetryNotify(
+		operation,
+		backoffCtx,
+		notify,
+	)
 }
 
 func (s *PolicySender) deleteInactive() {
@@ -232,12 +260,8 @@ func (s *PolicySender) deleteInactive() {
 
 func (s *PolicySender) getInactiveClients() []string {
 	clientsToDelete := []string{}
-	for c, status := range s.healthCheckMap {
-		if status.senderActive {
-			status.cancelFunc()
-		}
-
-		if elapsed := time.Since(status.lastSent); elapsed > s.maxClientInactiveDuration {
+	for c, t := range s.healthCheckMap {
+		if elapsed := time.Since(t); elapsed > s.maxClientInactiveDuration {
 			clientsToDelete = append(clientsToDelete, c)
 		}
 	}
