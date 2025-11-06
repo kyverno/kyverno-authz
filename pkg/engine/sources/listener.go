@@ -12,6 +12,7 @@ import (
 
 	"github.com/kyverno/kyverno/api/policies.kyverno.io/v1alpha1"
 	"golang.org/x/exp/maps"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 type listener struct {
@@ -36,7 +37,7 @@ func (p *listener) Process(req []*protov1alpha1.ValidatingPolicy) {
 		}
 		data, err := proto.Marshal(policy)
 		if err != nil {
-			// todo: handle this somehow ?
+			ctrl.LoggerFrom(nil).Error(err, "error marshaling the policy as proto")
 			continue
 		}
 

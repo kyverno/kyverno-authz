@@ -125,9 +125,7 @@ func Command() *cobra.Command {
 						policyListener := listener.NewPolicyListener(
 							controlPlaneAddr,
 							clientAddr,
-							[]listener.Processor{
-								sources.NewListener(v1alpha1.EvaluationModeHTTP),
-							},
+							sources.NewListener(v1alpha1.EvaluationModeHTTP),
 							controlPlaneReconnectWait,
 							controlPlaneMaxDialInterval,
 							healthCheckInterval,

@@ -24,7 +24,7 @@ type policyListener struct {
 	currentVersion              int64
 	client                      protov1alpha1.ValidatingPolicyServiceClient
 	conn                        *grpc.ClientConn
-	processors                  []Processor
+	processor                   Processor
 	connEstablished             bool
 	controlPlaneReconnectWait   time.Duration
 	controlPlaneMaxDialInterval time.Duration
@@ -35,13 +35,13 @@ type policyListener struct {
 func NewPolicyListener(
 	controlPlaneAddr string,
 	clientAddr string,
-	processors []Processor,
+	processor Processor,
 	controlPlaneReconnectWait,
 	controlPlaneMaxDialInterval,
 	healthCheckInterval time.Duration) *policyListener {
 	return &policyListener{
 		controlPlaneAddr:            controlPlaneAddr,
-		processors:                  processors,
+		processor:                   processor,
 		clientAddr:                  clientAddr,
 		controlPlaneReconnectWait:   controlPlaneReconnectWait,
 		controlPlaneMaxDialInterval: controlPlaneMaxDialInterval,
@@ -114,11 +114,9 @@ func (l *policyListener) InitialSync(ctx context.Context) error {
 	if req.CurrentVersion != l.currentVersion {
 		l.currentVersion = req.CurrentVersion
 	}
+	// wait for processing to be over in the initial sync, its fine if it errors
 	var wg sync.WaitGroup
-	wg.Add(len(l.processors))
-	for _, p := range l.processors {
-		go func() { defer wg.Done(); p.Process(req.Policies) }()
-	}
+	wg.Go(func() { l.processor.Process(req.Policies) })
 	wg.Wait()
 	ctrl.LoggerFrom(nil).Info("Policy listener has synced")
 	return nil
@@ -165,9 +163,7 @@ func (l *policyListener) listen(ctx context.Context) error {
 				}
 
 				ctrl.LoggerFrom(nil).Info(fmt.Sprintf("Received validating policy request with version: %d", req.CurrentVersion))
-				for _, p := range l.processors {
-					go func() { p.Process(req.Policies) }()
-				}
+				go func() { l.processor.Process(req.Policies) }()
 			}
 		}
 	})
