@@ -21,7 +21,7 @@ kyverno-authz serve http authz-server [flags]
       --control-plane-max-dial-interval duration   Duration to wait before stopping attempts of sending a policy to a client (default 8s)
       --control-plane-reconnect-wait duration      Duration to wait before retrying connecting to the control plane (default 3s)
       --external-policy-source stringArray         External policy sources
-      --health-check-interval duration             Interval for sending health checks (default 30s)
+      --health-check-interval duration             Interval for sending health checks (default 5s)
   -h, --help                                       help for authz-server
       --image-pull-secret stringArray              Image pull secrets
       --input-expression string                    CEL expression for transforming the incoming request

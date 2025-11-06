@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"github.com/google/go-containerregistry/pkg/name"
@@ -47,6 +48,10 @@ func Command() *cobra.Command {
 	var kubePolicySource bool
 	var imagePullSecrets []string
 	var allowInsecureRegistry bool
+	var controlPlaneAddr string
+	var controlPlaneReconnectWait time.Duration
+	var controlPlaneMaxDialInterval time.Duration
+	var healthCheckInterval time.Duration
 	command := &cobra.Command{
 		Use:   "authz-server",
 		Short: "Start the Kyverno Authz Server",
@@ -107,7 +112,7 @@ func Command() *cobra.Command {
 					}
 					envoyProvider := sdksources.NewComposite(extForEnvoy...)
 					// if kube policy source is enabled
-					if kubePolicySource {
+					if kubePolicySource && controlPlaneAddr == "" {
 						// create a controller manager
 						scheme := runtime.NewScheme()
 						if err := vpol.Install(scheme); err != nil {
@@ -176,6 +181,10 @@ func Command() *cobra.Command {
 	command.Flags().StringArrayVar(&imagePullSecrets, "image-pull-secret", nil, "Image pull secrets")
 	command.Flags().BoolVar(&allowInsecureRegistry, "allow-insecure-registry", false, "Allow insecure registry")
 	command.Flags().BoolVar(&kubePolicySource, "kube-policy-source", true, "Enable in-cluster kubernetes policy source")
+	command.Flags().DurationVar(&controlPlaneReconnectWait, "control-plane-reconnect-wait", 3*time.Second, "Duration to wait before retrying connecting to the control plane")
+	command.Flags().DurationVar(&controlPlaneMaxDialInterval, "control-plane-max-dial-interval", 8*time.Second, "Duration to wait before stopping attempts of sending a policy to a client")
+	command.Flags().DurationVar(&healthCheckInterval, "health-check-interval", 5*time.Second, "Interval for sending health checks")
+	command.Flags().StringVar(&controlPlaneAddr, "control-plane-address", "", "Control plane address")
 	clientcmd.BindOverrideFlags(&kubeConfigOverrides, command.Flags(), clientcmd.RecommendedConfigOverrideFlags("kube-"))
 
 	return command
