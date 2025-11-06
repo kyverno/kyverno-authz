@@ -122,6 +122,7 @@ func Command() *cobra.Command {
 						if clientAddr == "" {
 							panic("can't start auth server, no POD_IP has been passed")
 						}
+
 						policyListener := listener.NewPolicyListener(
 							controlPlaneAddr,
 							clientAddr,

@@ -11,8 +11,8 @@ import (
 
 func NewControlPlane[POLICY any](
 	compiler engine.Compiler[POLICY],
+	listener core.Source[*v1alpha1.ValidatingPolicy],
 ) (core.Source[POLICY], error) {
-	listener := NewListener("")
 	cache := sources.NewCache(
 		listener,
 		func(_ context.Context, in *v1alpha1.ValidatingPolicy) (string, error) {
