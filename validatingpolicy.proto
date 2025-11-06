@@ -82,8 +82,7 @@ message ValidatingPolicyStreamResponse {
 
 message HealthCheckRequest {
   string client_address = 1;
-  int64 current_version = 2;
-  google.protobuf.Timestamp time = 3;
+  google.protobuf.Timestamp time = 2;
 }
 
 message HealthCheckResponse {}

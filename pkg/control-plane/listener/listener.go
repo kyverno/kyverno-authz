@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cenkalti/backoff/v4"
 	protov1alpha1 "github.com/kyverno/kyverno-authz/pkg/control-plane/proto/v1alpha1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -51,12 +50,19 @@ func NewPolicyListener(
 }
 
 func (l *policyListener) Start(ctx context.Context) error {
-	b := backoff.NewExponentialBackOff()
-	b.InitialInterval = l.controlPlaneReconnectWait
-	b.MaxInterval = l.controlPlaneReconnectWait
-	bCtx := backoff.WithContext(b, ctx)
-	if err := backoff.Retry(l.dial, bCtx); err != nil {
-		return err
+loop:
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+			if err := l.dial(ctx); err != nil {
+				time.Sleep(time.Second * 2)
+				ctrl.LoggerFrom(nil).Error(err, "")
+				continue
+			}
+			break loop
+		}
 	}
 	go l.sendHealthChecks(ctx) // start sending health checks
 	if err := l.listen(ctx); err != nil {
@@ -65,7 +71,7 @@ func (l *policyListener) Start(ctx context.Context) error {
 	return nil
 }
 
-func (l *policyListener) dial() error {
+func (l *policyListener) dial(ctx context.Context) error {
 	ctrl.LoggerFrom(nil).Info(fmt.Sprintf("Connecting to control plane at %s", l.controlPlaneAddr))
 	l.connEstablished = false // set connection to false to mark a new connection
 	conn, err := grpc.NewClient(l.controlPlaneAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -75,7 +81,7 @@ func (l *policyListener) dial() error {
 
 	l.conn = conn
 	l.client = protov1alpha1.NewValidatingPolicyServiceClient(conn)
-	stream, err := l.client.ValidatingPoliciesStream(context.Background()) // doesn't matter which context we pass here because the context is being controller by the backoff
+	stream, err := l.client.ValidatingPoliciesStream(ctx)
 	if err != nil {
 		return err
 	}
@@ -84,13 +90,37 @@ func (l *policyListener) dial() error {
 }
 
 func (l *policyListener) InitialSync(ctx context.Context) error {
-	ctrl.LoggerFrom(nil).Info("Establishing validation channel...")
-	// Establish the stream
-	stream, err := l.client.ValidatingPoliciesStream(ctx)
-	if err != nil {
+	ctrl.LoggerFrom(nil).Info("Running initial policy sync...")
+	// Establish connection
+	if err := l.dial(ctx); err != nil {
+		return nil
+	}
+
+	if err := l.stream.Send(&protov1alpha1.ValidatingPolicyStreamRequest{ClientAddress: l.clientAddr}); err != nil {
+		ctrl.LoggerFrom(nil).Error(err, "Error sending initial sync request")
 		return err
 	}
-	l.stream = stream
+	req, err := l.stream.Recv()
+	if err == io.EOF {
+		ctrl.LoggerFrom(nil).Error(err, "Policy sender closed the stream")
+		return nil
+	}
+	if err != nil {
+		ctrl.LoggerFrom(nil).Error(err, "Error receiving initial policy request")
+		return err
+	}
+
+	ctrl.LoggerFrom(nil).Info(fmt.Sprintf("Received validating policy request with version: %d", req.CurrentVersion))
+	if req.CurrentVersion != l.currentVersion {
+		l.currentVersion = req.CurrentVersion
+	}
+	var wg sync.WaitGroup
+	wg.Add(len(l.processors))
+	for _, p := range l.processors {
+		go func() { defer wg.Done(); p.Process(req.Policies) }()
+	}
+	wg.Wait()
+	ctrl.LoggerFrom(nil).Info("Policy listener has synced")
 	return nil
 }
 
@@ -112,6 +142,7 @@ func (l *policyListener) listen(ctx context.Context) error {
 				}
 				return
 			default:
+				// guard against sending unnecessary messages to the control plane
 				if !l.connEstablished {
 					if err := l.stream.Send(&protov1alpha1.ValidatingPolicyStreamRequest{ClientAddress: l.clientAddr}); err != nil {
 						ctrl.LoggerFrom(nil).Error(err, "Error sending to stream")
@@ -128,16 +159,15 @@ func (l *policyListener) listen(ctx context.Context) error {
 					ctrl.LoggerFrom(nil).Error(err, "Error receiving policy request")
 					return
 				}
+				// request with no new data, do nothing
+				if req.CurrentVersion == l.currentVersion {
+					continue
+				}
 
 				ctrl.LoggerFrom(nil).Info(fmt.Sprintf("Received validating policy request with version: %d", req.CurrentVersion))
-				go func() {
-					for _, p := range l.processors {
-						p.Process(req.Policies)
-					}
-					if req.CurrentVersion != l.currentVersion {
-						l.currentVersion = req.CurrentVersion
-					}
-				}()
+				for _, p := range l.processors {
+					go func() { p.Process(req.Policies) }()
+				}
 			}
 		}
 	})
@@ -153,9 +183,8 @@ func (l *policyListener) sendHealthChecks(ctx context.Context) {
 			return
 		case <-time.After(l.healthCheckInterval):
 			if _, err := l.client.HealthCheck(ctx, &protov1alpha1.HealthCheckRequest{
-				ClientAddress:  l.clientAddr,
-				CurrentVersion: l.currentVersion,
-				Time:           timestamppb.Now()}); err != nil {
+				ClientAddress: l.clientAddr,
+				Time:          timestamppb.Now()}); err != nil {
 				ctrl.LoggerFrom(ctx).Error(err, "Health check failed")
 			}
 			continue

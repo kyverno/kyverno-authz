@@ -471,12 +471,11 @@ func (x *ValidatingPolicyStreamResponse) GetPolicies() []*ValidatingPolicy {
 }
 
 type HealthCheckRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	ClientAddress  string                 `protobuf:"bytes,1,opt,name=client_address,json=clientAddress,proto3" json:"client_address,omitempty"`
-	CurrentVersion int64                  `protobuf:"varint,2,opt,name=current_version,json=currentVersion,proto3" json:"current_version,omitempty"`
-	Time           *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=time,proto3" json:"time,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ClientAddress string                 `protobuf:"bytes,1,opt,name=client_address,json=clientAddress,proto3" json:"client_address,omitempty"`
+	Time          *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=time,proto3" json:"time,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *HealthCheckRequest) Reset() {
@@ -514,13 +513,6 @@ func (x *HealthCheckRequest) GetClientAddress() string {
 		return x.ClientAddress
 	}
 	return ""
-}
-
-func (x *HealthCheckRequest) GetCurrentVersion() int64 {
-	if x != nil {
-		return x.CurrentVersion
-	}
-	return 0
 }
 
 func (x *HealthCheckRequest) GetTime() *timestamppb.Timestamp {
@@ -611,15 +603,14 @@ const file_validatingpolicy_proto_rawDesc = "" +
 	"\x05nonce\x18\x03 \x01(\tR\x05nonce\"\x8e\x01\n" +
 	"\x1eValidatingPolicyStreamResponse\x12'\n" +
 	"\x0fcurrent_version\x18\x01 \x01(\x03R\x0ecurrentVersion\x12C\n" +
-	"\bpolicies\x18\x03 \x03(\v2'.kyverno.http.v1alpha1.ValidatingPolicyR\bpolicies\"\x94\x01\n" +
+	"\bpolicies\x18\x03 \x03(\v2'.kyverno.http.v1alpha1.ValidatingPolicyR\bpolicies\"k\n" +
 	"\x12HealthCheckRequest\x12%\n" +
-	"\x0eclient_address\x18\x01 \x01(\tR\rclientAddress\x12'\n" +
-	"\x0fcurrent_version\x18\x02 \x01(\x03R\x0ecurrentVersion\x12.\n" +
-	"\x04time\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x04time\"\x15\n" +
+	"\x0eclient_address\x18\x01 \x01(\tR\rclientAddress\x12.\n" +
+	"\x04time\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x04time\"\x15\n" +
 	"\x13HealthCheckResponse2\x8d\x02\n" +
 	"\x17ValidatingPolicyService\x12\x8b\x01\n" +
 	"\x18ValidatingPoliciesStream\x124.kyverno.http.v1alpha1.ValidatingPolicyStreamRequest\x1a5.kyverno.http.v1alpha1.ValidatingPolicyStreamResponse(\x010\x01\x12d\n" +
-	"\vHealthCheck\x12).kyverno.http.v1alpha1.HealthCheckRequest\x1a*.kyverno.http.v1alpha1.HealthCheckResponseB=Z;github.com/kyverno/kyverno-envoy-plugin/apis/proto/v1alpha1b\x06proto3"
+	"\vHealthCheck\x12).kyverno.http.v1alpha1.HealthCheckRequest\x1a*.kyverno.http.v1alpha1.HealthCheckResponseB6Z4github.com/kyverno/kyverno-authz/apis/proto/v1alpha1b\x06proto3"
 
 var (
 	file_validatingpolicy_proto_rawDescOnce sync.Once

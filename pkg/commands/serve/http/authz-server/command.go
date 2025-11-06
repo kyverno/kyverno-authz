@@ -127,12 +127,14 @@ func Command() *cobra.Command {
 							clientAddr,
 							[]listener.Processor{
 								sources.NewListener(v1alpha1.EvaluationModeHTTP),
-								sources.NewListener(v1alpha1.EvaluationModeEnvoy),
 							},
 							controlPlaneReconnectWait,
 							controlPlaneMaxDialInterval,
 							healthCheckInterval,
 						)
+						if err := policyListener.InitialSync(ctx); err != nil {
+							return err
+						}
 						group.StartWithContext(ctx, func(ctx context.Context) {
 							for {
 								select {
