@@ -54,11 +54,6 @@ func NewPolicySender(
 	}
 }
 
-/*
- * when a new policy comes, we spawn a sender per client,
- * when the client sends a message with current version equal to the current version of the
- */
-
 type clientConn struct {
 	cancelFunc context.CancelFunc
 	stream     grpc.BidiStreamingServer[protov1alpha1.ValidatingPolicyStreamRequest, protov1alpha1.ValidatingPolicyStreamResponse]
