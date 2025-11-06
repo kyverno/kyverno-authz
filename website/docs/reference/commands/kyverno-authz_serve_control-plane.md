@@ -15,7 +15,7 @@ kyverno-authz serve control-plane [flags]
 ### Options
 
 ```
-      --client-flush-interval duration          Interval for how often to remove dead client connections (default 3m0s)
+      --client-flush-interval duration          Interval for how often to remove dead client connections (default 15s)
       --grpc-address string                     Address to listen on (default ":9081")
       --grpc-network string                     Network to listen on (default "tcp")
   -h, --help                                    help for control-plane
@@ -41,7 +41,7 @@ kyverno-authz serve control-plane [flags]
       --kube-username string                    Username for basic authentication to the API server
       --leader-election                         Enable leader election
       --leader-election-id string               Leader election ID
-      --max-client-inactive-duration duration   Duration to wait before declaring a client as inactive (default 4m0s)
+      --max-client-inactive-duration duration   Duration to wait before declaring a client as inactive (default 10s)
       --max-send-interval duration              Duration to wait before stopping attempts of sending a policy to a client (default 10s)
       --metrics-address string                  Address to listen on for metrics (default ":9082")
       --probes-address string                   Address to listen on for health checks (default ":9080")
