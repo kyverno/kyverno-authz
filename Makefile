@@ -119,22 +119,6 @@ codegen-crds: $(REGISTER_GEN)
 	@rm -rf pkg/data/crds && mkdir -p pkg/data/crds
 	@cp $(CRDS_PATH)/policies.kyverno.io/* pkg/data/crds
 
-.PHONY: codegen-helm-crds
-codegen-helm-crds: codegen-crds ## Generate helm CRDs
-	@echo Generate helm crds... >&2
-	@cat $(CRDS_PATH)/authz.kyverno.io/* \
-		| $(SED) -e '1i{{- if .Values.crds.install }}' \
-		| $(SED) -e '$$a{{- end }}' \
-		| $(SED) -e '/^  annotations:/a \ \ \ \ {{- end }}' \
- 		| $(SED) -e '/^  annotations:/a \ \ \ \ {{- toYaml . | nindent 4 }}' \
-		| $(SED) -e '/^  annotations:/a \ \ \ \ {{- with .Values.crds.annotations }}' \
- 		| $(SED) -e '/^  annotations:/i \ \ labels:' \
-		| $(SED) -e '/^  labels:/a \ \ \ \ {{- end }}' \
- 		| $(SED) -e '/^  labels:/a \ \ \ \ {{- toYaml . | nindent 4 }}' \
-		| $(SED) -e '/^  labels:/a \ \ \ \ {{- with .Values.crds.labels }}' \
-		| $(SED) -e '/^  labels:/a \ \ \ \ {{- include "kyverno-authz-server.labels" . | nindent 4 }}' \
- 		> ./charts/kyverno-authz-server/templates/crds.yaml
-
 .PHONY: codegen-proto
 codegen-proto: ## Generate proto files
 codegen-proto: $(BUF)
@@ -160,6 +144,35 @@ codegen-cli-docs: ## Generate markdown CLI docs
 	@rm -rf ./website/docs/reference/commands
 	@go run ./website/commands -out ./website/docs/reference/commands -format markdown -frontmatter
 
+
+.PHONY: codegen-envoy-docs
+codegen-envoy-docs: ## Generate markdown docs for envoy authz-server command
+	@echo Generate envoy docs... >&2
+	@rm -f ./website/docs/server/envoy/commands.md
+	@go run ./website/commands -out ./website/docs/server/envoy -format markdown -frontmatter -command "serve envoy authz-server" -output-file commands.md
+	@$(SED) -i '/^### SEE ALSO/,$$d' ./website/docs/server/envoy/commands.md
+
+.PHONY: codegen-envoy-webhook-docs
+codegen-envoy-webhook-docs: ## Generate markdown docs for envoy validation-webhook command
+	@echo Generate envoy webhook docs... >&2
+	@rm -f ./website/docs/server/envoy/kyverno-authz_serve_envoy_validation-webhook.md
+	@go run ./website/commands -out ./website/docs/server/envoy -format markdown -frontmatter -command "serve envoy validation-webhook" -output-file webhook.md
+	@$(SED) -i '/^### SEE ALSO/,$$d' ./website/docs/server/envoy/webhook.md
+
+.PHONY: codegen-http-docs
+codegen-http-docs: ## Generate markdown docs for http authz-server command
+	@echo Generate http docs... >&2
+	@rm -f ./website/docs/server/http/commands.md
+	@go run ./website/commands -out ./website/docs/server/http -format markdown -frontmatter -command "serve http authz-server" -output-file commands.md
+	@$(SED) -i '/^### SEE ALSO/,$$d' ./website/docs/server/http/commands.md
+
+.PHONY: codegen-http-webhook-docs
+codegen-http-webhook-docs: ## Generate markdown docs for http validation-webhook command
+	@echo Generate http webhook docs... >&2
+	@rm -f ./website/docs/server/http/kyverno-authz_serve_http_validation-webhook.md
+	@go run ./website/commands -out ./website/docs/server/http -format markdown -frontmatter -command "serve http validation-webhook" -output-file webhook.md
+	@$(SED) -i '/^### SEE ALSO/,$$d' ./website/docs/server/http/webhook.md
+
 .PHONY: codegen-mkdocs
 codegen-mkdocs: ## Generate mkdocs website
 codegen-mkdocs: codegen-api-docs
@@ -168,45 +181,17 @@ codegen-mkdocs: codegen-cli-docs
 	@$(PIP) install -r requirements.txt
 	@mkdocs build -f ./website/mkdocs.yaml
 
-.PHONY: codegen-schemas-openapi
-codegen-schemas-openapi: ## Generate openapi schemas (v2 and v3)
-codegen-schemas-openapi: CURRENT_CONTEXT = $(shell kubectl config current-context)
-codegen-schemas-openapi: codegen-crds
-codegen-schemas-openapi: $(KIND)
-	@echo Generate openapi schema... >&2
-	@rm -rf ./.temp/.schemas
-	@mkdir -p ./.temp/.schemas/openapi/v2
-	@mkdir -p ./.temp/.schemas/openapi/v3/apis/authz.kyverno.io
-	@$(KIND) create cluster --name schema --image $(KIND_IMAGE)
-	@kubectl create -f $(CRDS_PATH)/authz.kyverno.io
-	@sleep 15
-	@kubectl get --raw /openapi/v2 > ./.temp/.schemas/openapi/v2/schema.json
-	@kubectl get --raw /openapi/v3/apis/authz.kyverno.io/v1alpha1 > ./.temp/.schemas/openapi/v3/apis/authz.kyverno.io/v1alpha1.json
-	@$(KIND) delete cluster --name schema
-	@kubectl config use-context $(CURRENT_CONTEXT) || true
-
-.PHONY: codegen-schemas-json
-codegen-schemas-json: ## Generate json schemas
-codegen-schemas-json: codegen-schemas-openapi
-	@echo Generate json schema... >&2
-	@$(PIP) install -r requirements.txt
-	@rm -rf ./.temp/.schemas/json
-	@rm -rf ./.schemas/json
-	@openapi2jsonschema .temp/.schemas/openapi/v3/apis/authz.kyverno.io/v1alpha1.json --kubernetes --strict --stand-alone --expanded -o ./.temp/.schemas/json
-	@mkdir -p ./.schemas/json
-	@cp ./.temp/.schemas/json/authorizationserver-authz-*.json ./.schemas/json
-
 .PHONY: codegen
 codegen: ## Rebuild all generated code and docs
 codegen: codegen-crds
-codegen: codegen-helm-crds
 codegen: codegen-proto
 codegen: codegen-helm-docs
-codegen: codegen-api-docs
 codegen: codegen-cli-docs
 codegen: codegen-mkdocs
-codegen: codegen-schemas-openapi
-codegen: codegen-schemas-json
+codegen: codegen-envoy-docs
+codegen: codegen-envoy-webhook-docs
+codegen: codegen-http-docs
+codegen: codegen-http-webhook-docs
 
 .PHONY: verify-codegen
 verify-codegen: ## Verify all generated code and docs are up to date
