@@ -51,7 +51,6 @@ func Command() *cobra.Command {
 	var allowInsecureRegistry bool
 	var controlPlaneAddr string
 	var controlPlaneReconnectWait time.Duration
-	var controlPlaneMaxDialInterval time.Duration
 	var healthCheckInterval time.Duration
 	command := &cobra.Command{
 		Use:   "authz-server",
@@ -122,7 +121,6 @@ func Command() *cobra.Command {
 							clientAddr,
 							sources.NewListener(v1alpha1.EvaluationModeEnvoy),
 							controlPlaneReconnectWait,
-							controlPlaneMaxDialInterval,
 							healthCheckInterval,
 						)
 						if err := policyListener.InitialSync(ctx); err != nil {
@@ -214,9 +212,6 @@ func Command() *cobra.Command {
 	command.Flags().StringArrayVar(&imagePullSecrets, "image-pull-secret", nil, "Image pull secrets")
 	command.Flags().BoolVar(&allowInsecureRegistry, "allow-insecure-registry", false, "Allow insecure registry")
 	command.Flags().BoolVar(&kubePolicySource, "kube-policy-source", true, "Enable in-cluster kubernetes policy source")
-	command.Flags().DurationVar(&controlPlaneReconnectWait, "control-plane-reconnect-wait", 3*time.Second, "Duration to wait before retrying connecting to the control plane")
-	command.Flags().DurationVar(&controlPlaneMaxDialInterval, "control-plane-max-dial-interval", 8*time.Second, "Duration to wait before stopping attempts of sending a policy to a client")
-	command.Flags().DurationVar(&healthCheckInterval, "health-check-interval", 5*time.Second, "Interval for sending health checks")
 	command.Flags().StringVar(&controlPlaneAddr, "control-plane-address", "", "Control plane address")
 	clientcmd.BindOverrideFlags(&kubeConfigOverrides, command.Flags(), clientcmd.RecommendedConfigOverrideFlags("kube-"))
 

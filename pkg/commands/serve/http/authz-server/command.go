@@ -50,7 +50,6 @@ func Command() *cobra.Command {
 	var allowInsecureRegistry bool
 	var controlPlaneAddr string
 	var controlPlaneReconnectWait time.Duration
-	var controlPlaneMaxDialInterval time.Duration
 	var healthCheckInterval time.Duration
 	var nestedRequest bool
 	var certFile string
@@ -128,19 +127,20 @@ func Command() *cobra.Command {
 							clientAddr,
 							sources.NewListener(v1alpha1.EvaluationModeHTTP),
 							controlPlaneReconnectWait,
-							controlPlaneMaxDialInterval,
 							healthCheckInterval,
 						)
 						if err := policyListener.InitialSync(ctx); err != nil {
 							return err
 						}
-						group.StartWithContext(ctx, func(ctx context.Context) {
+						group.Start(func() {
 							for {
+								ctx, cancel := context.WithCancel(context.Background())
 								select {
 								case <-ctx.Done():
 									return
 								default:
 									if connErr = policyListener.Start(ctx); connErr != nil {
+										cancel()
 										ctrl.LoggerFrom(ctx).Error(connErr, "error connecting to the control plane, sleeping 10 seconds then retrying")
 										time.Sleep(time.Second * 10)
 									}
@@ -223,7 +223,6 @@ func Command() *cobra.Command {
 	command.Flags().StringVar(&serverAddress, "server-address", ":9083", "Address to serve the http authorization server on")
 	command.Flags().BoolVar(&nestedRequest, "nested-request", false, "Expect the requests to validate to be in the body of the original request")
 	command.Flags().DurationVar(&controlPlaneReconnectWait, "control-plane-reconnect-wait", 3*time.Second, "Duration to wait before retrying connecting to the control plane")
-	command.Flags().DurationVar(&controlPlaneMaxDialInterval, "control-plane-max-dial-interval", 8*time.Second, "Duration to wait before stopping attempts of sending a policy to a client")
 	command.Flags().DurationVar(&healthCheckInterval, "health-check-interval", 5*time.Second, "Interval for sending health checks")
 	command.Flags().StringVar(&controlPlaneAddr, "control-plane-address", "", "Control plane address")
 	command.Flags().StringVar(&inputExpression, "input-expression", "", "CEL expression for transforming the incoming request")

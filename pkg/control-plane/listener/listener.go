@@ -9,6 +9,7 @@ import (
 
 	protov1alpha1 "github.com/kyverno/kyverno-authz/pkg/control-plane/proto/v1alpha1"
 	"google.golang.org/grpc"
+	grpcbackoff "google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -19,17 +20,16 @@ type Processor interface {
 }
 
 type policyListener struct {
-	controlPlaneAddr            string
-	clientAddr                  string
-	currentVersion              int64
-	client                      protov1alpha1.ValidatingPolicyServiceClient
-	conn                        *grpc.ClientConn
-	processor                   Processor
-	connEstablished             bool
-	controlPlaneReconnectWait   time.Duration
-	controlPlaneMaxDialInterval time.Duration
-	healthCheckInterval         time.Duration
-	stream                      grpc.BidiStreamingClient[protov1alpha1.ValidatingPolicyStreamRequest, protov1alpha1.ValidatingPolicyStreamResponse]
+	controlPlaneAddr          string
+	clientAddr                string
+	currentVersion            int64
+	client                    protov1alpha1.ValidatingPolicyServiceClient
+	conn                      *grpc.ClientConn
+	processor                 Processor
+	connEstablished           bool
+	controlPlaneReconnectWait time.Duration
+	healthCheckInterval       time.Duration
+	stream                    grpc.BidiStreamingClient[protov1alpha1.ValidatingPolicyStreamRequest, protov1alpha1.ValidatingPolicyStreamResponse]
 }
 
 func NewPolicyListener(
@@ -37,15 +37,13 @@ func NewPolicyListener(
 	clientAddr string,
 	processor Processor,
 	controlPlaneReconnectWait,
-	controlPlaneMaxDialInterval,
 	healthCheckInterval time.Duration) *policyListener {
 	return &policyListener{
-		controlPlaneAddr:            controlPlaneAddr,
-		processor:                   processor,
-		clientAddr:                  clientAddr,
-		controlPlaneReconnectWait:   controlPlaneReconnectWait,
-		controlPlaneMaxDialInterval: controlPlaneMaxDialInterval,
-		healthCheckInterval:         healthCheckInterval,
+		controlPlaneAddr:          controlPlaneAddr,
+		processor:                 processor,
+		clientAddr:                clientAddr,
+		controlPlaneReconnectWait: controlPlaneReconnectWait,
+		healthCheckInterval:       healthCheckInterval,
 	}
 }
 
@@ -57,7 +55,7 @@ loop:
 			return nil
 		default:
 			if err := l.dial(ctx); err != nil {
-				time.Sleep(time.Second * 2)
+				time.Sleep(l.controlPlaneReconnectWait)
 				ctrl.LoggerFrom(nil).Error(err, "")
 				continue
 			}
@@ -72,20 +70,34 @@ loop:
 }
 
 func (l *policyListener) dial(ctx context.Context) error {
-	ctrl.LoggerFrom(nil).Info(fmt.Sprintf("Connecting to control plane at %s", l.controlPlaneAddr))
-	l.connEstablished = false // set connection to false to mark a new connection
-	conn, err := grpc.NewClient(l.controlPlaneAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		return err
-	}
+	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("Connecting to control plane at %s", l.controlPlaneAddr))
+	l.connEstablished = false // mark new connection
+
+	// Block until either connected or context cancelled
+	conn, err := grpc.NewClient(
+		l.controlPlaneAddr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+
+		grpc.WithConnectParams(grpc.ConnectParams{
+			Backoff: grpcbackoff.Config{
+				BaseDelay:  0,
+				Multiplier: 1.0,
+				MaxDelay:   0,
+			},
+		}),
+	)
 
 	l.conn = conn
 	l.client = protov1alpha1.NewValidatingPolicyServiceClient(conn)
+
 	stream, err := l.client.ValidatingPoliciesStream(ctx)
 	if err != nil {
-		return err
+		conn.Close() // close connection if stream creation fails
+		return fmt.Errorf("failed to open policy stream: %w", err)
 	}
+
 	l.stream = stream
+	l.connEstablished = true
 	return nil
 }
 
