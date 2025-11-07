@@ -86,13 +86,18 @@ func (l *policyListener) dial(ctx context.Context) error {
 			},
 		}),
 	)
+	if err != nil {
+		return fmt.Errorf("failed to create grpc client: %w", err)
+	}
 
 	l.conn = conn
 	l.client = protov1alpha1.NewValidatingPolicyServiceClient(conn)
 
 	stream, err := l.client.ValidatingPoliciesStream(ctx)
 	if err != nil {
-		conn.Close() // close connection if stream creation fails
+		if closeErr := conn.Close(); closeErr != nil {
+			return fmt.Errorf("failed to open policy stream: %w (close error: %v)", err, closeErr)
+		}
 		return fmt.Errorf("failed to open policy stream: %w", err)
 	}
 

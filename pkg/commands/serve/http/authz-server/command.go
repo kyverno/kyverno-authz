@@ -135,17 +135,14 @@ func Command() *cobra.Command {
 						group.Start(func() {
 							for {
 								ctx, cancel := context.WithCancel(context.Background())
-								select {
-								case <-ctx.Done():
-									return
-								default:
-									if connErr = policyListener.Start(ctx); connErr != nil {
-										cancel()
-										ctrl.LoggerFrom(ctx).Error(connErr, "error connecting to the control plane, sleeping 10 seconds then retrying")
-										time.Sleep(time.Second * 10)
-									}
+								if connErr = policyListener.Start(ctx); connErr != nil {
+									cancel()
+									ctrl.LoggerFrom(ctx).Error(connErr, "error connecting to the control plane, sleeping 10 seconds then retrying")
+									time.Sleep(time.Second * 10)
 									continue
 								}
+								cancel()
+								return
 							}
 						})
 					}
