@@ -21,7 +21,9 @@ Kyverno Envoy plugin installation and reference documents are available [here](h
 
 👉 **[Quick Start](https://kyverno.github.io/kyverno-authz/latest/quick-start/)**
 
-👉 **[Installation](https://kyverno.github.io/kyverno-authz/latest/quick-start/authz-server/)**
+👉 **[Kubernetes Installation](https://kyverno.github.io/kyverno-authz/latest/quick-start/kube-install/)**
+
+👉 **[Local Installation](https://kyverno.github.io/kyverno-authz/latest/quick-start/local-install/)**
 
 ## RoadMap
 
