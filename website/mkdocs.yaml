@@ -52,7 +52,6 @@ nav:
   - reference/json-schemas.md
   - APIs:
     - policies.kyverno.io/v1alpha1: reference/apis/policies.kyverno.io.v1alpha1.md
-    - authz.kyverno.io/v1alpha1: reference/apis/authz.kyverno.io.v1alpha1.md
   - Command Line:
     - reference/commands/kyverno-authz.md
     - reference/commands/kyverno-authz_completion.md
@@ -60,7 +59,6 @@ nav:
     - reference/commands/kyverno-authz_completion_fish.md
     - reference/commands/kyverno-authz_completion_powershell.md
     - reference/commands/kyverno-authz_completion_zsh.md
-    - reference/commands/kyverno-authz_run.md
     - reference/commands/kyverno-authz_serve.md
     - reference/commands/kyverno-authz_serve_control-plane.md
     - reference/commands/kyverno-authz_serve_envoy.md
