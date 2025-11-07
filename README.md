@@ -1,23 +1,22 @@
 # kyverno-authz
 
-A flexible authorization service that enforces Kyverno policies for **Envoy proxies** and **plain HTTP services**. This plugin enables you to apply Kyverno's powerful policy engine to secure and control access to your APIs and services.
+A flexible authorization service that enforces Kyverno policies for **Envoy proxies** and **plain HTTP services**. This authz server enables you to apply Kyverno's powerful policy engine to secure and control access to your APIs and services.
 
 ## Overview 
 
-The Kyverno Envoy plugin provides authorization capabilities in two modes:
+The Kyverno Authz Server provides authorization capabilities in two modes:
 
 ### 🔌 Envoy Integration
 Integrates with [Envoy](https://www.envoyproxy.io/docs/envoy/latest/intro/what_is_envoy)'s [External Authorization filter](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/ext_authz_filter.html) (v1.7.0+) to make authorization decisions based on Kyverno policies. Perfect for service mesh architectures and API gateway deployments.
 
 ### 🌐 HTTP Authorization Server
-Works as a standalone HTTP authorization server that can protect any HTTP service. Your application forwards authorization requests to the plugin, which evaluates them against Kyverno policies and returns allow/deny decisions.
+Works as a standalone HTTP authorization server that can protect any HTTP service. Your application forwards authorization requests to the authz server, which evaluates them against Kyverno policies and returns allow/deny decisions.
 
 **WARNING: ⚠️ kyverno-authz is in development stage.**
 
-
 ## 📙 Documentation
 
-Kyverno Envoy plugin installation and reference documents are available [here](https://kyverno.github.io/kyverno-authz)
+Installation and reference documents are available [here](https://kyverno.github.io/kyverno-authz)
 
 👉 **[Quick Start](https://kyverno.github.io/kyverno-authz/latest/quick-start/)**
 
