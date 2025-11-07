@@ -70,13 +70,13 @@ For more certificate management options, refer to [Certificates management](../.
 
 ```bash
 # deploy the kyverno authz server
-helm install kyverno-authz-server                                             \
-  --namespace kyverno --create-namespace                                      \
-  --wait                                                                      \
-  --repo https://kyverno.github.io/kyverno-envoy-plugin kyverno-authz-server  \
-  --set config.type=http                                                      \
-  --set certManager.issuerRef.name=selfsigned-issuer \
-  --set certManager.issuerRef.kind=ClusterIssuer \
+helm install kyverno-authz-server                                       \
+  --namespace kyverno --create-namespace                                \
+  --wait                                                                \
+  --repo https://kyverno.github.io/kyverno-authz kyverno-authz-server   \
+  --set config.type=http                                                \
+  --set certManager.issuerRef.name=selfsigned-issuer                    \
+  --set certManager.issuerRef.kind=ClusterIssuer                        \
   --set certManager.issuerRef.group=cert-manager.io
 ```
 

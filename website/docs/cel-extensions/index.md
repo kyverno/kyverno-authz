@@ -2,7 +2,7 @@
 
 The CEL engine used to evaluate variables and authorization rules has been extended with libraries to help processing the input `CheckRequest` and forge the corresponding `OkResponse` and/or `DeniedResponse`.
 
-## Authorization plugin libraries
+## Kyverno Authz libraries
 
 - [Envoy](./envoy.md)
 - [HTTP](./http.md)

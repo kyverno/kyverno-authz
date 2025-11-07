@@ -1,6 +1,6 @@
 # JSON schemas
 
-JSON schemas for the Kyverno Envoy Plugin are available:
+JSON schemas for the Kyverno Authz Server are available:
 
 - [ValidatingPolicy (v1alpha1)](https://raw.githubusercontent.com/kyverno/playground/main/schemas/json/v3/validatingpolicy-policies.kyverno.io-v1alpha1.json)
 
