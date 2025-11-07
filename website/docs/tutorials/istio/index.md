@@ -90,7 +90,7 @@ spec:
 EOF
 ```
 
-For more certificate management options, refer to [Certificates management](../../install/certificates.md).
+For more certificate management options, refer to [Certificates management](../../quick-start/kube-install.md#certificates-management).
 
 ### Deploy the Kyverno Authz Server
 
