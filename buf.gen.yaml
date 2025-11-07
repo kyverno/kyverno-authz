@@ -1,8 +1,0 @@
-version: v1
-plugins:
-  - plugin: buf.build/protocolbuffers/go
-    out: pkg/control-plane/proto/v1alpha1
-    opt: paths=source_relative
-  - plugin: buf.build/grpc/go
-    out: pkg/control-plane/proto/v1alpha1
-    opt: paths=source_relative
