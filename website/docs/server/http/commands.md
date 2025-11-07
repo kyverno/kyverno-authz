@@ -43,7 +43,7 @@ kyverno-authz serve http authz-server [flags]
       --kube-username string                 Username for basic authentication to the API server
       --metrics-address string               Address to listen on for metrics (default ":9082")
       --nested-request                       Expect the requests to validate to be in the body of the original request
-      --probes-address string                Address to listen on for health checks (default ":9080")
-      --server-address string                Address to serve the http authorization server on (default ":9083")
+      --probes-address string                Address to listen on for health checks
+      --server-address string                Address to serve the http authorization server on (default ":9081")
 ```
 
