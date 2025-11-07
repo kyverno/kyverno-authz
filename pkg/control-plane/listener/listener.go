@@ -7,56 +7,60 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cenkalti/backoff/v4"
 	protov1alpha1 "github.com/kyverno/kyverno-authz/pkg/control-plane/proto/v1alpha1"
-	vpol "github.com/kyverno/kyverno/api/policies.kyverno.io/v1alpha1"
 	"google.golang.org/grpc"
+	grpcbackoff "google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 type Processor interface {
-	Process(req *protov1alpha1.ValidatingPolicy)
+	Process(policies []*protov1alpha1.ValidatingPolicy)
 }
 
 type policyListener struct {
-	controlPlaneAddr            string
-	clientAddr                  string
-	client                      protov1alpha1.ValidatingPolicyServiceClient
-	conn                        *grpc.ClientConn
-	processors                  map[vpol.EvaluationMode]Processor
-	connEstablished             bool
-	controlPlaneReconnectWait   time.Duration
-	controlPlaneMaxDialInterval time.Duration
-	healthCheckInterval         time.Duration
+	controlPlaneAddr          string
+	clientAddr                string
+	currentVersion            int64
+	client                    protov1alpha1.ValidatingPolicyServiceClient
+	conn                      *grpc.ClientConn
+	processor                 Processor
+	connEstablished           bool
+	controlPlaneReconnectWait time.Duration
+	healthCheckInterval       time.Duration
+	stream                    grpc.BidiStreamingClient[protov1alpha1.ValidatingPolicyStreamRequest, protov1alpha1.ValidatingPolicyStreamResponse]
 }
 
-// can two storage entities share the underlying connection of the policy listener?
-// store the normal policies and have it message
 func NewPolicyListener(
 	controlPlaneAddr string,
 	clientAddr string,
-	processors map[vpol.EvaluationMode]Processor,
+	processor Processor,
 	controlPlaneReconnectWait,
-	controlPlaneMaxDialInterval,
 	healthCheckInterval time.Duration) *policyListener {
 	return &policyListener{
-		controlPlaneAddr:            controlPlaneAddr,
-		processors:                  processors,
-		clientAddr:                  clientAddr,
-		controlPlaneReconnectWait:   controlPlaneReconnectWait,
-		controlPlaneMaxDialInterval: controlPlaneMaxDialInterval,
-		healthCheckInterval:         healthCheckInterval,
+		controlPlaneAddr:          controlPlaneAddr,
+		processor:                 processor,
+		clientAddr:                clientAddr,
+		controlPlaneReconnectWait: controlPlaneReconnectWait,
+		healthCheckInterval:       healthCheckInterval,
 	}
 }
 
 func (l *policyListener) Start(ctx context.Context) error {
-	b := backoff.NewExponentialBackOff()
-	b.InitialInterval = l.controlPlaneReconnectWait
-	b.MaxInterval = l.controlPlaneReconnectWait
-	if err := backoff.Retry(l.dial, b); err != nil {
-		return err
+loop:
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+			if err := l.dial(ctx); err != nil {
+				time.Sleep(l.controlPlaneReconnectWait)
+				ctrl.LoggerFrom(nil).Error(err, "")
+				continue
+			}
+			break loop
+		}
 	}
 	go l.sendHealthChecks(ctx) // start sending health checks
 	if err := l.listen(ctx); err != nil {
@@ -65,37 +69,84 @@ func (l *policyListener) Start(ctx context.Context) error {
 	return nil
 }
 
-func (l *policyListener) dial() error {
-	ctrl.LoggerFrom(nil).Info(fmt.Sprintf("Connecting to control plane at %s", l.controlPlaneAddr))
-	l.connEstablished = false // set connection to false to mark a new connection
-	conn, err := grpc.NewClient(l.controlPlaneAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+func (l *policyListener) dial(ctx context.Context) error {
+	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("Connecting to control plane at %s", l.controlPlaneAddr))
+	l.connEstablished = false // mark new connection
+
+	// Block until either connected or context cancelled
+	conn, err := grpc.NewClient(
+		l.controlPlaneAddr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+
+		grpc.WithConnectParams(grpc.ConnectParams{
+			Backoff: grpcbackoff.Config{
+				BaseDelay:  0,
+				Multiplier: 1.0,
+				MaxDelay:   0,
+			},
+		}),
+	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create grpc client: %w", err)
 	}
 
 	l.conn = conn
 	l.client = protov1alpha1.NewValidatingPolicyServiceClient(conn)
+
+	stream, err := l.client.ValidatingPoliciesStream(ctx)
+	if err != nil {
+		if closeErr := conn.Close(); closeErr != nil {
+			return fmt.Errorf("failed to open policy stream: %w (close error: %v)", err, closeErr)
+		}
+		return fmt.Errorf("failed to open policy stream: %w", err)
+	}
+
+	l.stream = stream
+	l.connEstablished = true
+	return nil
+}
+
+func (l *policyListener) InitialSync(ctx context.Context) error {
+	ctrl.LoggerFrom(nil).Info("Running initial policy sync...")
+	// Establish connection
+	if err := l.dial(ctx); err != nil {
+		return nil
+	}
+
+	if err := l.stream.Send(&protov1alpha1.ValidatingPolicyStreamRequest{ClientAddress: l.clientAddr}); err != nil {
+		ctrl.LoggerFrom(nil).Error(err, "Error sending initial sync request")
+		return err
+	}
+	req, err := l.stream.Recv()
+	if err == io.EOF {
+		ctrl.LoggerFrom(nil).Error(err, "Policy sender closed the stream")
+		return nil
+	}
+	if err != nil {
+		ctrl.LoggerFrom(nil).Error(err, "Error receiving initial policy request")
+		return err
+	}
+
+	ctrl.LoggerFrom(nil).Info(fmt.Sprintf("Received validating policy request with version: %d", req.CurrentVersion))
+	if req.CurrentVersion != l.currentVersion {
+		l.currentVersion = req.CurrentVersion
+	}
+	// wait for processing to be over in the initial sync, its fine if it errors
+	var wg sync.WaitGroup
+	wg.Go(func() { l.processor.Process(req.Policies) })
+	wg.Wait()
+	ctrl.LoggerFrom(nil).Info("Policy listener has synced")
 	return nil
 }
 
 func (l *policyListener) listen(ctx context.Context) error {
-	ctrl.LoggerFrom(nil).Info("Establishing validation channel...")
-
-	// Establish the stream
-	stream, err := l.client.ValidatingPoliciesStream(ctx)
-	if err != nil {
-		return err
-	}
-
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for {
 			select {
 			case <-ctx.Done():
 				ctrl.LoggerFrom(nil).Info("Stopping policy listener due to context cancellation")
-				if err := stream.CloseSend(); err != nil {
+				if err := l.stream.CloseSend(); err != nil {
 					ctrl.LoggerFrom(nil).Error(err, "Error closing stream")
 				}
 
@@ -106,14 +157,15 @@ func (l *policyListener) listen(ctx context.Context) error {
 				}
 				return
 			default:
+				// guard against sending unnecessary messages to the control plane
 				if !l.connEstablished {
-					if err := stream.Send(&protov1alpha1.ValidatingPolicyStreamRequest{ClientAddress: l.clientAddr}); err != nil {
+					if err := l.stream.Send(&protov1alpha1.ValidatingPolicyStreamRequest{ClientAddress: l.clientAddr}); err != nil {
 						ctrl.LoggerFrom(nil).Error(err, "Error sending to stream")
 						return
 					}
 					l.connEstablished = true
 				}
-				req, err := stream.Recv()
+				req, err := l.stream.Recv()
 				if err == io.EOF {
 					ctrl.LoggerFrom(nil).Error(err, "Policy sender closed the stream")
 					return
@@ -122,24 +174,16 @@ func (l *policyListener) listen(ctx context.Context) error {
 					ctrl.LoggerFrom(nil).Error(err, "Error receiving policy request")
 					return
 				}
+				// request with no new data, do nothing
+				if req.CurrentVersion == l.currentVersion {
+					continue
+				}
 
-				ctrl.LoggerFrom(nil).Info(fmt.Sprintf("Received validating policy request: %s, Delete: %t", req.Name, req.Delete))
-				go func() {
-					// if its a delete request, remove the policy from all processors that may have it
-					if req.Delete {
-						for _, p := range l.processors {
-							p.Process(req)
-						}
-						return
-					}
-					if p, ok := l.processors[vpol.EvaluationMode(req.Spec.EvaluationMode)]; ok {
-						p.Process(req)
-					}
-				}()
+				ctrl.LoggerFrom(nil).Info(fmt.Sprintf("Received validating policy request with version: %d", req.CurrentVersion))
+				go func() { l.processor.Process(req.Policies) }()
 			}
 		}
-	}()
-
+	})
 	ctrl.LoggerFrom(nil).Info("Policy listener running...")
 	wg.Wait()
 	return nil

@@ -50,7 +50,6 @@ func Command() *cobra.Command {
 	var allowInsecureRegistry bool
 	var controlPlaneAddr string
 	var controlPlaneReconnectWait time.Duration
-	var controlPlaneMaxDialInterval time.Duration
 	var healthCheckInterval time.Duration
 	var nestedRequest bool
 	var certFile string
@@ -118,38 +117,37 @@ func Command() *cobra.Command {
 					httpProvider := sdksources.NewComposite(extForHTTP...)
 					// if we have a control plane source
 					if controlPlaneAddr != "" {
-						httpListener := sources.NewListener()
 						clientAddr := os.Getenv("POD_IP")
 						if clientAddr == "" {
 							panic("can't start auth server, no POD_IP has been passed")
 						}
+
 						policyListener := listener.NewPolicyListener(
 							controlPlaneAddr,
 							clientAddr,
-							map[vpol.EvaluationMode]listener.Processor{
-								v1alpha1.EvaluationModeHTTP: httpListener,
-							},
+							sources.NewListener(v1alpha1.EvaluationModeHTTP),
 							controlPlaneReconnectWait,
-							controlPlaneMaxDialInterval,
 							healthCheckInterval,
 						)
-						group.StartWithContext(ctx, func(ctx context.Context) {
+						if err := policyListener.InitialSync(ctx); err != nil {
+							return err
+						}
+						group.Start(func() {
 							for {
-								select {
-								case <-ctx.Done():
-									return
-								default:
-									if connErr = policyListener.Start(ctx); connErr != nil {
-										ctrl.LoggerFrom(ctx).Error(connErr, "error connecting to the control plane, sleeping 10 seconds then retrying")
-										time.Sleep(time.Second * 10)
-									}
+								ctx, cancel := context.WithCancel(context.Background())
+								if connErr = policyListener.Start(ctx); connErr != nil {
+									cancel()
+									ctrl.LoggerFrom(ctx).Error(connErr, "error connecting to the control plane, sleeping 10 seconds then retrying")
+									time.Sleep(time.Second * 10)
 									continue
 								}
+								cancel()
+								return
 							}
 						})
 					}
 					// if kube policy source is enabled
-					if kubePolicySource {
+					if kubePolicySource && controlPlaneAddr == "" {
 						// create a controller manager
 						scheme := runtime.NewScheme()
 						if err := vpol.Install(scheme); err != nil {
@@ -222,8 +220,7 @@ func Command() *cobra.Command {
 	command.Flags().StringVar(&serverAddress, "server-address", ":9083", "Address to serve the http authorization server on")
 	command.Flags().BoolVar(&nestedRequest, "nested-request", false, "Expect the requests to validate to be in the body of the original request")
 	command.Flags().DurationVar(&controlPlaneReconnectWait, "control-plane-reconnect-wait", 3*time.Second, "Duration to wait before retrying connecting to the control plane")
-	command.Flags().DurationVar(&controlPlaneMaxDialInterval, "control-plane-max-dial-interval", 8*time.Second, "Duration to wait before stopping attempts of sending a policy to a client")
-	command.Flags().DurationVar(&healthCheckInterval, "health-check-interval", 30*time.Second, "Interval for sending health checks")
+	command.Flags().DurationVar(&healthCheckInterval, "health-check-interval", 5*time.Second, "Interval for sending health checks")
 	command.Flags().StringVar(&controlPlaneAddr, "control-plane-address", "", "Control plane address")
 	command.Flags().StringVar(&inputExpression, "input-expression", "", "CEL expression for transforming the incoming request")
 	command.Flags().StringVar(&outputExpression, "output-expression", "", "CEL expression for transforming responses before being sent to clients")
