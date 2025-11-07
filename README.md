@@ -1,4 +1,4 @@
-# kyverno-envoy-plugin
+# kyverno-authz
 
 A flexible authorization service that enforces Kyverno policies for **Envoy proxies** and **plain HTTP services**. This plugin enables you to apply Kyverno's powerful policy engine to secure and control access to your APIs and services.
 
@@ -12,16 +12,16 @@ Integrates with [Envoy](https://www.envoyproxy.io/docs/envoy/latest/intro/what_i
 ### 🌐 HTTP Authorization Server
 Works as a standalone HTTP authorization server that can protect any HTTP service. Your application forwards authorization requests to the plugin, which evaluates them against Kyverno policies and returns allow/deny decisions.
 
-**WARNING: ⚠️ Kyverno-envoy-plugin is in development stage.**
+**WARNING: ⚠️ kyverno-authz is in development stage.**
 
 
 ## 📙 Documentation
 
-Kyverno Envoy plugin installation and reference documents are available [here](https://kyverno.github.io/kyverno-envoy-plugin)
+Kyverno Envoy plugin installation and reference documents are available [here](https://kyverno.github.io/kyverno-authz)
 
-👉 **[Quick Start](https://kyverno.github.io/kyverno-envoy-plugin/latest/quick-start/)**
+👉 **[Quick Start](https://kyverno.github.io/kyverno-authz/latest/quick-start/)**
 
-👉 **[Installation](https://kyverno.github.io/kyverno-envoy-plugin/latest/quick-start/authz-server/)**
+👉 **[Installation](https://kyverno.github.io/kyverno-authz/latest/quick-start/authz-server/)**
 
 ## RoadMap
 
@@ -31,20 +31,20 @@ For detailed information on our planned features and upcoming updates, please [v
 
 We are here to help!
 
-👉 For feature requests and bugs, file an [issue](https://github.com/kyverno/kyverno-envoy-plugin/issues).
+👉 For feature requests and bugs, file an [issue](https://github.com/kyverno/kyverno-authz/issues).
 
 👉 For discussions or questions, join the [Kyverno Slack channel](https://slack.k8s.io/#kyverno).
 
-👉 To get notified on updates ⭐️ [star this repository](https://github.com/kyverno/kyverno-envoy-plugin/stargazers).
+👉 To get notified on updates ⭐️ [star this repository](https://github.com/kyverno/kyverno-authz/stargazers).
 
 ## ➕ Contributing
 
 Thanks for your interest in contributing to Kyverno! Here are some steps to help get you started:
 
-✔ Look through the [good first issues](https://github.com/kyverno/kyverno-envoy-plugin/labels/good%20first%20issue) list. Add a comment with `/assign` to request the assignment of the issue.
+✔ Look through the [good first issues](https://github.com/kyverno/kyverno-authz/labels/good%20first%20issue) list. Add a comment with `/assign` to request the assignment of the issue.
 
 ✔ Check out the Kyverno [Community page](https://kyverno.io/community/) for other ways to get involved.
 
 ## License
 
-Copyright 2023, the Kyverno project. All rights reserved. kyverno-envoy-plugin is licensed under the [Apache License 2.0](LICENSE).
+Copyright 2023, the Kyverno project. All rights reserved. kyverno-authz is licensed under the [Apache License 2.0](LICENSE).
