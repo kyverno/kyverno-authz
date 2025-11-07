@@ -1,4 +1,0 @@
-{{- if .Values.crds.install }}
-# CRDs are managed by the kyverno-lib dependency
-# The control plane uses ValidatingPolicy CRD from policies.kyverno.io
-{{- end }}

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"time"
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
@@ -15,7 +14,6 @@ import (
 	"github.com/kyverno/kyverno-authz/apis/v1alpha1"
 	"github.com/kyverno/kyverno-authz/pkg/authz/http"
 	httplib "github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/http"
-	"github.com/kyverno/kyverno-authz/pkg/control-plane/listener"
 	"github.com/kyverno/kyverno-authz/pkg/engine"
 	vpolcompiler "github.com/kyverno/kyverno-authz/pkg/engine/compiler"
 	"github.com/kyverno/kyverno-authz/pkg/engine/sources"
@@ -48,10 +46,6 @@ func Command() *cobra.Command {
 	var kubePolicySource bool
 	var imagePullSecrets []string
 	var allowInsecureRegistry bool
-	var controlPlaneAddr string
-	var controlPlaneReconnectWait time.Duration
-	var controlPlaneMaxDialInterval time.Duration
-	var healthCheckInterval time.Duration
 	var nestedRequest bool
 	var certFile string
 	var keyFile string
@@ -64,7 +58,7 @@ func Command() *cobra.Command {
 			// setup signals aware context
 			return signals.Do(context.Background(), func(ctx context.Context) error {
 				// track errors
-				var probesErr, connErr, httpErr, httpMgrErr error
+				var probesErr, httpErr, httpMgrErr error
 				err := func(ctx context.Context) error {
 					// create a rest config
 					kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
@@ -116,38 +110,6 @@ func Command() *cobra.Command {
 						return err
 					}
 					httpProvider := sdksources.NewComposite(extForHTTP...)
-					// if we have a control plane source
-					if controlPlaneAddr != "" {
-						httpListener := sources.NewListener()
-						clientAddr := os.Getenv("POD_IP")
-						if clientAddr == "" {
-							panic("can't start auth server, no POD_IP has been passed")
-						}
-						policyListener := listener.NewPolicyListener(
-							controlPlaneAddr,
-							clientAddr,
-							map[vpol.EvaluationMode]listener.Processor{
-								v1alpha1.EvaluationModeHTTP: httpListener,
-							},
-							controlPlaneReconnectWait,
-							controlPlaneMaxDialInterval,
-							healthCheckInterval,
-						)
-						group.StartWithContext(ctx, func(ctx context.Context) {
-							for {
-								select {
-								case <-ctx.Done():
-									return
-								default:
-									if connErr = policyListener.Start(ctx); connErr != nil {
-										ctrl.LoggerFrom(ctx).Error(connErr, "error connecting to the control plane, sleeping 10 seconds then retrying")
-										time.Sleep(time.Second * 10)
-									}
-									continue
-								}
-							}
-						})
-					}
 					// if kube policy source is enabled
 					if kubePolicySource {
 						// create a controller manager
@@ -221,12 +183,6 @@ func Command() *cobra.Command {
 	command.Flags().BoolVar(&kubePolicySource, "kube-policy-source", true, "Enable in-cluster kubernetes policy source")
 	command.Flags().StringVar(&serverAddress, "server-address", ":9083", "Address to serve the http authorization server on")
 	command.Flags().BoolVar(&nestedRequest, "nested-request", false, "Expect the requests to validate to be in the body of the original request")
-	command.Flags().DurationVar(&controlPlaneReconnectWait, "control-plane-reconnect-wait", 3*time.Second, "Duration to wait before retrying connecting to the control plane")
-	command.Flags().DurationVar(&controlPlaneMaxDialInterval, "control-plane-max-dial-interval", 8*time.Second, "Duration to wait before stopping attempts of sending a policy to a client")
-	command.Flags().DurationVar(&healthCheckInterval, "health-check-interval", 30*time.Second, "Interval for sending health checks")
-	command.Flags().StringVar(&controlPlaneAddr, "control-plane-address", "", "Control plane address")
-	command.Flags().StringVar(&inputExpression, "input-expression", "", "CEL expression for transforming the incoming request")
-	command.Flags().StringVar(&outputExpression, "output-expression", "", "CEL expression for transforming responses before being sent to clients")
 	command.Flags().StringVar(&certFile, "cert-file", "", "File containing tls certificate")
 	command.Flags().StringVar(&keyFile, "key-file", "", "File containing tls private key")
 	clientcmd.BindOverrideFlags(&kubeConfigOverrides, command.Flags(), clientcmd.RecommendedConfigOverrideFlags("kube-"))
