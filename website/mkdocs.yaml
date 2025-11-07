@@ -60,7 +60,6 @@ nav:
     - reference/commands/kyverno-authz_completion_powershell.md
     - reference/commands/kyverno-authz_completion_zsh.md
     - reference/commands/kyverno-authz_serve.md
-    - reference/commands/kyverno-authz_serve_control-plane.md
     - reference/commands/kyverno-authz_serve_envoy.md
     - reference/commands/kyverno-authz_serve_envoy_authz-server.md
     - reference/commands/kyverno-authz_serve_envoy_validation-webhook.md
