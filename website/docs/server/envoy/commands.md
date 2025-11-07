@@ -16,6 +16,7 @@ kyverno-authz serve envoy authz-server [flags]
 
 ```
       --allow-insecure-registry              Allow insecure registry
+      --control-plane-address string         Control plane address
       --external-policy-source stringArray   External policy sources
       --grpc-address string                  Address to listen on (default ":9081")
       --grpc-network string                  Network to listen on (default "tcp")
