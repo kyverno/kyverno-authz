@@ -64,10 +64,10 @@ This policy:
 Start the Authz Server with Docker:
 
 ```bash
-docker run --rm \
-  -p 9081:9081 \
-  ghcr.io/kyverno/kyverno-authz:latest \
-  serve envoy authz-server --kube-policy-source=false \
+docker run --rm                                         \
+  -p 9081:9081                                          \
+  ghcr.io/kyverno/kyverno-authz:latest                  \
+  serve envoy authz-server --kube-policy-source=false   \
   --external-policy-source file://data/policies
 ```
 
