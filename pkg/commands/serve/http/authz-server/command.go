@@ -104,7 +104,7 @@ func Command() *cobra.Command {
 						if err != nil {
 							return err
 						}
-						source := sdksources.NewComposite(extSources...)
+						source = sdksources.NewComposite(extSources...)
 						// if kube policy source is enabled
 						if kubePolicySource {
 							// create a controller manager
