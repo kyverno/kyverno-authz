@@ -25,11 +25,11 @@ docker pull ghcr.io/kyverno/kyverno-authz:<version>
 ```
 
 ```bash
-docker run --rm                                     \
-    -v ${HOME}/.kube/:/etc/kubeconfig/              \
-    -e KUBECONFIG=/etc/kubeconfig/config            \
-    --network=host                                  \
-    ghcr.io/kyverno/kyverno-authz:<version>  \
+docker run --rm                             \
+    -v ${HOME}/.kube/:/etc/kubeconfig/      \
+    -e KUBECONFIG=/etc/kubeconfig/config    \
+    --network=host                          \
+    ghcr.io/kyverno/kyverno-authz:<version> \
     version
 ```
 
