@@ -42,6 +42,6 @@ kyverno-authz serve envoy authz-server [flags]
       --kube-user string                     The name of the kubeconfig user to use
       --kube-username string                 Username for basic authentication to the API server
       --metrics-address string               Address to listen on for metrics (default ":9082")
-      --probes-address string                Address to listen on for health checks (default ":9080")
+      --probes-address string                Address to listen on for health checks
 ```
 
