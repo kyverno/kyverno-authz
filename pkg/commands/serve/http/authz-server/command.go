@@ -3,8 +3,6 @@ package authzserver
 import (
 	"context"
 	"fmt"
-	"log"
-	"os"
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
@@ -58,8 +56,10 @@ func Command() *cobra.Command {
 			// setup signals aware context
 			return signals.Do(context.Background(), func(ctx context.Context) error {
 				// track errors
-				var probesErr, httpErr, httpMgrErr error
+				var probesErr, serverErr, mgrErr error
 				err := func(ctx context.Context) error {
+					logger := ctrl.LoggerFrom(ctx)
+					kubeOk := true
 					// create a rest config
 					kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 						clientcmd.NewDefaultClientConfigLoadingRules(),
@@ -67,7 +67,8 @@ func Command() *cobra.Command {
 					)
 					config, err := kubeConfig.ClientConfig()
 					if err != nil {
-						return err
+						logger.Info("Warning, no kubernetes cluster configuration found, some features will be disabled")
+						kubeOk = false
 					}
 					// create a cancellable context
 					ctx, cancel := context.WithCancel(ctx)
@@ -77,80 +78,97 @@ func Command() *cobra.Command {
 					var group wait.Group
 					// wait all tasks in the group are over
 					defer group.Wait()
-					secrets := make([]string, 0)
-					if len(imagePullSecrets) > 0 {
-						secrets = append(secrets, imagePullSecrets...)
-					}
-					dynclient, err := dynamic.NewForConfig(config)
-					if err != nil {
-						return err
-					}
-					// Create kubernetes client
-					kubeclient, err := kubernetes.NewForConfig(config)
-					if err != nil {
-						return err
-					}
-					namespace, _, err := kubeConfig.Namespace()
-					if err != nil {
-						return fmt.Errorf("failed to get namespace from kubeconfig: %w", err)
-					}
-					if namespace == "" || namespace == "default" {
-						// Log a warning or require explicit namespace setting
-						log.Printf("Using namespace '%s' - consider setting explicit namespace", namespace)
-					}
-					rOpts, nOpts, err := ocifs.RegistryOpts(kubeclient.CoreV1().Secrets(namespace), allowInsecureRegistry, secrets...)
-					if err != nil {
-						log.Fatalf("failed to initialize registry opts: %v", err)
-						os.Exit(1)
-					}
 					// initialize compiler
-					httpCompiler := vpolcompiler.NewCompiler[dynamic.Interface, *httplib.CheckRequest, *httplib.CheckResponse]()
-					extForHTTP, err := getExternalProviders(httpCompiler, nOpts, rOpts, externalPolicySources...)
-					if err != nil {
-						return err
-					}
-					httpProvider := sdksources.NewComposite(extForHTTP...)
-					// if kube policy source is enabled
-					if kubePolicySource {
-						// create a controller manager
-						scheme := runtime.NewScheme()
-						if err := vpol.Install(scheme); err != nil {
+					compiler := vpolcompiler.NewCompiler[dynamic.Interface, *httplib.CheckRequest, *httplib.CheckResponse]()
+					// load sources
+					var source engine.HTTPSource
+					var dyn dynamic.Interface
+					if kubeOk {
+						// Create kubernetes client
+						kubeclient, err := kubernetes.NewForConfig(config)
+						if err != nil {
 							return err
 						}
-						httpMgr, err := ctrl.NewManager(config, ctrl.Options{
-							Scheme: scheme,
-							Metrics: metricsserver.Options{
-								BindAddress: metricsAddress,
-							},
-							Cache: cache.Options{
-								ByObject: map[client.Object]cache.ByObject{
-									&vpol.ValidatingPolicy{}: {
-										Field: fields.OneTermEqualSelector("spec.evaluation.mode", string(v1alpha1.EvaluationModeHTTP)),
+						namespace, _, err := kubeConfig.Namespace()
+						if err != nil {
+							return fmt.Errorf("failed to get namespace from kubeconfig: %w", err)
+						}
+						if namespace == "" || namespace == "default" {
+							logger.Info(fmt.Sprintf("Using namespace '%s' - consider setting explicit namespace", namespace))
+						}
+						rOpts, nOpts, err := ocifs.RegistryOpts(kubeclient.CoreV1().Secrets(namespace), allowInsecureRegistry, imagePullSecrets...)
+						if err != nil {
+							return fmt.Errorf("failed to initialize registry opts: %w", err)
+						}
+						extSources, err := getExternalSources(compiler, nOpts, rOpts, externalPolicySources...)
+						if err != nil {
+							return err
+						}
+						source = sdksources.NewComposite(extSources...)
+						// if kube policy source is enabled
+						if kubePolicySource {
+							// create a controller manager
+							scheme := runtime.NewScheme()
+							if err := vpol.Install(scheme); err != nil {
+								return err
+							}
+							mgr, err := ctrl.NewManager(config, ctrl.Options{
+								Scheme: scheme,
+								Metrics: metricsserver.Options{
+									BindAddress: metricsAddress,
+								},
+								Cache: cache.Options{
+									ByObject: map[client.Object]cache.ByObject{
+										&vpol.ValidatingPolicy{}: {
+											Field: fields.OneTermEqualSelector("spec.evaluation.mode", string(v1alpha1.EvaluationModeHTTP)),
+										},
 									},
 								},
-							},
-						})
+							})
+							if err != nil {
+								return fmt.Errorf("failed to construct manager: %w", err)
+							}
+							kubeSource, err := sources.NewKube("http", mgr, compiler)
+							if err != nil {
+								return fmt.Errorf("failed to create http source: %w", err)
+							}
+							source = sdksources.NewComposite(kubeSource, source)
+							// start manager
+							group.StartWithContext(ctx, func(ctx context.Context) {
+								// cancel context at the end
+								defer cancel()
+								mgrErr = mgr.Start(ctx)
+							})
+							if !mgr.GetCache().WaitForCacheSync(ctx) {
+								defer cancel()
+								return fmt.Errorf("failed to wait for http cache sync")
+							}
+						}
+						dynclient, err := dynamic.NewForConfig(config)
 						if err != nil {
-							return fmt.Errorf("failed to construct manager: %w", err)
+							return err
 						}
-						httpSource, err := sources.NewKube("http", httpMgr, httpCompiler)
+						dyn = dynclient
+					} else {
+						rOpts, nOpts, err := ocifs.RegistryOpts(nil, allowInsecureRegistry)
 						if err != nil {
-							return fmt.Errorf("failed to create http source: %w", err)
+							return fmt.Errorf("failed to initialize registry opts: %w", err)
 						}
-						httpProvider = sdksources.NewComposite(httpSource, httpProvider)
-						// start managers
-						group.StartWithContext(ctx, func(ctx context.Context) {
-							// cancel context at the end
-							defer cancel()
-							httpMgrErr = httpMgr.Start(ctx)
-						})
-						if !httpMgr.GetCache().WaitForCacheSync(ctx) {
-							defer cancel()
-							return fmt.Errorf("failed to wait for http cache sync")
+						extSources, err := getExternalSources(compiler, nOpts, rOpts, externalPolicySources...)
+						if err != nil {
+							return err
 						}
+						source = sdksources.NewComposite(extSources...)
 					}
-					// create http and grpc servers
-					probesServer := probes.NewServer(probesAddress)
+					// probes server
+					if probesAddress != "" {
+						probesServer := probes.NewServer(probesAddress)
+						group.StartWithContext(ctx, func(ctx context.Context) {
+							defer cancel()
+							probesErr = probesServer.Run(ctx)
+						})
+					}
+					// auth server
 					httpConfig := http.Config{
 						Address:          serverAddress,
 						NestedRequest:    nestedRequest,
@@ -159,29 +177,24 @@ func Command() *cobra.Command {
 						InputExpression:  inputExpression,
 						OutputExpression: outputExpression,
 					}
-					httpAuthServer := http.NewServer(httpConfig, httpProvider, dynclient) // run servers
-					group.StartWithContext(ctx, func(ctx context.Context) {
-						// probes
-						defer cancel()
-						probesErr = probesServer.Run(ctx)
-					})
+					authServer := http.NewServer(httpConfig, source, dyn)
 					group.StartWithContext(ctx, func(ctx context.Context) {
 						defer cancel()
-						httpErr = httpAuthServer.Run(ctx)
+						serverErr = authServer.Run(ctx)
 					})
 					return nil
 				}(ctx)
-				return multierr.Combine(err, probesErr, httpErr, httpMgrErr)
+				return multierr.Combine(err, probesErr, serverErr, mgrErr)
 			})
 		},
 	}
-	command.Flags().StringVar(&probesAddress, "probes-address", ":9080", "Address to listen on for health checks")
+	command.Flags().StringVar(&probesAddress, "probes-address", "", "Address to listen on for health checks")
 	command.Flags().StringVar(&metricsAddress, "metrics-address", ":9082", "Address to listen on for metrics")
 	command.Flags().StringArrayVar(&externalPolicySources, "external-policy-source", nil, "External policy sources")
 	command.Flags().StringArrayVar(&imagePullSecrets, "image-pull-secret", nil, "Image pull secrets")
 	command.Flags().BoolVar(&allowInsecureRegistry, "allow-insecure-registry", false, "Allow insecure registry")
 	command.Flags().BoolVar(&kubePolicySource, "kube-policy-source", true, "Enable in-cluster kubernetes policy source")
-	command.Flags().StringVar(&serverAddress, "server-address", ":9083", "Address to serve the http authorization server on")
+	command.Flags().StringVar(&serverAddress, "server-address", ":9081", "Address to serve the http authorization server on")
 	command.Flags().BoolVar(&nestedRequest, "nested-request", false, "Expect the requests to validate to be in the body of the original request")
 	command.Flags().StringVar(&certFile, "cert-file", "", "File containing tls certificate")
 	command.Flags().StringVar(&keyFile, "key-file", "", "File containing tls private key")
@@ -190,7 +203,7 @@ func Command() *cobra.Command {
 	return command
 }
 
-func getExternalProviders[POLICY any](vpolCompiler engine.Compiler[POLICY], nOpts []name.Option, rOpts []remote.Option, urls ...string) ([]core.Source[POLICY], error) {
+func getExternalSources[POLICY any](vpolCompiler engine.Compiler[POLICY], nOpts []name.Option, rOpts []remote.Option, urls ...string) ([]core.Source[POLICY], error) {
 	mux := fsimpl.NewMux()
 	mux.Add(filefs.FS)
 	// mux.Add(httpfs.FS)
