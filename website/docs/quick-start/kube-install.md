@@ -111,7 +111,7 @@ Now we can deploy the Kyverno Authz Server.
     helm install kyverno-authz-server                                                                 \
       --namespace kyverno --create-namespace                                                          \
       --wait                                                                                          \
-      --repo https://kyverno.github.io/kyverno-authz kyverno-authz-server                      \
+      --repo https://kyverno.github.io/kyverno-authz kyverno-authz-server                             \
       --set config.type=envoy                                                                         \
       --set validatingWebhookConfiguration.certificates.certManager.issuerRef.group=cert-manager.io   \
       --set validatingWebhookConfiguration.certificates.certManager.issuerRef.kind=ClusterIssuer      \
@@ -125,9 +125,17 @@ Now we can deploy the Kyverno Authz Server.
     helm install kyverno-authz-server                                                                 \
       --namespace kyverno --create-namespace                                                          \
       --wait                                                                                          \
-      --repo https://kyverno.github.io/kyverno-authz kyverno-authz-server                      \
+      --repo https://kyverno.github.io/kyverno-authz kyverno-authz-server                             \
       --set config.type=http                                                                          \
       --set validatingWebhookConfiguration.certificates.certManager.issuerRef.group=cert-manager.io   \
       --set validatingWebhookConfiguration.certificates.certManager.issuerRef.kind=ClusterIssuer      \
       --set validatingWebhookConfiguration.certificates.certManager.issuerRef.name=selfsigned-issuer
     ```
+
+
+docker run --rm                                     \
+    -v ${HOME}/.kube/:/etc/kubeconfig/              \
+    -e KUBECONFIG=/etc/kubeconfig/config            \
+    --network=host                                  \
+    ghcr.io/kyverno/kyverno-authz:v0.4.0-beta.3  \
+    version

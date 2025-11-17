@@ -64,21 +64,18 @@ This policy:
 Start the Authz Server with Docker:
 
 ```bash
-docker run --rm \
-  -v ${HOME}/.kube/:/etc/kubeconfig/ \
-  -v ${PWD}/quick-start.yaml/:/data/policies/quick-start.yaml \
-  -e KUBECONFIG=/etc/kubeconfig/config \
-  -p 9081:9081 \
-  ghcr.io/kyverno/kyverno-authz:a83ddce53efe0a35dfe239d3089bdefa19ca4f80 \
-  serve envoy authz-server --kube-policy-source=false \
+docker run --rm                                         \
+  -p 9081:9081                                          \
+  ghcr.io/kyverno/kyverno-authz:latest                  \
+  serve envoy authz-server --kube-policy-source=false   \
   --external-policy-source file://data/policies
 ```
 
 Expected startup output:
 
 ```
-2025-11-04T17:42:32Z    INFO    HTTP Server starting... {"address": ":9080", "cert": "", "key": ""}
-2025-11-04T17:42:32Z    INFO    GRPC Server starting... {"address": "[::]:9081", "network": "tcp"}
+2025-11-17T12:19:18+01:00       INFO    Using namespace 'default' - consider setting explicit namespace
+2025-11-17T12:19:18+01:00       INFO    GRPC Server starting... {"address": "[::]:9081", "network": "tcp"}
 ```
 
 The gRPC server listens on port **9081**.

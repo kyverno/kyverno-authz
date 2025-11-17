@@ -45,29 +45,26 @@ You can use Docker to start the Kyverno Authz Server and load the policy created
 Run the following command from your terminal:
 
 ```bash
-docker run --rm                                                                     \
-    -v ${HOME}/.kube/:/etc/kubeconfig/                                              \
-    -v ${PWD}/quick-start.yaml/:/data/policies/quick-start.yaml                     \
-    -e KUBECONFIG=/etc/kubeconfig/config                                            \
-    -p 9083:9083                                                                    \
-    ghcr.io/kyverno/kyverno-authz:a83ddce53efe0a35dfe239d3089bdefa19ca4f80   \
-    serve http authz-server --kube-policy-source=false                              \
+docker run --rm                                         \
+    -p 9081:9081                                        \
+    ghcr.io/kyverno/kyverno-authz:latest                \
+    serve http authz-server --kube-policy-source=false  \
     --external-policy-source file://data/policies
 ```
 
 !!! info
     - The flag --external-policy-source tells the server to load policies from file://data/policies.
-    - Port 9083 is exposed for HTTP requests.
+    - Port 9081 is exposed for HTTP requests.
     - TLS certificates are not required for this example.
 
 Once the container starts, you should see output similar to this:
 
 ```
-2025-11-04T10:23:08Z    INFO    HTTP Server starting... {"address": ":9080", "cert": "", "key": ""}
-2025-11-04T10:23:08Z    INFO    HTTP Server starting... {"address": ":9083", "cert": "", "key": ""}
+2025-11-17T12:19:55+01:00       INFO    Using namespace 'default' - consider setting explicit namespace
+2025-11-17T12:19:55+01:00       INFO    HTTP Server starting... {"address": ":9081", "cert": "", "key": ""}
 ```
 
-This confirms the server is running and listening on port `9083`.
+This confirms the server is running and listening on port `9081`.
 
 ## Step 3: Send Requests to the Server
 
@@ -76,7 +73,7 @@ Now that the server is running, you can send test requests to observe how the po
 ### Example 1 — Request without a Host header
 
 ```bash
-curl -s -I -X POST http://127.0.0.1:9083
+curl -s -I -X POST http://127.0.0.1:9081
 ```
 
 This request does not match the condition object.attributes.host == "http-srv.app".
@@ -85,7 +82,7 @@ The policy will not be triggered, so the request should succeed or be allowed.
 ### Example 2 — Request with a matching Host header
 
 ```bash
-curl -s -I -X POST http://127.0.0.1:9083 -H "Host: http-srv.app"
+curl -s -I -X POST http://127.0.0.1:9081 -H "Host: http-srv.app"
 ```
 
 In this case, the condition is met and the policy denies the request.
