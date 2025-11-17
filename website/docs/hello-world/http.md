@@ -46,9 +46,6 @@ Run the following command from your terminal:
 
 ```bash
 docker run --rm                                                                     \
-    -v ${HOME}/.kube/:/etc/kubeconfig/                                              \
-    -v ${PWD}/quick-start.yaml/:/data/policies/quick-start.yaml                     \
-    -e KUBECONFIG=/etc/kubeconfig/config                                            \
     -p 9083:9083                                                                    \
     ghcr.io/kyverno/kyverno-authz:a83ddce53efe0a35dfe239d3089bdefa19ca4f80   \
     serve http authz-server --kube-policy-source=false                              \
@@ -63,8 +60,8 @@ docker run --rm                                                                 
 Once the container starts, you should see output similar to this:
 
 ```
-2025-11-04T10:23:08Z    INFO    HTTP Server starting... {"address": ":9080", "cert": "", "key": ""}
-2025-11-04T10:23:08Z    INFO    HTTP Server starting... {"address": ":9083", "cert": "", "key": ""}
+2025-11-17T12:19:55+01:00       INFO    Using namespace 'default' - consider setting explicit namespace
+2025-11-17T12:19:55+01:00       INFO    HTTP Server starting... {"address": ":9081", "cert": "", "key": ""}
 ```
 
 This confirms the server is running and listening on port `9083`.
