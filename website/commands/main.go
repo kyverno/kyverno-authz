@@ -81,7 +81,7 @@ func main() {
 				base := filepath.Base(*outputFile)
 				name := strings.TrimSuffix(base, filepath.Ext(base))
 				title := cases.Title(language.Und, cases.NoLower).String(strings.ReplaceAll(name, "_", " "))
-				frontmatter := fmt.Sprintf("---\ntitle: %q\nslug: %q\ndescription: \"CLI reference for %s\"\n---\n\n", title, name, title)
+				frontmatter := fmt.Sprintf("---\ntitle: %q\nslug: %q\ndescription: \"CLI reference for `%s`\"\n---\n\n", title, name, *cmdPath)
 				if _, err := file.WriteString(frontmatter); err != nil {
 					log.Fatal(err)
 				}
