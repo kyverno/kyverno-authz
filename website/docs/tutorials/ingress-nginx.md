@@ -27,13 +27,14 @@ kind create cluster --image $KIND_IMAGE --wait 1m
 
 First we need to install Ingress NGINX in the cluster.
 
-```bash
+```yaml
 # install ingress-nginx
 helm install ingress-nginx \
   --namespace ingress-nginx --create-namespace \
   --wait \
   --repo https://kubernetes.github.io/ingress-nginx ingress-nginx \
   --values - <<EOF
+---
 controller:
   service:
     type: ClusterIP
@@ -60,16 +61,18 @@ kubectl apply \
 
 Now create a separate Ingress resource for `myapp.com` with external authentication enabled.
 
-```bash
+```yaml
 # create ingress with external auth for myapp.com
 kubectl apply -n demo -f - <<EOF
+---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: myapp
   annotations:
     nginx.ingress.kubernetes.io/auth-method: POST
-    nginx.ingress.kubernetes.io/auth-url: "http://kyverno-authz-server.kyverno.svc.cluster.local:9081/"
+    nginx.ingress.kubernetes.io/auth-url: >-
+      http://kyverno-authz-server.kyverno.svc.cluster.local:9081/
 spec:
   ingressClassName: nginx
   rules:
@@ -86,10 +89,6 @@ spec:
 EOF
 ```
 
-curl -s -w "\nhttp_code=%{http_code}" \
-  -H "Host: myapp.com" \
-  http://ingress-nginx-controller.ingress-nginx/anything/api/v1
-
 The `nginx.ingress.kubernetes.io/auth-url` annotation points to `localhost:9081` because the Kyverno Authz Server sidecar is injected into the Ingress NGINX controller pod and runs locally on port 9081 (HTTP). The Ingress is configured for host `myapp.com` and path `/api/v1/*` to match the ValidatingPolicy conditions.
 
 ### Deploy cert-manager
@@ -98,19 +97,23 @@ The Kyverno Authz Server comes with a validation webhook and needs a certificate
 
 Let's deploy `cert-manager` to manage the certificate we need.
 
-```bash
+```yaml
 # install cert-manager
 helm install cert-manager \
   --namespace cert-manager --create-namespace \
   --wait \
   --repo https://charts.jetstack.io cert-manager \
   --values - <<EOF
+---
 crds:
   enabled: true
 EOF
+```
 
+```yaml
 # create a self-signed cluster issuer
 kubectl apply -f - <<EOF
+---
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
@@ -135,15 +138,36 @@ kubectl apply \
 
 Now we can deploy the Kyverno Authz Server.
 
-```bash
+```yaml
 # deploy the kyverno authz server
 helm install kyverno-authz-server \
   --namespace kyverno --create-namespace \
   --wait \
   --repo https://kyverno.github.io/kyverno-authz kyverno-authz-server \
   --values - <<EOF
+---
 config:
   type: http
+  http:
+    nestedRequest: false
+    inputExpression: >-
+      http.CheckRequest{
+        attributes: http.CheckRequestAttributes{
+          method: object.attributes.Header("x-original-method")[0],
+          header: object.attributes.header,
+          host: url(object.attributes.Header("x-original-url")[0]).getHostname(),
+          scheme: url(object.attributes.Header("x-original-url")[0]).getScheme(),
+          path: url(object.attributes.Header("x-original-url")[0]).getEscapedPath(),
+          query: url(object.attributes.Header("x-original-url")[0]).getQuery(),
+          fragment: "todo",
+        }
+      }
+    outputExpression: >-
+      has(object.ok)
+        ? httpserver.HttpResponse{ status: 200 }
+        : object.denied.reason == "Unauthorized"
+            ? httpserver.HttpResponse{ status: 401, body: bytes(object.denied.reason) }
+            : httpserver.HttpResponse{ status: 403, body: bytes(object.denied.reason) }
 validatingWebhookConfiguration:
   certificates:
     certManager:
@@ -154,313 +178,114 @@ validatingWebhookConfiguration:
 EOF
 ```
 
-## Create a Kyverno ValidatingPolicy
+### Create a Kyverno ValidatingPolicy
 
 In summary the policy below does the following:
 
-- Is triggered only when the host is `myapp.com` and the path starts with `/api/v1`
-- Fetches a secret word from an external service
-- Allows GET requests with a matching secret header
-- Allows POST requests with `application/json` content type
-- Denies all other requests with `403`
+- Checks that the JWT token is valid
+- Checks that the action is allowed based on the token payload `role` and the request path
 
 ```yaml
-apiVersion: envoy.kyverno.io/v1alpha1
+kubectl apply -f - <<EOF
+---
+apiVersion: policies.kyverno.io/v1alpha1
 kind: ValidatingPolicy
 metadata:
-  name: example-api
+  name: demo
 spec:
   evaluation:
-    mode: HTTP
-  matchConditions:
-  - expression: |
-      object.attributes.host == "myapp.com"
-    name: host
-  - expression: |
-      object.attributes.path.startsWith("/api/v1")
-    name: v1-api
-  variables:
-  - name: secretWord
-    expression: |
-      http.Get("http://my-server:3000").secretWord
-  - name: secretHeader
-    expression: |
-      size(object.attributes.Header("secret-header")) > 0 ? object.attributes.Header("secret-header")[0] : ""
-  - name: contentType
-    expression: |
-      size(object.attributes.Header("content-type")) > 0 ? object.attributes.Header("content-type")[0] : ""
-  validations:
-  - expression: |
-      variables.secretHeader == variables.secretWord && object.attributes.method == "GET"
-        ? http.Allowed().Response()
+    mode: HTTP 
+  failurePolicy: Fail 
+  variables: 
+  - name: authorizationlist
+    expression: object.attributes.Header("authorization")
+  - name: authorization
+    expression: >
+      size(variables.authorizationlist) == 1
+        ? variables.authorizationlist[0].split(" ")
+        : []
+  - name: token
+    expression: >
+      size(variables.authorization) == 2 && variables.authorization[0].lowerAscii() == "bearer"
+        ? jwt.Decode(variables.authorization[1], "secret")
         : null
-  - expression: |
-      variables.contentType == "application/json" && object.attributes.method == "POST"
-        ? http.Allowed().Response()
+  validations: 
+    # request not authenticated -> 401
+  - expression: >
+      variables.token == null || !variables.token.Valid
+        ? http.Denied("Unauthorized").Response()
         : null
-  - expression: |
-      http.Denied("validations didnt pass").Response()
-```
-
-### Deploy the external service
-
-The policy will fetch a secret word from an external service. Let's deploy it first.
-
-```go
-package main
-
-import (
-	"encoding/json"
-	"log"
-	"net/http"
-)
-
-func main() {
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		log.Println("got a request")
-		resp := map[string]string{"secretWord": "my-secret-word"}
-		json.NewEncoder(w).Encode(resp)
-	})
-
-	log.Println("Server listening on :3000")
-	if err := http.ListenAndServe(":3000", nil); err != nil {
-		log.Fatal(err)
-	}
-}
-```
-
-Deploy this service to your cluster:
-
-```bash
-# create a deployment and service for the external service
-kubectl apply -n demo -f - <<EOF
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: my-server
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: my-server
-  template:
-    metadata:
-      labels:
-        app: my-server
-    spec:
-      containers:
-      - name: server
-        image: your-registry/my-server:latest
-        ports:
-        - containerPort: 3000
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: my-server
-spec:
-  selector:
-    app: my-server
-  ports:
-  - port: 3000
-    targetPort: 3000
+    # request authenticated but not admin role -> 403
+  - expression: >
+      variables.token.Claims.?role.orValue("") != "admin"
+        ? http.Denied("Forbidden").Response()
+        : null
+    # request authenticated and admin role -> 200
+  - expression: >
+      http.Allowed().Response()
 EOF
 ```
 
 ## Testing
 
-At this point we have deployed and configured Ingress NGINX, the Kyverno Authz Server, a sample application, and the authorization policies.
+At this point we have deployed and configured Ingress NGINX, the Kyverno Authz Server, a sample application, a protected ingress, and the validating policy.
 
-### Port-forward to the Ingress controller
 
-To access the Ingress without setting up DNS, port-forward to the Ingress NGINX controller:
+### Start an in-cluster shell
+
+Let's start a pod in the cluster with a shell to call into the sample application.
 
 ```bash
-kubectl port-forward -n ingress-nginx service/ingress-nginx-controller 8080:80
+# run an in-cluster shell
+kubectl run -i -t busybox --image=alpine --restart=Never -n demo
+```
+
+### Install curl
+
+We will use curl to call into the sample application but it's not installed in our shell, let's install it in the pod.
+
+```bash
+# install curl
+apk add curl
 ```
 
 ### Call into the sample application
 
-Now we can send requests to the sample application and verify the result.
+Now we can send request to the sample application and verify the result.
 
-The policy requires requests to `myapp.com` with path `/api/v1/*`. Let's test different scenarios:
+For convenience, we will store Alice’s and Bob’s tokens in environment variables.
 
-GET request with the correct secret header will return `200`:
+Here Bob is assigned the admin role and Alice is assigned the guest role.
+
+```bash
+export ALICE_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjIyNDEwODE1MzksIm5iZiI6MTUxNDg1MTEzOSwicm9sZSI6Imd1ZXN0Iiwic3ViIjoiWVd4cFkyVT0ifQ.ja1bgvIt47393ba_WbSBm35NrUhdxM4mOVQN8iXz8lk"
+export BOB_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjIyNDEwODE1MzksIm5iZiI6MTUxNDg1MTEzOSwicm9sZSI6ImFkbWluIiwic3ViIjoiWVd4cFkyVT0ifQ.veMeVDYlulTdieeX-jxFZ_tCmqQ_K8rwx2OktUHv5Z0"
+```
+
+Calling without a JWT token will return `403`:
 
 ```bash
 curl -s -w "\nhttp_code=%{http_code}" \
+  ingress-nginx-controller.ingress-nginx/anything/api/v1 \
+  -H "Host: myapp.com"
+```
+
+Calling with Alice’s JWT token will return `403`:
+
+```bash
+curl -s -w "\nhttp_code=%{http_code}" \
+  ingress-nginx-controller.ingress-nginx/anything/api/v1 \
   -H "Host: myapp.com" \
-  -H "secret-header: my-secret-word" \
-  localhost:8080/api/v1/get
+  -H "authorization: Bearer $ALICE_TOKEN"
 ```
 
-GET request with wrong secret header will return `403`:
+Calling with Bob’s JWT token will return `200`:
 
 ```bash
 curl -s -w "\nhttp_code=%{http_code}" \
+  ingress-nginx-controller.ingress-nginx/anything/api/v1 \
   -H "Host: myapp.com" \
-  -H "secret-header: wrong-word" \
-  localhost:8080/api/v1/get
-```
-
-POST request with JSON content type will return `200`:
-
-```bash
-curl -s -w "\nhttp_code=%{http_code}" \
-  -X POST \
-  -H "Host: myapp.com" \
-  -H "Content-Type: application/json" \
-  -d '{"data":"test"}' \
-  localhost:8080/api/v1/post
-```
-
-POST request without JSON content type will return `403`:
-
-```bash
-curl -s -w "\nhttp_code=%{http_code}" \
-  -X POST \
-  -H "Host: myapp.com" \
-  localhost:8080/api/v1/post
-```
-
-Request to wrong host will not trigger the policy:
-
-```bash
-curl -s -w "\nhttp_code=%{http_code}" \
-  -H "Host: wronghost.com" \
-  localhost:8080/api/v1/get
-```
-
-## Alternative: Using Kubernetes Resources
-
-The previous policy fetched data from an external HTTP service using the `http.Get()` function. You can also fetch data from Kubernetes resources like ConfigMaps using the `resource.Get()` function. These functions are part of the [Kyverno CEL libraries](https://kyverno.io/docs/policy-types/cel-libraries/).
-
-### Create a ConfigMap with the secret word
-
-```bash
-# create configmap with secret word
-kubectl apply -n demo -f - <<EOF
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: secret-word
-data:
-  secret-word: "my-k8s-secret"
-EOF
-```
-
-### Create a policy that reads from ConfigMap
-
-```yaml
-# create policy that reads from configmap
-kubectl apply -f - <<EOF
-apiVersion: envoy.kyverno.io/v1alpha1
-kind: ValidatingPolicy
-metadata:
-  name: acme-api
-spec:
-  evaluation:
-    mode: HTTP
-  matchConditions:
-  - expression: |
-      object.attributes.host == "acme.corp"
-    name: host
-  - expression: |
-      object.attributes.path.startsWith("/api/v1")
-    name: v1-api
-  variables:
-  - name: secretWord
-    expression: |
-      resource.Get("v1", "configmaps", "demo", "secret-word").data["secret-word"]
-  - name: secretHeader
-    expression: |
-      size(object.attributes.Header("secret-header")) > 0 ? object.attributes.Header("secret-header")[0] : ""
-  - name: contentType
-    expression: |
-      size(object.attributes.Header("content-type")) > 0 ? object.attributes.Header("content-type")[0] : ""
-  validations:
-  - expression: |
-      variables.secretHeader == variables.secretWord && object.attributes.method == "GET"
-        ? http.Allowed().Response()
-        : null
-  - expression: |
-      variables.contentType == "application/json" && object.attributes.method == "POST"
-        ? http.Allowed().Response()
-        : null
-  - expression: |
-      http.Denied("validations didnt pass").Response()
-EOF
-```
-
-This policy is similar to the previous one, but fetches the secret word from a ConfigMap in the `demo` namespace instead of an external HTTP service.
-
-### Create an Ingress for acme.corp
-
-```yaml
-# create ingress for acme.corp
-kubectl apply -n demo -f - <<EOF
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: acme
-  annotations:
-    nginx.ingress.kubernetes.io/auth-method: POST
-    nginx.ingress.kubernetes.io/auth-url: "http://kyverno-authz-server.kyverno:9081"
-spec:
-  ingressClassName: nginx
-  rules:
-  - host: acme.corp
-    http:
-      paths:
-      - path: /api/v1
-        pathType: Prefix
-        backend:
-          service:
-            name: httpbin
-            port:
-              number: 8000
-EOF
-```
-
-### Test the acme.corp policy
-
-GET request with the correct secret header from ConfigMap will return `200`:
-
-```bash
-curl -s -w "\nhttp_code=%{http_code}" \
-  -H "Host: acme.corp" \
-  -H "secret-header: my-k8s-secret" \
-  localhost:8080/api/v1/get
-```
-
-GET request with wrong secret header will return `403`:
-
-```bash
-curl -s -w "\nhttp_code=%{http_code}" \
-  -H "Host: acme.corp" \
-  -H "secret-header: wrong-secret" \
-  localhost:8080/api/v1/get
-```
-
-POST request with JSON content type will return `200`:
-
-```bash
-curl -s -w "\nhttp_code=%{http_code}" \
-  -X POST \
-  -H "Host: acme.corp" \
-  -H "Content-Type: application/json" \
-  -d '{"data":"test"}' \
-  localhost:8080/api/v1/post
-```
-
-POST request without JSON content type will return `403`:
-
-```bash
-curl -s -w "\nhttp_code=%{http_code}" \
-  -X POST \
-  -H "Host: acme.corp" \
-  localhost:8080/api/v1/post
+  -H "authorization: Bearer $BOB_TOKEN"
 ```
 
 ## Wrap Up
@@ -469,4 +294,4 @@ Congratulations on completing the tutorial!
 
 This tutorial demonstrated how to configure Ingress NGINX to utilize the Kyverno Authz Server as an external authorization service.
 
-Additionally, the tutorial provided an example policy that fetches data from an external service and validates requests based on headers and HTTP methods.
+Additionally, the tutorial provided an example policy to decode a JWT token and make a decision based on it.

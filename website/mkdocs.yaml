@@ -39,6 +39,7 @@ nav:
     - cel-extensions/jwk.md
     - cel-extensions/jwt.md
     - cel-extensions/http.md
+    - cel-extensions/mcp.md
 - Tutorials:
   - tutorials/index.md
   - Envoy:

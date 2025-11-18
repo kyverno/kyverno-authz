@@ -28,21 +28,20 @@ type authorizer struct {
 
 func (a *authorizer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
-
 	logger := ctrl.LoggerFrom(r.Context()).WithValues("from", r.RemoteAddr)
 	logger.Info("received request")
 	if a.nestedRequest {
 		reader := bufio.NewReader(r.Body)
 		req, err := http.ReadRequest(reader)
 		if err != nil {
-			writeErrResp(w, err)
+			writeErrResp(logger, w, err)
 			return
 		}
 		r = req
 	}
 	httpReq, err := httpcel.NewRequest(r)
 	if err != nil {
-		writeErrResp(w, err)
+		writeErrResp(logger, w, err)
 		return
 	}
 	if a.inputProgram != nil {
@@ -50,7 +49,7 @@ func (a *authorizer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"object": &httpReq,
 		})
 		if err != nil {
-			writeErrResp(w, err)
+			writeErrResp(logger, w, err)
 			return
 		}
 		if out.Value() != nil {
@@ -63,7 +62,7 @@ func (a *authorizer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	response := a.engine.Handle(r.Context(), a.dyn, &httpReq)
 	if response.Error != nil {
 		metrics.RecordHTTPRequestError(r.Context(), httpReq, response.Error)
-		writeErrResp(w, response.Error)
+		writeErrResp(logger, w, response.Error)
 		return
 	}
 	result := response.Result
@@ -77,19 +76,20 @@ func (a *authorizer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"object": result,
 	})
 	if err != nil {
-		writeErrResp(w, err)
+		writeErrResp(logger, w, err)
 		return
 	}
 	if out, err := utils.ConvertToNative[httpserver.HttpResponse](out); err != nil {
-		writeErrResp(w, err)
+		writeErrResp(logger, w, err)
 	} else {
 		writeResponse(logger, w, out)
 	}
 }
 
-func writeErrResp(w http.ResponseWriter, err error) {
+func writeErrResp(logger logr.Logger, w http.ResponseWriter, err error) {
 	w.WriteHeader(http.StatusInternalServerError)
 	fmt.Fprint(w, err.Error()) //nolint:errcheck
+	logger.Error(err, "an error has occured")
 }
 
 func writeResponse(logger logr.Logger, w http.ResponseWriter, resp httpserver.HttpResponse) {
