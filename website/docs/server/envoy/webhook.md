@@ -1,7 +1,7 @@
 ---
-title: "webhook"
+title: "Webhook"
 slug: "webhook"
-description: "CLI reference for webhook"
+description: "CLI reference for Webhook"
 ---
 
 ## kyverno-authz serve envoy validation-webhook

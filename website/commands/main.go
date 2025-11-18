@@ -10,6 +10,8 @@ import (
 
 	"github.com/kyverno/kyverno-authz/pkg/commands/root"
 	"github.com/spf13/cobra/doc"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 func main() {
@@ -78,7 +80,7 @@ func main() {
 			if *front {
 				base := filepath.Base(*outputFile)
 				name := strings.TrimSuffix(base, filepath.Ext(base))
-				title := strings.ReplaceAll(name, "_", " ")
+				title := cases.Title(language.Und, cases.NoLower).String(strings.ReplaceAll(name, "_", " "))
 				frontmatter := fmt.Sprintf("---\ntitle: %q\nslug: %q\ndescription: \"CLI reference for %s\"\n---\n\n", title, name, title)
 				if _, err := file.WriteString(frontmatter); err != nil {
 					log.Fatal(err)

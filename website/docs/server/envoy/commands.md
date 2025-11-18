@@ -1,7 +1,7 @@
 ---
-title: "commands"
+title: "Commands"
 slug: "commands"
-description: "CLI reference for commands"
+description: "CLI reference for Commands"
 ---
 
 ## kyverno-authz serve envoy authz-server
