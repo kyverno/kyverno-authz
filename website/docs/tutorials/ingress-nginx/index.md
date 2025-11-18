@@ -17,7 +17,7 @@ This tutorial shows how Ingress NGINX can be configured to delegate authorizatio
 If you don't have a cluster at hand, you can create a local one with [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation).
 
 ```bash
-KIND_IMAGE=kindest/node:v1.31.1
+KIND_IMAGE=kindest/node:v1.34.0
 
 # create cluster
 kind create cluster --image $KIND_IMAGE --wait 1m
@@ -65,19 +65,36 @@ EOF
 
 For more certificate management options, refer to [Certificates management](../../quick-start/kube-install.md#certificates-management).
 
+### Install Kyverno ValidatingPolicy CRD
 
-### Deploy the Authz server
+Before deploying the Kyverno Authz Server, we need to install the Kyverno ValidatingPolicy CRD.
+
+```bash
+kubectl apply \
+  -f https://raw.githubusercontent.com/kyverno/kyverno/refs/heads/main/config/crds/policies.kyverno.io/policies.kyverno.io_validatingpolicies.yaml
+```
+
+### Deploy the Kyverno Authz Server
+
+Now we can deploy the Kyverno Authz Server.
 
 ```bash
 # deploy the kyverno authz server
-helm install kyverno-authz-server                                       \
-  --namespace kyverno --create-namespace                                \
-  --wait                                                                \
-  --repo https://kyverno.github.io/kyverno-authz kyverno-authz-server   \
-  --set config.type=http                                                \
-  --set certManager.issuerRef.name=selfsigned-issuer                    \
-  --set certManager.issuerRef.kind=ClusterIssuer                        \
-  --set certManager.issuerRef.group=cert-manager.io
+helm install kyverno-authz-server \
+  --namespace kyverno --create-namespace \
+  --wait \
+  --repo https://kyverno.github.io/kyverno-authz kyverno-authz-server \
+  --values - <<EOF
+config:
+  type: http
+validatingWebhookConfiguration:
+  certificates:
+    certManager:
+      issuerRef:
+        group: cert-manager.io
+        kind: ClusterIssuer
+        name: selfsigned-issuer
+EOF
 ```
 
 ## Create a Kyverno ValidatingPolicy
