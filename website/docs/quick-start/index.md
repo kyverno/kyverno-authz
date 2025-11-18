@@ -6,7 +6,7 @@
 
 Connects with [Envoy’s External Authorization filter](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/ext_authz_filter.html) via gRPC.
 
-Envoy sends authorization requests to the Kyverno sidecar, which evaluates policies and returns allow/deny decisions.
+Envoy sends authorization requests to the Kyverno Authz Server, which evaluates policies and returns allow/deny decisions.
 
 ![Architecture Overview](../schemas/overview.svg)
 
