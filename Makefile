@@ -151,7 +151,7 @@ codegen-envoy-webhook-docs: ## Generate markdown docs for envoy validation-webho
 .PHONY: codegen-http-docs
 codegen-http-docs: ## Generate markdown docs for http authz-server command
 	@echo Generate http docs... >&2
-	@rm -f ./website/docs/server/http/commands.md
+	@rm -f ./website/docs/server/http/authz-server.md
 	@go run ./website/commands -out ./website/docs/server/http -format markdown -command "serve http authz-server" -output-file authz-server.md
 	@$(SED) -i '/^### SEE ALSO/,$$d' ./website/docs/server/http/authz-server.md
 	@$(SED) -i '/^## .*$$/d' ./website/docs/server/http/authz-server.md
