@@ -196,10 +196,11 @@ func Command() *cobra.Command {
 	command.Flags().BoolVar(&kubePolicySource, "kube-policy-source", true, "Enable in-cluster kubernetes policy source")
 	command.Flags().StringVar(&serverAddress, "server-address", ":9081", "Address to serve the http authorization server on")
 	command.Flags().BoolVar(&nestedRequest, "nested-request", false, "Expect the requests to validate to be in the body of the original request")
+	command.Flags().StringVar(&inputExpression, "input-expression", "", "CEL expression for transforming the incoming request")
+	command.Flags().StringVar(&outputExpression, "output-expression", "", "CEL expression for transforming responses before being sent to clients")
 	command.Flags().StringVar(&certFile, "cert-file", "", "File containing tls certificate")
 	command.Flags().StringVar(&keyFile, "key-file", "", "File containing tls private key")
 	clientcmd.BindOverrideFlags(&kubeConfigOverrides, command.Flags(), clientcmd.RecommendedConfigOverrideFlags("kube-"))
-
 	return command
 }
 

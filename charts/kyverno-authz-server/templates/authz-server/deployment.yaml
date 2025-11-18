@@ -136,6 +136,8 @@ spec:
           {{- else }}
           - --server-address={{ $.Values.config.http.address }}
           - --nested-request={{ $.Values.config.http.nestedRequest }}
+          - --input-expression={{ $.Values.config.http.inputExpression }}
+          - --output-expression={{ $.Values.config.http.outputExpression }}
           {{- end }}
           - --allow-insecure-registry={{ $.Values.config.allowInsecureRegistry }}
           {{- range $.Values.config.imagePullSecrets }}
