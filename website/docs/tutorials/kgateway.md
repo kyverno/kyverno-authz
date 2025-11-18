@@ -136,7 +136,7 @@ spec:
 EOF
 ```
 
-For more certificate management options, refer to [Certificates management](../../quick-start/kube-install.md#certificates-management).
+For more certificate management options, refer to [Certificates management](../quick-start/kube-install.md#certificates-management).
 
 ### Install Kyverno ValidatingPolicy CRD
 

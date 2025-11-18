@@ -43,10 +43,12 @@ nav:
     - cel-extensions/http.md
 - Tutorials:
   - tutorials/index.md
-  - tutorials/istio/index.md
-  - tutorials/envoy-gateway/index.md
-  - tutorials/kgateway/index.md
-  - tutorials/ingress-nginx/index.md
+  - Envoy:
+    - tutorials/istio.md
+    - tutorials/envoy-gateway.md
+    - tutorials/kgateway.md
+  - HTTP:
+    - tutorials/ingress-nginx.md
 - Reference:
   - reference/index.md
   - reference/json-schemas.md
