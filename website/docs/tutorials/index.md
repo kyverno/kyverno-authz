@@ -1,6 +1,9 @@
 # Tutorials
 
-If you didn't read the Quick start section yet, we really recommend giving it a try to discover and familiarise with the Kyverno Authz Server first.
+!!! info
+    Select an item in the navigation menu to browse a specific page.
+
+If you didn't read the [Getting Started](../quick-start/index.md) section yet, we really recommend giving it a try to discover and familiarise with the Kyverno Authz Server first.
 
 - [Hello World](../hello-world/index.md)
 - [Envoy example](../server/envoy/example.md)

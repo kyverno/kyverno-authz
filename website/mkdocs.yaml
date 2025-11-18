@@ -21,14 +21,12 @@ nav:
     - server/envoy/index.md
     - server/envoy/commands.md
     - server/envoy/configuration.md
-    - server/envoy/webhook.md
     - server/envoy/example.md
   - HTTP:
     - server/http/index.md
     - server/http/commands.md
     - server/http/configuration.md
     - server/http/programmability.md
-    - server/http/webhook.md
     - server/http/example.md
 - Policies:
   - policies/index.md
@@ -43,10 +41,12 @@ nav:
     - cel-extensions/http.md
 - Tutorials:
   - tutorials/index.md
-  - tutorials/istio/index.md
-  - tutorials/envoy-gateway/index.md
-  - tutorials/kgateway/index.md
-  - tutorials/ingress-nginx/index.md
+  - Envoy:
+    - tutorials/istio.md
+    - tutorials/envoy-gateway.md
+    - tutorials/kgateway.md
+  - HTTP:
+    - tutorials/ingress-nginx.md
 - Reference:
   - reference/index.md
   - reference/json-schemas.md

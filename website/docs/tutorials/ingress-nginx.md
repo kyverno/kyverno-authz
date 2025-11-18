@@ -33,10 +33,64 @@ helm install ingress-nginx \
   --namespace ingress-nginx --create-namespace \
   --wait \
   --repo https://kubernetes.github.io/ingress-nginx ingress-nginx \
-  --set controller.service.type=ClusterIP
+  --values - <<EOF
+controller:
+  service:
+    type: ClusterIP
+EOF
 ```
 
 The `controller.service.type=ClusterIP` setting is used because the kind cluster created in the previous step doesn't come with load balancer support. For production environments or cloud providers with load balancer support, you can omit this setting or use `LoadBalancer`.
+
+### Deploy a sample application
+
+Httpbin is a well-known application that can be used to test HTTP requests and helps to show quickly how we can play with the request and response attributes.
+
+```bash
+# create the demo namespace
+kubectl create ns demo
+
+# deploy the httpbin application
+kubectl apply \
+  -n demo \
+  -f https://raw.githubusercontent.com/istio/istio/master/samples/httpbin/httpbin.yaml
+```
+
+### Create an Ingress with External Authentication
+
+Now create a separate Ingress resource for `myapp.com` with external authentication enabled.
+
+```bash
+# create ingress with external auth for myapp.com
+kubectl apply -n demo -f - <<EOF
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: myapp
+  annotations:
+    nginx.ingress.kubernetes.io/auth-method: POST
+    nginx.ingress.kubernetes.io/auth-url: "http://kyverno-authz-server.kyverno.svc.cluster.local:9081/"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: myapp.com
+    http:
+      paths:
+      - path: /anything
+        pathType: Prefix
+        backend:
+          service:
+            name: httpbin
+            port:
+              number: 8000
+EOF
+```
+
+curl -s -w "\nhttp_code=%{http_code}" \
+  -H "Host: myapp.com" \
+  http://ingress-nginx-controller.ingress-nginx/anything/api/v1
+
+The `nginx.ingress.kubernetes.io/auth-url` annotation points to `localhost:9081` because the Kyverno Authz Server sidecar is injected into the Ingress NGINX controller pod and runs locally on port 9081 (HTTP). The Ingress is configured for host `myapp.com` and path `/api/v1/*` to match the ValidatingPolicy conditions.
 
 ### Deploy cert-manager
 
@@ -50,7 +104,10 @@ helm install cert-manager \
   --namespace cert-manager --create-namespace \
   --wait \
   --repo https://charts.jetstack.io cert-manager \
-  --set crds.enabled=true
+  --values - <<EOF
+crds:
+  enabled: true
+EOF
 
 # create a self-signed cluster issuer
 kubectl apply -f - <<EOF
@@ -63,7 +120,7 @@ spec:
 EOF
 ```
 
-For more certificate management options, refer to [Certificates management](../../quick-start/kube-install.md#certificates-management).
+For more certificate management options, refer to [Certificates management](../quick-start/kube-install.md#certificates-management).
 
 ### Install Kyverno ValidatingPolicy CRD
 
@@ -211,52 +268,6 @@ spec:
 EOF
 ```
 
-### Deploy a sample application
-
-Httpbin is a well-known application that can be used to test HTTP requests and helps to show quickly how we can play with the request and response attributes.
-
-```bash
-# create the demo namespace
-kubectl create ns demo
-
-# deploy the httpbin application
-kubectl apply \
-  -n demo \
-  -f https://raw.githubusercontent.com/istio/istio/master/samples/httpbin/httpbin.yaml
-```
-
-### Create an Ingress with External Authentication
-
-Now create a separate Ingress resource for `myapp.com` with external authentication enabled.
-
-```yaml
-# create ingress with external auth for myapp.com
-kubectl apply -n demo -f - <<EOF
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: myapp
-  annotations:
-    nginx.ingress.kubernetes.io/auth-method: POST
-    nginx.ingress.kubernetes.io/auth-url: "http://kyverno-authz-server.kyverno.svc.cluster.local:9083/validate"
-spec:
-  ingressClassName: nginx
-  rules:
-  - host: myapp.com
-    http:
-      paths:
-      - path: /api/v1
-        pathType: Prefix
-        backend:
-          service:
-            name: httpbin
-            port:
-              number: 8000
-EOF
-```
-
-The `nginx.ingress.kubernetes.io/auth-url` annotation points to `localhost:9083` because the Kyverno Authz Server sidecar is injected into the Ingress NGINX controller pod and runs locally on port 9083 (HTTP). The Ingress is configured for host `myapp.com` and path `/api/v1/*` to match the ValidatingPolicy conditions.
-
 ## Testing
 
 At this point we have deployed and configured Ingress NGINX, the Kyverno Authz Server, a sample application, and the authorization policies.
@@ -395,7 +406,7 @@ metadata:
   name: acme
   annotations:
     nginx.ingress.kubernetes.io/auth-method: POST
-    nginx.ingress.kubernetes.io/auth-url: "http://kyverno-authz-server.kyverno.svc.cluster.local:9083/validate"
+    nginx.ingress.kubernetes.io/auth-url: "http://kyverno-authz-server.kyverno:9081"
 spec:
   ingressClassName: nginx
   rules:

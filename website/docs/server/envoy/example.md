@@ -56,7 +56,7 @@ Notice that in the configuration, we define an `extensionProviders` section that
 [...]
 meshConfig:
   extensionProviders:
-  - name: kyverno-authz-server.local
+  - name: kyverno-authz-server
     envoyExtAuthzGrpc:
       service: kyverno-authz-server.kyverno.svc.cluster.local
       port: '9081'
@@ -107,24 +107,21 @@ kubectl apply \
 Now we can deploy the Kyverno Authz Server.
 
 ```bash
-# create the kyverno namespace
-kubectl create ns kyverno
-
-# label the namespace to inject the envoy proxy
-kubectl label namespace kyverno istio-injection=enabled
-
 # deploy the kyverno authz server
 helm install kyverno-authz-server \
-  --namespace kyverno \
-  --wait  \
+  --namespace kyverno --create-namespace \
+  --wait \
   --repo https://kyverno.github.io/kyverno-authz kyverno-authz-server \
   --values - <<EOF
-certificates:
-  certManager:
-    issuerRef:
-      group: cert-manager.io
-      kind: ClusterIssuer
-      name: selfsigned-issuer
+config:
+  type: envoy
+validatingWebhookConfiguration:
+  certificates:
+    certManager:
+      issuerRef:
+        group: cert-manager.io
+        kind: ClusterIssuer
+        name: selfsigned-issuer
 EOF
 ```
 
@@ -160,7 +157,7 @@ metadata:
 spec:
   action: CUSTOM
   provider:
-    name: kyverno-authz-server.local
+    name: kyverno-authz-server
   rules:
   - {} # empty rules, it will apply to all requests
 EOF
@@ -171,7 +168,7 @@ Notice that in this resource, we define the Kyverno Authz Server `extensionProvi
 ```yaml
 [...]
   provider:
-    name: kyverno-authz-server.local
+    name: kyverno-authz-server
 [...]
 ```
 
