@@ -2,14 +2,51 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Serve",
+            "name": "Serve (envoy)",
             "type": "go",
             "request": "launch",
             "mode": "auto",
             "program": "${workspaceFolder}",
             "args": [
                 "serve",
+                "envoy",
                 "authz-server"
+            ],
+        },
+        {
+            "name": "Validation webhook (envoy)",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}",
+            "args": [
+                "serve",
+                "envoy",
+                "validation-webhook"
+            ],
+        },
+        {
+            "name": "Serve (http)",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}",
+            "args": [
+                "serve",
+                "http",
+                "authz-server"
+            ],
+        },
+        {
+            "name": "Validation webhook (http)",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}",
+            "args": [
+                "serve",
+                "http",
+                "validation-webhook"
             ],
         },
         {
