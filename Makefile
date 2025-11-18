@@ -135,30 +135,34 @@ codegen-cli-docs: ## Generate markdown CLI docs
 .PHONY: codegen-envoy-docs
 codegen-envoy-docs: ## Generate markdown docs for envoy authz-server command
 	@echo Generate envoy docs... >&2
-	@rm -f ./website/docs/server/envoy/commands.md
-	@go run ./website/commands -out ./website/docs/server/envoy -format markdown -frontmatter -command "serve envoy authz-server" -output-file commands.md
-	@$(SED) -i '/^### SEE ALSO/,$$d' ./website/docs/server/envoy/commands.md
+	@rm -f ./website/docs/server/envoy/authz-server.md
+	@go run ./website/commands -out ./website/docs/server/envoy -format markdown -command "serve envoy authz-server" -output-file authz-server.md
+	@$(SED) -i '/^### SEE ALSO/,$$d' ./website/docs/server/envoy/authz-server.md
+	@$(SED) -i '/^## .*$$/d' ./website/docs/server/envoy/authz-server.md
 
 .PHONY: codegen-envoy-webhook-docs
 codegen-envoy-webhook-docs: ## Generate markdown docs for envoy validation-webhook command
 	@echo Generate envoy webhook docs... >&2
 	@rm -f ./website/docs/server/envoy/kyverno-authz_serve_envoy_validation-webhook.md
-	@go run ./website/commands -out ./website/docs/server/envoy -format markdown -frontmatter -command "serve envoy validation-webhook" -output-file webhook.md
+	@go run ./website/commands -out ./website/docs/server/envoy -format markdown -command "serve envoy validation-webhook" -output-file webhook.md
 	@$(SED) -i '/^### SEE ALSO/,$$d' ./website/docs/server/envoy/webhook.md
+	@$(SED) -i '/^## .*$$/d' ./website/docs/server/envoy/webhook.md
 
 .PHONY: codegen-http-docs
 codegen-http-docs: ## Generate markdown docs for http authz-server command
 	@echo Generate http docs... >&2
-	@rm -f ./website/docs/server/http/commands.md
-	@go run ./website/commands -out ./website/docs/server/http -format markdown -frontmatter -command "serve http authz-server" -output-file commands.md
-	@$(SED) -i '/^### SEE ALSO/,$$d' ./website/docs/server/http/commands.md
+	@rm -f ./website/docs/server/http/authz-server.md
+	@go run ./website/commands -out ./website/docs/server/http -format markdown -command "serve http authz-server" -output-file authz-server.md
+	@$(SED) -i '/^### SEE ALSO/,$$d' ./website/docs/server/http/authz-server.md
+	@$(SED) -i '/^## .*$$/d' ./website/docs/server/http/authz-server.md
 
 .PHONY: codegen-http-webhook-docs
 codegen-http-webhook-docs: ## Generate markdown docs for http validation-webhook command
 	@echo Generate http webhook docs... >&2
 	@rm -f ./website/docs/server/http/kyverno-authz_serve_http_validation-webhook.md
-	@go run ./website/commands -out ./website/docs/server/http -format markdown -frontmatter -command "serve http validation-webhook" -output-file webhook.md
+	@go run ./website/commands -out ./website/docs/server/http -format markdown -command "serve http validation-webhook" -output-file webhook.md
 	@$(SED) -i '/^### SEE ALSO/,$$d' ./website/docs/server/http/webhook.md
+	@$(SED) -i '/^## .*$$/d' ./website/docs/server/http/authz-server.md
 
 .PHONY: codegen-mkdocs
 codegen-mkdocs: ## Generate mkdocs website

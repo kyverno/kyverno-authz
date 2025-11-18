@@ -27,12 +27,8 @@ When Envoy receives an API request intended for your microservice, it consults t
 
 ![filters chain](../../schemas/filters-chain.png)
 
-
 ## Index
 
 - [Configuration](./configuration.md) — How to configure the Kyverno Envoy Authz Server
 - [Example](./example.md) — Example setup and usage with Istio
-- [Webhook](./webhook.md) — Using the webhook integration
-- [CLI Reference](./commands.md) — Reference for the `authz-server` command
-
-
+- [CLI Reference](./commands.md) — Reference for the `serve envoy ...` commands
