@@ -37,6 +37,7 @@ Contains all the attributes of an HTTP request.
 | `fragment` | `string` | URL fragment |
 
 **Example:**
+
 ```cel
 object.attributes.method == "POST" && object.attributes.path.startsWith("/api")
 ```
@@ -69,11 +70,13 @@ The final response object that contains either an OK or Denied response.
 Creates an allowed response (CheckResponseOk).
 
 **Signature:**
+
 ```cel
 http.Allowed() -> http.CheckResponseOk
 ```
 
 **Example:**
+
 ```cel
 http.Allowed()
 ```
@@ -83,11 +86,13 @@ http.Allowed()
 Creates a denied response with a reason string.
 
 **Signature:**
+
 ```cel
 http.Denied(string) -> http.CheckResponseDenied
 ```
 
 **Example:**
+
 ```cel
 http.Denied("Access denied: insufficient permissions")
 http.Denied("Invalid authentication token")
@@ -98,11 +103,13 @@ http.Denied("Invalid authentication token")
 Gets all values for a specific header from the request attributes. Returns a list of strings.
 
 **Signature:**
+
 ```cel
 http.CheckRequestAttributes.Header(string) -> list<string>
 ```
 
 **Example:**
+
 ```cel
 object.attributes.Header("authorization")
 object.attributes.Header("content-type")
@@ -113,11 +120,13 @@ object.attributes.Header("content-type")
 Gets all values for a specific query parameter from the request attributes. Returns a list of strings.
 
 **Signature:**
+
 ```cel
 http.CheckRequestAttributes.QueryParam(string) -> list<string>
 ```
 
 **Example:**
+
 ```cel
 object.attributes.QueryParam("token")
 object.attributes.QueryParam("api_key")
@@ -128,12 +137,14 @@ object.attributes.QueryParam("api_key")
 Converts a CheckResponseOk or CheckResponseDenied into a final CheckResponse.
 
 **Signature:**
+
 ```cel
 http.CheckResponseOk.Response() -> http.CheckResponse
 http.CheckResponseDenied.Response() -> http.CheckResponse
 ```
 
 **Example:**
+
 ```cel
 http.Allowed().Response()
 http.Denied("Forbidden").Response()
