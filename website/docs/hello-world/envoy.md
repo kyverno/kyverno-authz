@@ -21,6 +21,8 @@ Before starting, ensure you have:
 
 ## Step 1: Create a Policy
 
+Start by creating a simple **ValidatingPolicy**.
+
 Save the following policy as `quick-start.yaml` in your working directory:
 
 ```yaml
@@ -61,26 +63,36 @@ This policy:
 
 ## Step 2: Run the Envoy Authz Server
 
-Start the Authz Server with Docker:
+You can use Docker to start the Kyverno Authz Server and load the policy created above.
+
+Run the following command from your terminal:
 
 ```bash
-docker run --rm                                         \
-  -p 9081:9081                                          \
-  ghcr.io/kyverno/kyverno-authz:latest                  \
-  serve envoy authz-server --kube-policy-source=false   \
+docker run --rm                                               \
+  -p 9081:9081                                                \
+  -v ${PWD}/quick-start.yaml:/data/policies/quick-start.yaml  \
+  ghcr.io/kyverno/kyverno-authz:latest                        \
+  serve envoy authz-server --kube-policy-source=false         \
   --external-policy-source file://data/policies
 ```
 
-Expected startup output:
+!!! info
+    - The flag --external-policy-source tells the server to load policies from file://data/policies.
+    - Port 9081 is exposed for HTTP requests.
+    - TLS certificates are not required for this example.
+
+Once the container starts, you should see output similar to this:
 
 ```
 2025-11-17T12:19:18+01:00       INFO    Using namespace 'default' - consider setting explicit namespace
 2025-11-17T12:19:18+01:00       INFO    GRPC Server starting... {"address": "[::]:9081", "network": "tcp"}
 ```
 
-The gRPC server listens on port **9081**.
+This confirms the server is running and listening on port `9081`.
 
 ## Step 3: Send Requests to the Server
+
+Now that the server is running, you can send test requests to observe how the policy behaves.
 
 ### Example 1 — Missing Authorization Header
 
@@ -104,8 +116,14 @@ Response:
 
 ```json
 {
-  "status": { "code": 7 },
-  "deniedResponse": { "status": { "code": "Unauthorized" } }
+  "status": {
+    "code": 7
+  },
+  "deniedResponse": {
+    "status": {
+      "code": "Unauthorized"
+    }
+  }
 }
 ```
 
@@ -133,8 +151,14 @@ Response:
 
 ```json
 {
-  "status": { "code": 7 },
-  "deniedResponse": { "status": { "code": "Forbidden" } }
+  "status": {
+    "code": 7
+  },
+  "deniedResponse": {
+    "status": {
+      "code": "Forbidden"
+    }
+  }
 }
 ```
 

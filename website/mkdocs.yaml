@@ -13,7 +13,6 @@ nav:
     - hello-world/index.md
     - HTTP: hello-world/http.md
     - Envoy: hello-world/envoy.md
-    - Sidecar Injector: quick-start/sidecar-injector.md
   - Next Steps: quick-start/next-steps.md
 - Authz Server:
   - server/index.md
@@ -28,6 +27,7 @@ nav:
     - server/http/configuration.md
     - server/http/programmability.md
     - server/http/example.md
+  - Sidecar Injector: server/sidecar-injector.md
 - Policies:
   - policies/index.md
   - Envoy Policy Breakdown: policies/envoy-policy-breakdown.md

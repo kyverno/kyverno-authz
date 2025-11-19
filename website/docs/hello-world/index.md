@@ -1,7 +1,8 @@
 # Hello World
 
 The **Hello World** examples provide the simplest possible introduction to the **Kyverno Authorization Server**.
-It’s designed to help you understand the basic workflow, configuration, and behavior of the server—without requiring Kubernetes or any external setup.
+
+It’s designed to help you understand the basic workflow, configuration, and behavior of the server, without requiring Kubernetes or any external setup.
 
 - [Envoy Authz Server](./envoy.md)
 - [HTTP Authz Server](./http.md)

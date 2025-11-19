@@ -8,4 +8,4 @@ If you didn't read the [Getting Started](../quick-start/index.md) section yet, w
 - [Hello World](../hello-world/index.md)
 - [Envoy example](../server/envoy/example.md)
 - [HTTP example](../server/http/example.md)
-- [Sidecar injector guide](../quick-start/sidecar-injector.md)
+- [Sidecar injector guide](../server/sidecar-injector.md)

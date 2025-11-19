@@ -20,4 +20,3 @@ Runs as a programmable HTTP server that evaluates requests directly and returns 
 
 - **[Envoy Hello World](../hello-world/envoy.md)** – Introduction to the Envoy Authz Server
 - **[HTTP Hello World](../hello-world/http.md)** – Introduction to the HTTP Authz Server
-- **[Sidecar Injector](./sidecar-injector.md)** – Automate sidecar injection

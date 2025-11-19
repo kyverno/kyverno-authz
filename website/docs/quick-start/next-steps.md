@@ -8,7 +8,8 @@ We covered the main components of the Kyverno Authz Server.
 
 To continue exploring and learn more about the Kyverno Authz Server:
 
+- [Checkout authz server docs](../server/index.md)
 - [Start writing your own policies](../policies/index.md)
 - [Browse the tutorials section](../tutorials/index.md)
-- [Consult the Reference documentation](../reference/index.md)
-- [Engage with our Community and start contributing](../community/index.md)
+- [Consult the reference documentation](../reference/index.md)
+- [Engage with our community and start contributing](../community/index.md)
