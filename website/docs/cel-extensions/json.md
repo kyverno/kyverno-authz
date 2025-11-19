@@ -1,4 +1,4 @@
-# JSON library
+# Json library
 
 The JSON CEL library provides functions for parsing JSON strings into CEL values.
 

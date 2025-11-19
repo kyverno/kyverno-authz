@@ -1,4 +1,4 @@
-# HTTP library
+# Http library
 
 The `http` library provides types and functions for working with HTTP requests and responses in CEL expressions.
 
