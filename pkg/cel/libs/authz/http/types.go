@@ -20,6 +20,10 @@ type (
 	query  = map[string][]string
 )
 
+type CheckRequest struct {
+	Attributes CheckRequestAttributes `cel:"attributes"`
+}
+
 type CheckRequestAttributes struct {
 	Method        string `cel:"method"`
 	Header        header `cel:"header"`
@@ -33,19 +37,15 @@ type CheckRequestAttributes struct {
 	Fragment      string `cel:"fragment"`
 }
 
-type CheckRequest struct {
-	Attributes CheckRequestAttributes `cel:"attributes"`
+type CheckResponse struct {
+	Ok     *CheckResponseOk     `cel:"ok"`
+	Denied *CheckResponseDenied `cel:"denied"`
 }
 
 type CheckResponseOk struct{}
 
 type CheckResponseDenied struct {
 	Reason string `cel:"reason"`
-}
-
-type CheckResponse struct {
-	Ok     *CheckResponseOk     `cel:"ok"`
-	Denied *CheckResponseDenied `cel:"denied"`
 }
 
 func NewRequest(r *http.Request) (CheckRequest, error) {

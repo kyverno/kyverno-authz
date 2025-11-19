@@ -42,6 +42,15 @@ Contains all the attributes of an HTTP request.
 object.attributes.method == "POST" && object.attributes.path.startsWith("/api")
 ```
 
+### `http.CheckResponse`
+
+The final response object that contains either an OK or Denied response.
+
+| Field | CEL Type | Description |
+|---|---|---|
+| `ok` | `http.CheckResponseOk` | Set if request is allowed |
+| `denied` | `http.CheckResponseDenied` | Set if request is denied |
+
 ### `http.CheckResponseOk`
 
 Represents an allowed/approved response (empty struct).
@@ -54,18 +63,9 @@ Represents a denied response with a reason.
 |---|---|---|
 | `reason` | `string` | Reason for denial |
 
-### `http.CheckResponse`
-
-The final response object that contains either an OK or Denied response.
-
-| Field | CEL Type | Description |
-|---|---|---|
-| `ok` | `http.CheckResponseOk` | Set if request is allowed |
-| `denied` | `http.CheckResponseDenied` | Set if request is denied |
-
 ## Functions
 
-### http.Allowed()
+### http.Allowed
 
 Creates an allowed response (CheckResponseOk).
 
@@ -81,7 +81,7 @@ http.Allowed() -> http.CheckResponseOk
 http.Allowed()
 ```
 
-### http.Denied()
+### http.Denied
 
 Creates a denied response with a reason string.
 
@@ -98,7 +98,7 @@ http.Denied("Access denied: insufficient permissions")
 http.Denied("Invalid authentication token")
 ```
 
-### Header()
+### Header
 
 Gets all values for a specific header from the request attributes. Returns a list of strings.
 
@@ -115,7 +115,7 @@ object.attributes.Header("authorization")
 object.attributes.Header("content-type")
 ```
 
-### QueryParam()
+### QueryParam
 
 Gets all values for a specific query parameter from the request attributes. Returns a list of strings.
 
@@ -132,7 +132,7 @@ object.attributes.QueryParam("token")
 object.attributes.QueryParam("api_key")
 ```
 
-### Response()
+### Response
 
 Converts a CheckResponseOk or CheckResponseDenied into a final CheckResponse.
 
