@@ -170,7 +170,7 @@ validatingWebhookConfiguration:
 EOF
 ```
 
-## Create a Kyverno ValidatingPolicy
+### Create a Kyverno ValidatingPolicy
 
 In summary the policy below does the following:
 
@@ -218,7 +218,7 @@ spec:
 EOF
 ```
 
-## Create a GatewayExtension to delegate auth to the Kyverno Authz Server
+### Create a GatewayExtension to delegate auth to the Kyverno Authz Server
 
 ```bash
 kubectl apply -f - <<EOF

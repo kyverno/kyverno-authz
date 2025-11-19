@@ -171,7 +171,7 @@ Notice that in this resource, we define the Kyverno Authz Server `extensionProvi
 [...]
 ```
 
-## Create a Kyverno ValidatingPolicy
+### Create a Kyverno ValidatingPolicy
 
 In summary the policy below does the following:
 

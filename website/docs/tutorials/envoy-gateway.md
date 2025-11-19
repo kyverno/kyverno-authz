@@ -186,7 +186,7 @@ validatingWebhookConfiguration:
 EOF
 ```
 
-## Create a Kyverno ValidatingPolicy
+### Create a Kyverno ValidatingPolicy
 
 In summary the policy below does the following:
 
