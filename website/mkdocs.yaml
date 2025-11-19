@@ -35,10 +35,11 @@ nav:
   - CEL extensions:
     - cel-extensions/index.md
     - cel-extensions/envoy.md
-    - cel-extensions/json.md
+    - cel-extensions/http.md
+    - cel-extensions/httpserver.md
     - cel-extensions/jwk.md
     - cel-extensions/jwt.md
-    - cel-extensions/http.md
+    - cel-extensions/json.md
     - cel-extensions/mcp.md
 - Tutorials:
   - tutorials/index.md

@@ -1,4 +1,4 @@
-# MCP Library
+# Mcp Library
 
 The MCP (Match Condition Parameters) CEL extension enables parsing and extracting arguments from an MCP JSON payload, as specified in [Envoy's Match Condition Parameters](https://github.com/envoyproxy/envoy/blob/main/api-docs/xds_protocol.rst#match-condition-parameters).
 
