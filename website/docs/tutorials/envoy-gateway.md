@@ -30,9 +30,9 @@ First we need to install Envoy Gateway in the cluster.
 
 ```bash
 # install envoy gateway
-helm install envoy-gateway \
+helm install envoy-gateway                            \
   --namespace envoy-gateway-system --create-namespace \
-  --wait \
+  --wait                                              \
   --version v1.6.0 oci://docker.io/envoyproxy/gateway-helm
 ```
 
@@ -46,7 +46,7 @@ kubectl create ns demo
 
 # deploy the httpbin application
 kubectl apply \
-  -n demo \
+  -n demo     \
   -f https://raw.githubusercontent.com/istio/istio/master/samples/httpbin/httpbin.yaml
 ```
 
@@ -54,11 +54,14 @@ kubectl apply \
 
 With Envoy Gateway installed we can now create a `Gateway`. To do so we will also create a dedicated `GatewayClass`.
 
-Depending on your setup you will potentially need to create an `EnvoyProxy` resource to customize the way Envoy Gateway will create the underlying `Service`. The script below creates one to set the name and type of the service because the kind cluster created in the first step doesn't come with load balancer support.
+Depending on your setup you will potentially need to create an `EnvoyProxy` resource to customize the way Envoy Gateway will create the underlying `Service`.
+
+The script below creates one to set the name and type of the service because the kind cluster created in the first step doesn't come with load balancer support.
 
 ```yaml
 # create a gateway
 kubectl apply -n demo -f - <<EOF
+---
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: EnvoyProxy
 metadata:
@@ -103,6 +106,7 @@ Next, we need to link the Gateway to our sample applicate with an `HTTPRoute`.
 ```yaml
 # create an http route to the sample app
 kubectl apply -n demo -f - <<EOF
+---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -130,19 +134,27 @@ The Kyverno Authz Server comes with a validation webhook and needs a certificate
 
 Let's deploy `cert-manager` to manage the certificate we need.
 
-```bash
+Install cert-manager:
+
+```yaml
 # install cert-manager
-helm install cert-manager \
-  --namespace cert-manager --create-namespace \
-  --wait \
-  --repo https://charts.jetstack.io cert-manager \
+helm install cert-manager                         \
+  --namespace cert-manager --create-namespace     \
+  --wait                                          \
+  --repo https://charts.jetstack.io cert-manager  \
   --values - <<EOF
+---
 crds:
   enabled: true
 EOF
+```
 
-# create a self-signed cluster issuer
+Create a certificate issuer:
+
+```yaml
+# create a certificate issuer
 kubectl apply -f - <<EOF
+---
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
@@ -167,13 +179,14 @@ kubectl apply \
 
 Now we can deploy the Kyverno Authz Server.
 
-```bash
+```yaml
 # deploy the kyverno authz server
-helm install kyverno-authz-server \
-  --namespace kyverno --create-namespace \
-  --wait \
-  --repo https://kyverno.github.io/kyverno-authz kyverno-authz-server \
+helm install kyverno-authz-server                                       \
+  --namespace kyverno --create-namespace                                \
+  --wait                                                                \
+  --repo https://kyverno.github.io/kyverno-authz kyverno-authz-server   \
   --values - <<EOF
+---
 config:
   type: envoy
 validatingWebhookConfiguration:
@@ -196,6 +209,7 @@ In summary the policy below does the following:
 ```yaml
 # deploy kyverno authorization policy
 kubectl apply -f - <<EOF
+---
 apiVersion: policies.kyverno.io/v1alpha1
 kind: ValidatingPolicy
 metadata:
@@ -241,6 +255,7 @@ A `SecurityPolicy` is the custom Envoy Gateway resource to configure underlying 
 ```yaml
 # deploy envoy gateway security policy
 kubectl apply -n demo -f - <<EOF
+---
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: SecurityPolicy
 metadata:
@@ -294,6 +309,7 @@ Last thing we need to configure is to grant access to the Kyverno Authz Server s
 ```yaml
 # grant access
 kubectl apply -n kyverno -f - <<EOF
+---
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: ReferenceGrant
 metadata:

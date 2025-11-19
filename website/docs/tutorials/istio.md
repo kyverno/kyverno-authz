@@ -29,17 +29,20 @@ We need to register the Kyverno Authz Server with Istio.
 
 ```bash
 # install istio base chart
-helm install istio-base \
+helm install istio-base                       \
   --namespace istio-system --create-namespace \
-  --wait \
+  --wait                                      \
   --repo https://istio-release.storage.googleapis.com/charts base
+```
 
+```yaml
 # install istiod chart
-helm install istiod \
-  --namespace istio-system --create-namespace \
-  --wait \
+helm install istiod                                                 \
+  --namespace istio-system --create-namespace                       \
+  --wait                                                            \
   --repo https://istio-release.storage.googleapis.com/charts istiod \
   --values - <<EOF
+---
 meshConfig:
   accessLogFile: /dev/stdout
   extensionProviders:
@@ -68,19 +71,27 @@ The Kyverno Authz Server comes with a validation webhook and needs a certificate
 
 Let's deploy `cert-manager` to manage the certificate we need.
 
-```bash
+Install cert-manager:
+
+```yaml
 # install cert-manager
-helm install cert-manager \
-  --namespace cert-manager --create-namespace \
-  --wait \
-  --repo https://charts.jetstack.io cert-manager \
+helm install cert-manager                         \
+  --namespace cert-manager --create-namespace     \
+  --wait                                          \
+  --repo https://charts.jetstack.io cert-manager  \
   --values - <<EOF
+---
 crds:
   enabled: true
 EOF
+```
 
-# create a self-signed cluster issuer
+Create a certificate issuer:
+
+```yaml
+# create a certificate issuer
 kubectl apply -f - <<EOF
+---
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
@@ -105,13 +116,14 @@ kubectl apply \
 
 Now we can deploy the Kyverno Authz Server.
 
-```bash
+```yaml
 # deploy the kyverno authz server
-helm install kyverno-authz-server \
-  --namespace kyverno --create-namespace \
-  --wait \
+helm install kyverno-authz-server                                     \
+  --namespace kyverno --create-namespace                              \
+  --wait                                                              \
   --repo https://kyverno.github.io/kyverno-authz kyverno-authz-server \
   --values - <<EOF
+---
 config:
   type: envoy
 validatingWebhookConfiguration:
@@ -137,7 +149,7 @@ kubectl label namespace demo istio-injection=enabled
 
 # deploy the httpbin application
 kubectl apply \
-   -n demo \
+   -n demo    \
    -f https://raw.githubusercontent.com/istio/istio/master/samples/httpbin/httpbin.yaml
 ```
 
@@ -148,6 +160,7 @@ An `AuthorizationPolicy` is the custom Istio resource that defines the services 
 ```yaml
 # deploy istio authorization policy
 kubectl apply -f - <<EOF
+---
 apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:
@@ -181,6 +194,7 @@ In summary the policy below does the following:
 ```yaml
 # deploy kyverno authorization policy
 kubectl apply -f - <<EOF
+---
 apiVersion: policies.kyverno.io/v1alpha1
 kind: ValidatingPolicy
 metadata:

@@ -29,9 +29,9 @@ First we need to install Ingress NGINX in the cluster.
 
 ```yaml
 # install ingress-nginx
-helm install ingress-nginx \
-  --namespace ingress-nginx --create-namespace \
-  --wait \
+helm install ingress-nginx                                        \
+  --namespace ingress-nginx --create-namespace                    \
+  --wait                                                          \
   --repo https://kubernetes.github.io/ingress-nginx ingress-nginx \
   --values - <<EOF
 ---
@@ -53,7 +53,7 @@ kubectl create ns demo
 
 # deploy the httpbin application
 kubectl apply \
-  -n demo \
+  -n demo     \
   -f https://raw.githubusercontent.com/istio/istio/master/samples/httpbin/httpbin.yaml
 ```
 
@@ -99,10 +99,10 @@ Let's deploy `cert-manager` to manage the certificate we need.
 
 ```yaml
 # install cert-manager
-helm install cert-manager \
-  --namespace cert-manager --create-namespace \
-  --wait \
-  --repo https://charts.jetstack.io cert-manager \
+helm install cert-manager                         \
+  --namespace cert-manager --create-namespace     \
+  --wait                                          \
+  --repo https://charts.jetstack.io cert-manager  \
   --values - <<EOF
 ---
 crds:
@@ -140,9 +140,9 @@ Now we can deploy the Kyverno Authz Server.
 
 ```yaml
 # deploy the kyverno authz server
-helm install kyverno-authz-server \
-  --namespace kyverno --create-namespace \
-  --wait \
+helm install kyverno-authz-server                                     \
+  --namespace kyverno --create-namespace                              \
+  --wait                                                              \
   --repo https://kyverno.github.io/kyverno-authz kyverno-authz-server \
   --values - <<EOF
 ---
@@ -265,26 +265,26 @@ export BOB_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjIyNDEwODE1MzksI
 Calling without a JWT token will return `401`:
 
 ```bash
-curl -s -w "\nhttp_code=%{http_code}" \
-  ingress-nginx-controller.ingress-nginx/anything/api/v1 \
+curl -s -w "\nhttp_code=%{http_code}"                     \
+  ingress-nginx-controller.ingress-nginx/anything/api/v1  \
   -H "Host: myapp.com"
 ```
 
 Calling with Alice’s JWT token will return `403`:
 
 ```bash
-curl -s -w "\nhttp_code=%{http_code}" \
-  ingress-nginx-controller.ingress-nginx/anything/api/v1 \
-  -H "Host: myapp.com" \
+curl -s -w "\nhttp_code=%{http_code}"                     \
+  ingress-nginx-controller.ingress-nginx/anything/api/v1  \
+  -H "Host: myapp.com"                                    \
   -H "authorization: Bearer $ALICE_TOKEN"
 ```
 
 Calling with Bob’s JWT token will return `200`:
 
 ```bash
-curl -s -w "\nhttp_code=%{http_code}" \
-  ingress-nginx-controller.ingress-nginx/anything/api/v1 \
-  -H "Host: myapp.com" \
+curl -s -w "\nhttp_code=%{http_code}"                     \
+  ingress-nginx-controller.ingress-nginx/anything/api/v1  \
+  -H "Host: myapp.com"                                    \
   -H "authorization: Bearer $BOB_TOKEN"
 ```
 

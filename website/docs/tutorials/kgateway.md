@@ -1,6 +1,10 @@
 # KGateway
 
-[kgateway](https://https://kgateway.dev/) is the most mature and widely deployed Envoy-based gateway in the market today. Built on open source and open standards, kgateway implements the Kubernetes Gateway API with a control plane that scales from lightweight microgateway deployments between services, to massively parallel centralized gateways handling billions of API calls, to advanced AI gateway use cases for safety, security, and governance when serving models or integrating applications with third-party LLMs. kgateway brings omni-directional API connectivity to any cloud and any environment.
+[kgateway](https://https://kgateway.dev/) is the most mature and widely deployed Envoy-based gateway in the market today.
+
+Built on open source and open standards, kgateway implements the Kubernetes Gateway API with a control plane that scales from lightweight microgateway deployments between services, to massively parallel centralized gateways handling billions of API calls, to advanced AI gateway use cases for safety, security, and governance when serving models or integrating applications with third-party LLMs.
+
+`kgateway` brings omni-directional API connectivity to any cloud and any environment.
 
 This tutorial shows how kgateway can be configured to delegate authorization decisions to the Kyverno Authz Server.
 
@@ -48,7 +52,7 @@ kubectl create ns demo
 
 # deploy the httpbin application
 kubectl apply \
-  -n demo \
+  -n demo     \
   -f https://raw.githubusercontent.com/istio/istio/master/samples/httpbin/httpbin.yaml
 ```
 
@@ -56,8 +60,9 @@ kubectl apply \
 
 Create an API gateway with an HTTP listener by using the Kubernetes Gateway API.
 
-```bash
+```yaml
 kubectl apply -f - <<EOF
+---
 kind: Gateway
 apiVersion: gateway.networking.k8s.io/v1
 metadata:
@@ -83,8 +88,9 @@ EOF
 
 Now that you have an app and a gateway proxy, you can create a route to access the app.
 
-```bash
+```yaml
 kubectl apply -f - <<EOF
+---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -114,19 +120,28 @@ The Kyverno Authz Server comes with a validation webhook and needs a certificate
 
 Let's deploy `cert-manager` to manage the certificate we need.
 
-```bash
+
+Install cert-manager:
+
+```yaml
 # install cert-manager
-helm install cert-manager \
-  --namespace cert-manager --create-namespace \
-  --wait \
-  --repo https://charts.jetstack.io cert-manager \
+helm install cert-manager                         \
+  --namespace cert-manager --create-namespace     \
+  --wait                                          \
+  --repo https://charts.jetstack.io cert-manager  \
   --values - <<EOF
+---
 crds:
   enabled: true
 EOF
+```
 
-# create a self-signed cluster issuer
+Create a certificate issuer:
+
+```yaml
+# create a certificate issuer
 kubectl apply -f - <<EOF
+---
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
@@ -151,13 +166,14 @@ kubectl apply \
 
 Now we can deploy the Kyverno Authz Server.
 
-```bash
+```yaml
 # deploy the kyverno authz server
-helm install kyverno-authz-server \
-  --namespace kyverno --create-namespace \
-  --wait \
+helm install kyverno-authz-server                                     \
+  --namespace kyverno --create-namespace                              \
+  --wait                                                              \
   --repo https://kyverno.github.io/kyverno-authz kyverno-authz-server \
   --values - <<EOF
+---
 config:
   type: envoy
 validatingWebhookConfiguration:
@@ -180,6 +196,7 @@ In summary the policy below does the following:
 ```yaml
 # deploy kyverno authorization policy
 kubectl apply -f - <<EOF
+---
 apiVersion: policies.kyverno.io/v1alpha1
 kind: ValidatingPolicy
 metadata:
@@ -220,8 +237,9 @@ EOF
 
 ### Create a GatewayExtension to delegate auth to the Kyverno Authz Server
 
-```bash
+```yaml
 kubectl apply -f - <<EOF
+---
 apiVersion: gateway.kgateway.dev/v1alpha1
 kind: GatewayExtension
 metadata:
@@ -235,9 +253,7 @@ spec:
         name: kyverno-authz-server
         namespace: kyverno
         port: 9081
-EOF
-
-kubectl apply -f - <<EOF
+---
 apiVersion: gateway.kgateway.dev/v1alpha1
 kind: TrafficPolicy
 metadata:
@@ -258,9 +274,10 @@ EOF
 
 Last thing we need to configure is to grant access to the Kyverno Authz Server service for our GatewayExtension to take effect.
 
-```bash
+```yaml
 # grant access
 kubectl apply -f - <<EOF
+---
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: ReferenceGrant
 metadata:
