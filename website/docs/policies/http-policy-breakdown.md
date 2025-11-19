@@ -37,6 +37,7 @@ spec:
 The `failurePolicy` defines how to handle failures during policy evaluation (parse errors, type check errors, runtime errors).
 
 Allowed values:
+
 - `Fail` (default): Deny the request if policy evaluation fails
 - `Ignore`: Allow the request if policy evaluation fails
 
@@ -129,10 +130,12 @@ spec:
 ### Error Handling
 
 If a match condition evaluation fails:
+
 1. If any match condition evaluated to `false`, the policy is skipped
 2. Otherwise:
-   - For `failurePolicy: Fail`: Reject the request
-   - For `failurePolicy: Ignore`: Skip the policy and allow the request
+
+    - For `failurePolicy: Fail`: Reject the request
+    - For `failurePolicy: Ignore`: Skip the policy and allow the request
 
 ## Variables
 
@@ -241,6 +244,7 @@ spec:
 ```
 
 This policy demonstrates:
+
 - **Sequential evaluation**: Each validation is checked in order
 - **Conditional responses**: Using ternary operators to return responses or null
 - **Different denial reasons**: Providing specific reasons for authentication vs authorization failures

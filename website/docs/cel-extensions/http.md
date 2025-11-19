@@ -1,6 +1,8 @@
 # HTTP library
 
-The `http` library provides types and functions for working with HTTP requests and responses in CEL expressions. It enables policies to inspect incoming HTTP requests and construct authorization responses.
+The `http` library provides types and functions for working with HTTP requests and responses in CEL expressions.
+
+It enables policies to inspect incoming HTTP requests and construct authorization responses.
 
 ## Types
 

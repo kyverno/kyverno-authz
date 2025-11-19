@@ -1,6 +1,8 @@
 # CEL extensions
 
-The CEL engine used to evaluate variables and authorization rules has been extended with libraries to help processing the input `CheckRequest` and forge the corresponding `OkResponse` and/or `DeniedResponse`.
+The CEL engine used to evaluate variables and authorization rules has been extended with various libraries. Each library has a different scope and purpose.
+
+Some libraries are specific to `Envoy` or `HTTP` while others are common to booth Authz Server types.
 
 ## Kyverno Authz libraries
 

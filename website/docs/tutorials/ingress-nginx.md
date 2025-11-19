@@ -194,9 +194,9 @@ metadata:
   name: demo
 spec:
   evaluation:
-    mode: HTTP 
-  failurePolicy: Fail 
-  variables: 
+    mode: HTTP
+  failurePolicy: Fail
+  variables:
   - name: authorizationlist
     expression: object.attributes.Header("authorization")
   - name: authorization
@@ -209,7 +209,7 @@ spec:
       size(variables.authorization) == 2 && variables.authorization[0].lowerAscii() == "bearer"
         ? jwt.Decode(variables.authorization[1], "secret")
         : null
-  validations: 
+  validations:
     # request not authenticated -> 401
   - expression: >
       variables.token == null || !variables.token.Valid

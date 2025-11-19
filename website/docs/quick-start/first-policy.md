@@ -62,7 +62,6 @@ The policy below does the following:
 
 === "HTTP"
 
-
     ```yaml
     apiVersion: policies.kyverno.io/v1alpha1
     kind: ValidatingPolicy
@@ -73,25 +72,30 @@ The policy below does the following:
         mode: HTTP # (1)!
       failurePolicy: Fail # (2)!
       variables: # (3)!
+      - name: authorizationlist
+        expression: object.attributes.Header("authorization")
       - name: authorization
-        expression: object.attributes.header[?"authorization"].orValue("").split(" ")
+        expression: >
+          size(variables.authorizationlist) == 1
+            ? variables.authorizationlist[0].split(" ")
+            : []
       - name: token
         expression: >
           size(variables.authorization) == 2 && variables.authorization[0].lowerAscii() == "bearer"
             ? jwt.Decode(variables.authorization[1], "secret")
             : null
       validations: # (4)!
-        # request not authenticated -> allowed
+        # request not authenticated -> 401
       - expression: >
           variables.token == null || !variables.token.Valid
-            ? http.Allowed().Response()
+            ? http.Denied("Unauthorized").Response()
             : null
-        # request authenticated but not admin role -> denied
+        # request authenticated but not admin role -> 403
       - expression: >
           variables.token.Claims.?role.orValue("") != "admin"
-            ? http.Denied("authenticated but not an admin").Response()
+            ? http.Denied("Forbidden").Response()
             : null
-        # request authenticated and admin role -> allowed
+        # request authenticated and admin role -> 200
       - expression: >
           http.Allowed().Response()
     ```
