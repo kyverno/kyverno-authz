@@ -1,116 +1,29 @@
+{{- $name := (include "sidecar-injector.name" $) }}
+{{- $namespace := (include "kyverno.lib.namespace" $) }}
+{{- $component := "sidecar-injector" }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ template "sidecar-injector.name" . }}
-  namespace: {{ template "kyverno.lib.namespace" . }}
+  name: {{ $name }}
+  namespace: {{ $namespace }}
   labels:
-    {{- include "sidecar-injector.labels" . | nindent 4 }}
-  {{- with .Values.deployment.annotations }}
-  annotations:
-    {{- tpl (toYaml .) $ | nindent 4 }}
-  {{- end }}
+    {{- include "kyverno.lib.labels.merge" (list
+      (include "kyverno.lib.labels.common" $)
+      (include "kyverno.lib.labels.common.selector" $)
+      (include "kyverno.lib.labels.component" $component)
+    ) | nindent 4 }}
 data:
-  http-sidecar.yaml: |
+  sidecar.yaml: |
+    {{- with .Values.sidecar.containers }}
+    # containers
     containers:
-    - name: {{ .Values.sidecar.name }}
-      image: {{ include "sidecar-injector.image" .Values.sidecar.image }}
-      imagePullPolicy: {{ .Values.sidecar.image.pullPolicy }}
-      ports:
-      - name: http
-        protocol: TCP
-        containerPort: 9080
-      - name: metrics
-        protocol: TCP
-        containerPort: 9082
-      - name: http-auth
-        protocol: TCP
-        containerPort: 9083
-      {{- if .Values.sidecar.config.controlPlane.address }}
-      env:
-      - name: POD_IP
-        valueFrom:
-          fieldRef:
-            fieldPath: status.podIP
-      {{- end }}
-      args:
-      - serve
-      - http
-      - authz-server
-      - --probes-address=:9080
-      - --metrics-address=:9082
-      - --http-auth-server-address={{ .Values.sidecar.config.httpAuthServerAddress }}
-      - --kube-policy-source=false
-      - --allow-insecure-registry={{ .Values.sidecar.config.allowInsecureRegistry }}
-      - --nested-request={{ .Values.sidecar.config.nestedRequest }}
-      {{- with .Values.sidecar.externalPolicySources }}
-      # external policy sources
-      {{- range . }}
-      - {{ printf "--external-policy-source=%s" (tpl (toYaml .) $) }}
-      {{- end }}
-      {{- end }}
-      {{- range .Values.sidecar.config.imagePullSecrets }}
-      - {{ printf "--image-pull-secret=%s" . }}
-      {{- end }}
-      {{- if .Values.sidecar.config.controlPlane.address }}
-      - {{ printf "--control-plane-address=%s" .Values.sidecar.config.controlPlane.address }}
-      - {{ printf "--control-plane-reconnect-wait=%s" .Values.sidecar.config.controlPlane.reconnectWait }}
-      - {{ printf "--control-plane-max-dial-interval=%s" .Values.sidecar.config.controlPlane.maxDialInterval }}
-      - {{ printf "--health-check-interval=%s" .Values.sidecar.config.controlPlane.healthCheckInterval }}
-      {{- end }}
-      {{- with .Values.sidecar.volumeMounts }}
-      # volume mounts
-      volumeMounts:
-      {{- tpl (toYaml .) $ | nindent 6 }}
-      {{- end }}
-    {{- with .Values.sidecar.volumes }}
-    # volumes
-    volumes:
     {{- tpl (toYaml .) $ | nindent 4 }}
     {{- end }}
-    {{- with .Values.sidecar.imagePullSecrets }}
-    # image pull secrets
-    imagePullSecrets:
+    {{- with .Values.sidecar.initContainers }}
+    # initContainers
+    initContainers:
     {{- tpl (toYaml .) $ | nindent 4 }}
     {{- end }}
-  envoy-sidecar.yaml: |
-    containers:
-    - name: {{ .Values.sidecar.name }}
-      image: {{ include "sidecar-injector.image" .Values.sidecar.image }}
-      imagePullPolicy: {{ .Values.sidecar.image.pullPolicy }}
-      ports:
-      - name: http
-        protocol: TCP
-        containerPort: 9080
-      - name: grpc
-        protocol: TCP
-        containerPort: 9081
-      - name: metrics
-        protocol: TCP
-        containerPort: 9082
-      args:
-      - serve
-      - envoy
-      - authz-server
-      - --probes-address=:9080
-      - --grpc-address=:9081
-      - --grpc-network={{ .Values.sidecar.config.grpcNetwork }}
-      - --metrics-address=:9082
-      - --kube-policy-source=false
-      - --allow-insecure-registry={{ .Values.sidecar.config.allowInsecureRegistry }}
-      {{- with .Values.sidecar.externalPolicySources }}
-      # external policy sources
-      {{- range . }}
-      - {{ printf "--external-policy-source=%s" (tpl (toYaml .) $) }}
-      {{- end }}
-      {{- end }}
-      {{- range .Values.sidecar.config.imagePullSecrets }}
-      - {{ printf "--image-pull-secret=%s" . }}
-      {{- end }}
-      {{- with .Values.sidecar.volumeMounts }}
-      # volume mounts
-      volumeMounts:
-      {{- tpl (toYaml .) $ | nindent 6 }}
-      {{- end }}
     {{- with .Values.sidecar.volumes }}
     # volumes
     volumes:

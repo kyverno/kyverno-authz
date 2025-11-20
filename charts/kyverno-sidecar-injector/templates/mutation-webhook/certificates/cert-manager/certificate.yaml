@@ -1,0 +1,26 @@
+{{- with .Values.mutatingWebhookConfiguration.certificates.certManager -}}
+{{- $name := (include "sidecar-injector.name" $) }}
+{{- $namespace := (include "kyverno.lib.namespace" $) }}
+{{- $component := "sidecar-injector" }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $name }}
+  namespace: {{ $namespace }}
+  labels:
+    {{- include "kyverno.lib.labels.merge" (list
+      (include "kyverno.lib.labels.common" $)
+      (include "kyverno.lib.labels.common.selector" $)
+      (include "kyverno.lib.labels.component" $component)
+    ) | nindent 4 }}
+spec:
+  secretName: {{ $name }}
+  privateKey:
+    rotationPolicy: Always
+  dnsNames:
+    - {{ printf "%s.%s.svc" $name $namespace }}
+  {{- with .issuerRef }}
+  issuerRef:
+    {{- tpl (toYaml .) $ | nindent 4 }}
+  {{- end }}
+{{- end }}

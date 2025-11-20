@@ -255,8 +255,11 @@ authzServer:
     # -- Service port.
     port: 9081
 
+    # -- Service application protocol.
     appProtocol: ~
 
+    # -- Service node port.
+    # Only used if `type` is `NodePort`.
     nodePort: ~
 
 validatingWebhookConfiguration:
@@ -448,6 +451,3 @@ validatingWebhookConfiguration:
       - containerPort: 9443
         name: webhook
         protocol: TCP
-
-crds:
-  install: false

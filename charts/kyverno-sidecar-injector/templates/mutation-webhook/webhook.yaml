@@ -1,0 +1,50 @@
+{{- $name := (include "sidecar-injector.name" $) }}
+{{- $namespace := (include "kyverno.lib.namespace" $) }}
+{{- $component := "sidecar-injector" }}
+{{- $value := .Values.mutatingWebhookConfiguration }}
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "kyverno.lib.labels.merge" (list
+      (include "kyverno.lib.labels.common" $)
+      (include "kyverno.lib.labels.common.selector" $)
+      (include "kyverno.lib.labels.component" $component)
+    ) | nindent 4 }}
+  {{- if (or $value.certificates.certManager $value.annotations) }}
+  annotations:
+    {{- with $value.annotations }}
+    {{- tpl (toYaml .) $ | nindent 4 }}
+    {{- end }}
+    {{- if $value.certificates.certManager }}
+    cert-manager.io/inject-ca-from: {{ printf "%s/%s" $namespace $name }}
+    {{- end }}
+  {{- end }}
+webhooks:
+  - name: {{ printf "%s.%s.svc" $name $namespace }}
+    clientConfig:
+      service:
+        name: {{ $name }}
+        namespace: {{ $namespace }}
+        path: /mutate
+      {{- if $value.certificates.static }}
+      caBundle: {{ index $value.certificates.static.crt | b64enc }}
+      {{- end }}
+    failurePolicy: {{ $value.failurePolicy }}
+    sideEffects: None
+    admissionReviewVersions: [ v1 ]
+    rules:
+      - apiGroups: [ '' ]
+        apiVersions: [ v1 ]
+        resources: [ pods ]
+        operations: [ CREATE ]
+        scope: '*'
+    {{- with $value.objectSelector }}
+    objectSelector:
+      {{- tpl (toYaml .) $ | nindent 6 }}
+    {{- end }}
+    {{- with $value.namespaceSelector }}
+    namespaceSelector:
+      {{- tpl (toYaml .) $ | nindent 6 }}
+    {{- end }}

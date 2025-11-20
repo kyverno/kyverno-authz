@@ -79,8 +79,8 @@ helm install kyverno-authz-server --namespace kyverno --create-namespace kyverno
 | authzServer.service.annotations | object | `{}` | Service annotations. |
 | authzServer.service.type | string | `"ClusterIP"` | Service type. |
 | authzServer.service.port | int | `9081` | Service port. |
-| authzServer.service.appProtocol | string | `nil` |  |
-| authzServer.service.nodePort | string | `nil` |  |
+| authzServer.service.appProtocol | string | `nil` | Service application protocol. |
+| authzServer.service.nodePort | string | `nil` | Service node port. Only used if `type` is `NodePort`. |
 | validatingWebhookConfiguration.annotations | object | `{}` | Webhook annotations |
 | validatingWebhookConfiguration.certificates.static | object | `{}` | Static data to set in certificate secret |
 | validatingWebhookConfiguration.certificates.certManager | object | `{}` | Infos for creating certificate with cert manager |
@@ -113,7 +113,6 @@ helm install kyverno-authz-server --namespace kyverno --create-namespace kyverno
 | validatingWebhookConfiguration.container.livenessProbe | object | See [values.yaml](values.yaml) | Liveness probe. The block is directly forwarded into the deployment, so you can use whatever livenessProbe configuration you want. ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/ |
 | validatingWebhookConfiguration.container.readinessProbe | object | See [values.yaml](values.yaml) | Readiness Probe. The block is directly forwarded into the deployment, so you can use whatever readinessProbe configuration you want. ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/ |
 | validatingWebhookConfiguration.container.ports | list | `[{"containerPort":9080,"name":"probes","protocol":"TCP"},{"containerPort":9082,"name":"metrics","protocol":"TCP"},{"containerPort":9443,"name":"webhook","protocol":"TCP"}]` | Container ports. |
-| crds.install | bool | `false` |  |
 
 ## Source Code
 

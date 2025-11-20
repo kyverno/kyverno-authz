@@ -1,0 +1,34 @@
+sidecar:
+  volumes:
+  - name: kyverno-authz-server
+    configMap:
+      name: kyverno-authz-server
+      optional: true
+  containers:
+  - name: kyverno-authz-server
+    imagePullPolicy: IfNotPresent
+    ports:
+    - name: http
+      protocol: TCP
+      containerPort: 9080
+    - name: auth
+      protocol: TCP
+      containerPort: 9081
+    - name: metrics
+      protocol: TCP
+      containerPort: 9082
+    args:
+    - serve
+    - envoy
+    - authz-server
+    - --probes-address=:9080
+    - --grpc-address=:9081
+    - --grpc-network=tcp
+    - --metrics-address=:9082
+    - --kube-policy-source=false
+    - --allow-insecure-registry=false
+    - --external-policy-source=file://data/kyverno-authz-server
+    volumeMounts:
+    - name: kyverno-authz-server
+      readOnly: true
+      mountPath: /data/kyverno-authz-server
