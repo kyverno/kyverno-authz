@@ -42,10 +42,6 @@ helm install kyverno-authz-server --namespace kyverno --create-namespace kyverno
 | config.http.outputExpression | string | `""` | CEL: expression applied to outgoing responses |
 | config.sources.kube | bool | `true` | Enable in-cluster kubernetes policy source |
 | config.sources.external | list | `[]` | External policy sources |
-| config.sources.controlPlane.address | string | `""` | Control plane address (leave empty for standalone mode) |
-| config.sources.controlPlane.reconnectWait | string | `"3s"` | Duration to wait before retrying connecting to the control plane |
-| config.sources.controlPlane.maxDialInterval | string | `"8s"` | Duration to wait before stopping attempts of sending a policy to a client |
-| config.sources.controlPlane.healthCheckInterval | string | `"30s"` | Interval for sending health checks |
 | config.allowInsecureRegistry | bool | `false` | Allow insecure registry for pulling policy images |
 | config.imagePullSecrets | list | `[]` | Image pull secrets for fetching policies from OCI registries |
 | authzServer.deployment.replicas | int | `nil` | Desired number of pods |
@@ -79,8 +75,8 @@ helm install kyverno-authz-server --namespace kyverno --create-namespace kyverno
 | authzServer.service.annotations | object | `{}` | Service annotations. |
 | authzServer.service.type | string | `"ClusterIP"` | Service type. |
 | authzServer.service.port | int | `9081` | Service port. |
-| authzServer.service.appProtocol | string | `nil` |  |
-| authzServer.service.nodePort | string | `nil` |  |
+| authzServer.service.appProtocol | string | `nil` | Service application protocol. |
+| authzServer.service.nodePort | string | `nil` | Service node port. Only used if `type` is `NodePort`. |
 | validatingWebhookConfiguration.annotations | object | `{}` | Webhook annotations |
 | validatingWebhookConfiguration.certificates.static | object | `{}` | Static data to set in certificate secret |
 | validatingWebhookConfiguration.certificates.certManager | object | `{}` | Infos for creating certificate with cert manager |
@@ -113,7 +109,6 @@ helm install kyverno-authz-server --namespace kyverno --create-namespace kyverno
 | validatingWebhookConfiguration.container.livenessProbe | object | See [values.yaml](values.yaml) | Liveness probe. The block is directly forwarded into the deployment, so you can use whatever livenessProbe configuration you want. ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/ |
 | validatingWebhookConfiguration.container.readinessProbe | object | See [values.yaml](values.yaml) | Readiness Probe. The block is directly forwarded into the deployment, so you can use whatever readinessProbe configuration you want. ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/ |
 | validatingWebhookConfiguration.container.ports | list | `[{"containerPort":9080,"name":"probes","protocol":"TCP"},{"containerPort":9082,"name":"metrics","protocol":"TCP"},{"containerPort":9443,"name":"webhook","protocol":"TCP"}]` | Container ports. |
-| crds.install | bool | `false` |  |
 
 ## Source Code
 

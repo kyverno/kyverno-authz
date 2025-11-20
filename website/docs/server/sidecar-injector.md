@@ -29,17 +29,20 @@ We need to register the Kyverno Authz Server with Istio.
 
 ```bash
 # install istio base chart
-helm install istio-base \
+helm install istio-base                       \
   --namespace istio-system --create-namespace \
-  --wait \
+  --wait                                      \
   --repo https://istio-release.storage.googleapis.com/charts base
+```
 
+```yaml
 # install istiod chart
-helm install istiod \
-  --namespace istio-system --create-namespace \
-  --wait \
+helm install istiod                                                 \
+  --namespace istio-system --create-namespace                       \
+  --wait                                                            \
   --repo https://istio-release.storage.googleapis.com/charts istiod \
   --values - <<EOF
+---
 meshConfig:
   accessLogFile: /dev/stdout
   extensionProviders:
@@ -50,13 +53,13 @@ meshConfig:
 EOF
 ```
 
-Notice that in the configuration, we define an `extensionProviders` section that points to `kyverno-authz-server.local`, this the service entry we will use to let Envoy talk to our sidecar:
+Notice that in the configuration, we define an `extensionProviders` section that points to `kyverno-authz-server.local`, this is the service entry we will use to let Envoy talk to our sidecar:
 
 ```yaml
 [...]
 meshConfig:
   extensionProviders:
-  - name: kyverno-authz-server.local
+  - name: kyverno-authz-server
     envoyExtAuthzGrpc:
       service: kyverno-authz-server.local
       port: '9081'
@@ -67,9 +70,10 @@ meshConfig:
 
 We need to tell istio about the sidecar we injected and how to reach it.
 
-```bash
+```yaml
 # register authz server sidecar in the mesh
 kubectl apply -f - <<EOF
+---
 apiVersion: networking.istio.io/v1
 kind: ServiceEntry
 metadata:
@@ -93,19 +97,27 @@ The Kyverno Authz Server comes with a validation webhook and needs a certificate
 
 Let's deploy `cert-manager` to manage the certificate we need.
 
-```bash
+Install cert-manager:
+
+```yaml
 # install cert-manager
-helm install cert-manager \
-  --namespace cert-manager --create-namespace \
-  --wait \
-  --repo https://charts.jetstack.io cert-manager \
+helm install cert-manager                         \
+  --namespace cert-manager --create-namespace     \
+  --wait                                          \
+  --repo https://charts.jetstack.io cert-manager  \
   --values - <<EOF
+---
 crds:
   enabled: true
 EOF
+```
 
-# create a self-signed cluster issuer
+Create a certificate issuer:
+
+```yaml
+# create a certificate issuer
 kubectl apply -f - <<EOF
+---
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
@@ -149,9 +161,10 @@ It uses the [CEL language](https://github.com/google/cel-spec) to analyse the in
     Because the sidecar usually doesn't have the permissions to fetch policies from the API server, we need to provide the policies using an external source.
     In this example, we use a config map.
 
-```bash
+```yaml
 # deploy kyverno validating policy
 kubectl apply -f - <<EOF
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -184,13 +197,14 @@ This simple policy will deny requests if they don't contain the header `x-force-
 
 Now we can deploy the Kyverno Authz Server.
 
-```bash
+```yaml
 # deploy the kyverno sidecar injector
 helm install kyverno-authz-server \
   --namespace kyverno --create-namespace \
   --wait  \
   --repo https://kyverno.github.io/kyverno-authz kyverno-sidecar-injector \
   --values - <<EOF
+---
 certificates:
   certManager:
     issuerRef:
@@ -222,7 +236,7 @@ Httpbin is a well-known application that can be used to test HTTP requests and h
 ```bash
 # deploy the httpbin application
 kubectl apply \
-  -n demo \
+  -n demo     \
   -f https://raw.githubusercontent.com/istio/istio/master/samples/httpbin/httpbin.yaml
 ```
 
@@ -230,9 +244,10 @@ kubectl apply \
 
 An `AuthorizationPolicy` is the custom Istio resource that defines the services that will be protected by the Kyverno Authz Server.
 
-```bash
+```yaml
 # deploy istio authorization policy
 kubectl apply -f - <<EOF
+---
 apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:
@@ -241,7 +256,7 @@ metadata:
 spec:
   action: CUSTOM
   provider:
-    name: kyverno-authz-server.local
+    name: kyverno-authz-server
   rules:
   - {} # empty rules, it will apply to all requests
 EOF
@@ -252,7 +267,7 @@ Notice that in this resource, we define the Kyverno Authz Server `extensionProvi
 ```yaml
 [...]
   provider:
-    name: kyverno-authz-server.local
+    name: kyverno-authz-server
 [...]
 ```
 

@@ -374,16 +374,14 @@ deploy-kyverno-sidecar-injector: $(HELM)
 	@$(HELM) dependency build --skip-refresh ./charts/kyverno-sidecar-injector
 	@echo Install kyverno-sidecar-injector chart... >&2
 	@$(HELM) upgrade --install kyverno-sidecar-injector --namespace kyverno --create-namespace --wait ./charts/kyverno-sidecar-injector \
-		--set containers.injector.image.registry=$(KO_REGISTRY) \
-		--set containers.injector.image.repository=$(PACKAGE) \
-		--set containers.injector.image.tag=$(GIT_SHA) \
-		--set sidecar.image.registry=$(KO_REGISTRY) \
-		--set sidecar.image.repository=$(PACKAGE) \
-		--set sidecar.image.tag=$(GIT_SHA) \
-		--set certificates.certManager.issuerRef.group=cert-manager.io \
-		--set certificates.certManager.issuerRef.kind=ClusterIssuer \
-		--set certificates.certManager.issuerRef.name=selfsigned-issuer \
-		--values .manifests/sidecar-injector/values.yaml
+		--set container.image.registry=$(KO_REGISTRY) \
+		--set container.image.repository=$(PACKAGE) \
+		--set container.image.tag=$(GIT_SHA) \
+		--set mutatingWebhookConfiguration.certificates.certManager.issuerRef.group=cert-manager.io \
+		--set mutatingWebhookConfiguration.certificates.certManager.issuerRef.kind=ClusterIssuer \
+		--set mutatingWebhookConfiguration.certificates.certManager.issuerRef.name=selfsigned-issuer \
+		--values .manifests/sidecar-injector/envoy-values.yaml \
+		--set sidecar.containers[0].image=$(KO_REGISTRY)/$(PACKAGE):$(GIT_SHA)
 
 .PHONY: install-kyverno-sidecar-injector
 install-kyverno-sidecar-injector: ## Install kyverno-sidecar-injector chart

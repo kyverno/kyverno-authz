@@ -11,33 +11,30 @@ nameOverride: ~
 # -- (string) Override the expanded name of the chart
 fullnameOverride: ~
 
-rbac:
+sidecar:
+  # -- (list) Additional init containers
+  initContainers: []
 
+  # -- (list) Additional containers
+  containers: []
+
+  # -- (list) Additional volumes
+  volumes: []
+
+  # -- (list) Additional image pull secrets
+  imagePullSecrets: []
+
+rbac:
   # -- Create RBAC resources
   create: true
 
   serviceAccount:
-
     # -- The ServiceAccount name
     name:
 
     # -- Annotations for the ServiceAccount
     annotations: {}
       # example.com/annotation: value
-
-certificates:
-
-  # -- Static data to set in certificate secret
-  static: {}
-    # crt: ...
-    # key: ...
-
-  # -- Infos for creating certificate with cert manager
-  certManager: {}
-    # issuerRef:
-    #   name: selfsigned-issuer
-    #   kind: ClusterIssuer
-    #   group: cert-manager.io
 
 deployment:
 
@@ -86,7 +83,7 @@ pod:
   topologySpreadConstraints: []
 
   # -- Optional priority class
-  priorityClassName: ''
+  priorityClassName: ""
 
   # -- Change `hostNetwork` to `true` when you want the pod to share its host's network namespace.
   # Useful for situations like when you end up dealing with a custom CNI over Amazon EKS.
@@ -118,126 +115,123 @@ pod:
   # -- Node affinity constraints.
   nodeAffinity: {}
 
-containers:
+container:
+  image:
+    # -- Image registry
+    registry: ghcr.io
 
-  injector:
+    # -- Image repository
+    repository: kyverno/kyverno-authz
 
-    image:
+    # -- (string) Image tag
+    # Defaults to appVersion in Chart.yaml if omitted
+    tag: ~
 
-      # -- Image registry
-      registry: ghcr.io
+    # -- Image pull policy
+    pullPolicy: IfNotPresent
 
-      # -- Image repository
-      repository: kyverno/kyverno-authz
+  resources:
+    # -- Pod resource limits
+    limits:
+      memory: 384Mi
 
-      # -- (string) Image tag
-      # Defaults to appVersion in Chart.yaml if omitted
-      tag: ~
+    # -- Pod resource requests
+    requests:
+      cpu: 100m
+      memory: 128Mi
 
-      # -- Image pull policy
-      pullPolicy: IfNotPresent
+  # -- Container security context
+  securityContext:
+    runAsNonRoot: true
+    privileged: false
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+    seccompProfile:
+      type: RuntimeDefault
 
-    resources:
+  # -- Startup probe.
+  # The block is directly forwarded into the deployment, so you can use whatever startupProbes configuration you want.
+  # ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/
+  # @default -- See [values.yaml](values.yaml)
+  startupProbe:
+    httpGet:
+      path: /livez
+      port: 9443
+      scheme: HTTPS
+    failureThreshold: 20
+    initialDelaySeconds: 2
+    periodSeconds: 6
 
-      # -- Pod resource limits
-      limits:
-        memory: 384Mi
+  # -- Liveness probe.
+  # The block is directly forwarded into the deployment, so you can use whatever livenessProbe configuration you want.
+  # ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/
+  # @default -- See [values.yaml](values.yaml)
+  livenessProbe:
+    httpGet:
+      path: /livez
+      port: 9443
+      scheme: HTTPS
+    initialDelaySeconds: 15
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 2
+    successThreshold: 1
 
-      # -- Pod resource requests
-      requests:
-        cpu: 100m
-        memory: 128Mi
+  # -- Readiness Probe.
+  # The block is directly forwarded into the deployment, so you can use whatever readinessProbe configuration you want.
+  # ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/
+  # @default -- See [values.yaml](values.yaml)
+  readinessProbe:
+    httpGet:
+      path: /readyz
+      port: 9443
+      scheme: HTTPS
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6
+    successThreshold: 1
 
-    # -- Container security context
-    securityContext:
-      runAsNonRoot: true
-      privileged: false
-      allowPrivilegeEscalation: false
-      readOnlyRootFilesystem: true
-      capabilities:
-        drop:
-          - ALL
-      seccompProfile:
-        type: RuntimeDefault
-
-    # -- Startup probe.
-    # The block is directly forwarded into the deployment, so you can use whatever startupProbes configuration you want.
-    # ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/
-    # @default -- See [values.yaml](values.yaml)
-    startupProbe:
-      httpGet:
-        path: /livez
-        port: 9443
-        scheme: HTTPS
-      failureThreshold: 20
-      initialDelaySeconds: 2
-      periodSeconds: 6
-
-    # -- Liveness probe.
-    # The block is directly forwarded into the deployment, so you can use whatever livenessProbe configuration you want.
-    # ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/
-    # @default -- See [values.yaml](values.yaml)
-    livenessProbe:
-      httpGet:
-        path: /livez
-        port: 9443
-        scheme: HTTPS
-      initialDelaySeconds: 15
-      periodSeconds: 30
-      timeoutSeconds: 5
-      failureThreshold: 2
-      successThreshold: 1
-
-    # -- Readiness Probe.
-    # The block is directly forwarded into the deployment, so you can use whatever readinessProbe configuration you want.
-    # ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/
-    # @default -- See [values.yaml](values.yaml)
-    readinessProbe:
-      httpGet:
-        path: /readyz
-        port: 9443
-        scheme: HTTPS
-      initialDelaySeconds: 5
-      periodSeconds: 10
-      timeoutSeconds: 5
-      failureThreshold: 6
-      successThreshold: 1
-
-    # -- Container ports.
-    ports:
-    - containerPort: 9443
-      name: https
-      protocol: TCP
-
-    # -- Container args.
-    args:
-      - serve
-      - sidecar-injector
-      - --address=:9443
-      - --cert-file=/opt/kubernetes-sidecar-injector/certs/tls.crt
-      - --key-file=/opt/kubernetes-sidecar-injector/certs/tls.key
-      - --config-file=/opt/kubernetes-sidecar-injector/config/envoy-sidecar.yaml
+  # -- Container ports.
+  ports:
+  - containerPort: 9443
+    name: https
+    protocol: TCP
 
 service:
-
-  # -- Service port.
-  port: 443
+  # -- Service annotations.
+  annotations: {}
 
   # -- Service type.
   type: ClusterIP
 
+  # -- Service port.
+  port: 443
+
   # -- Service node port.
   # Only used if `type` is `NodePort`.
-  nodePort:
+  nodePort: ~
 
-  # -- Service annotations.
-  annotations: {}
-
-webhook:
-
+mutatingWebhookConfiguration:
   # -- Webhook annotations
   annotations: {}
     # example.com/annotation: value
+
+  certificates:
+    # -- Static data to set in certificate secret
+    static: {}
+      # crt: ...
+      # key: ...
+
+    # -- Infos for creating certificate with cert manager
+    certManager: {}
+      # issuerRef:
+      #   name: selfsigned-issuer
+      #   kind: ClusterIssuer
+      #   group: cert-manager.io
 
   # -- Webhook failure policy
   failurePolicy: Fail
@@ -252,66 +246,3 @@ webhook:
         operator: In
         values:
         - enabled
-
-sidecar:
-
-  # -- Sidecar container name
-  name: kyverno-authz-server
-
-  image:
-
-    # -- Image registry
-    registry: ghcr.io
-
-    # -- Image repository
-    repository: kyverno/kyverno-authz
-
-    # -- (string) Image tag
-    # Defaults to appVersion in Chart.yaml if omitted
-    tag: ~
-
-    # -- Image pull policy
-    pullPolicy: IfNotPresent
-
-  # -- (list) External policy sources
-  externalPolicySources: []
-
-  # -- (list) Additional volumes
-  volumes: []
-
-  # -- (list) Additional sidecar container volume mounts
-  volumeMounts: []
-
-  # -- (list) Additional image pull secrets
-  imagePullSecrets: []
-
-  config:
-    # -- GRPC network type (tcp, unix, etc.)
-    grpcNetwork: tcp
-
-    # -- HTTP authorization server address
-    httpAuthServerAddress: ":9083"
-
-    # -- Allow insecure registry for pulling policy images
-    allowInsecureRegistry: false
-
-    # -- Expect the requests to validate to be in the body of the original request
-    nestedRequest: false
-
-    # -- Image pull secrets for fetching policies from OCI registries
-    imagePullSecrets: []
-      # - secret-name
-
-    # Control plane settings (for sidecar mode)
-    controlPlane:
-      # -- Control plane address (required for sidecar mode)
-      address: ""
-
-      # -- Duration to wait before retrying connecting to the control plane
-      reconnectWait: 3s
-
-      # -- Duration to wait before stopping attempts of sending a policy to a client
-      maxDialInterval: 8s
-
-      # -- Interval for sending health checks
-      healthCheckInterval: 30s
