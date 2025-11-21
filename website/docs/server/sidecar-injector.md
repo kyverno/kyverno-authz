@@ -33,16 +33,13 @@ helm install istio-base                       \
   --namespace istio-system --create-namespace \
   --wait                                      \
   --repo https://istio-release.storage.googleapis.com/charts base
-```
 
-```yaml
 # install istiod chart
 helm install istiod                                                 \
   --namespace istio-system --create-namespace                       \
   --wait                                                            \
   --repo https://istio-release.storage.googleapis.com/charts istiod \
   --values - <<EOF
----
 meshConfig:
   accessLogFile: /dev/stdout
   extensionProviders:
@@ -70,10 +67,9 @@ meshConfig:
 
 We need to tell istio about the sidecar we injected and how to reach it.
 
-```yaml
+```bash
 # register authz server sidecar in the mesh
 kubectl apply -f - <<EOF
----
 apiVersion: networking.istio.io/v1
 kind: ServiceEntry
 metadata:
@@ -99,14 +95,13 @@ Let's deploy `cert-manager` to manage the certificate we need.
 
 Install cert-manager:
 
-```yaml
+```bash
 # install cert-manager
 helm install cert-manager                         \
   --namespace cert-manager --create-namespace     \
   --wait                                          \
   --repo https://charts.jetstack.io cert-manager  \
   --values - <<EOF
----
 crds:
   enabled: true
 EOF
@@ -114,10 +109,9 @@ EOF
 
 Create a certificate issuer:
 
-```yaml
+```bash
 # create a certificate issuer
 kubectl apply -f - <<EOF
----
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
@@ -161,10 +155,9 @@ It uses the [CEL language](https://github.com/google/cel-spec) to analyse the in
     Because the sidecar usually doesn't have the permissions to fetch policies from the API server, we need to provide the policies using an external source.
     In this example, we use a config map.
 
-```yaml
+```bash
 # deploy kyverno validating policy
 kubectl apply -f - <<EOF
----
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -197,35 +190,58 @@ This simple policy will deny requests if they don't contain the header `x-force-
 
 Now we can deploy the Kyverno Authz Server.
 
-```yaml
+```bash
 # deploy the kyverno sidecar injector
-helm install kyverno-authz-server \
-  --namespace kyverno --create-namespace \
-  --wait  \
+helm install kyverno-sidecar-injector                                     \
+  --namespace kyverno --create-namespace                                  \
+  --wait                                                                  \
   --repo https://kyverno.github.io/kyverno-authz kyverno-sidecar-injector \
   --values - <<EOF
----
-certificates:
-  certManager:
-    issuerRef:
-      group: cert-manager.io
-      kind: ClusterIssuer
-      name: selfsigned-issuer
+mutatingWebhookConfiguration:
+  certificates:
+    certManager:
+      issuerRef:
+        group: cert-manager.io
+        kind: ClusterIssuer
+        name: selfsigned-issuer
 sidecar:
-  externalPolicySources:
-    # load policies from the file system
-  - file://data/kyverno-authz-server
+  # add configmap in the target pod
   volumes:
-    # add configmap in the target pod
   - name: kyverno-authz-server
     configMap:
       name: kyverno-authz-server
       optional: true
-  volumeMounts:
-    # mount the configmap in sidecar container
+  # add kyverno authz server sidecar
+  initContainers:
   - name: kyverno-authz-server
-    readOnly: true
-    mountPath: /data/kyverno-authz-server
+    image: ghcr.io/kyverno/kyverno-authz:latest
+    imagePullPolicy: IfNotPresent
+    restartPolicy: Always
+    ports:
+    - name: http
+      protocol: TCP
+      containerPort: 9080
+    - name: auth
+      protocol: TCP
+      containerPort: 9081
+    - name: metrics
+      protocol: TCP
+      containerPort: 9082
+    args:
+    - serve
+    - envoy
+    - authz-server
+    - --probes-address=:9080
+    - --grpc-address=:9081
+    - --grpc-network=tcp
+    - --metrics-address=:9082
+    - --kube-policy-source=false
+    - --allow-insecure-registry=false
+    - --external-policy-source=file://data/kyverno-authz-server
+    volumeMounts:
+    - name: kyverno-authz-server
+      readOnly: true
+      mountPath: /data/kyverno-authz-server
 EOF
 ```
 
@@ -244,10 +260,9 @@ kubectl apply \
 
 An `AuthorizationPolicy` is the custom Istio resource that defines the services that will be protected by the Kyverno Authz Server.
 
-```yaml
+```bash
 # deploy istio authorization policy
 kubectl apply -f - <<EOF
----
 apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:

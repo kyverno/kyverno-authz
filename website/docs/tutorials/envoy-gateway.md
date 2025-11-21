@@ -58,10 +58,9 @@ Depending on your setup you will potentially need to create an `EnvoyProxy` reso
 
 The script below creates one to set the name and type of the service because the kind cluster created in the first step doesn't come with load balancer support.
 
-```yaml
+```bash
 # create a gateway
 kubectl apply -n demo -f - <<EOF
----
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: EnvoyProxy
 metadata:
@@ -103,10 +102,9 @@ EOF
 
 Next, we need to link the Gateway to our sample applicate with an `HTTPRoute`.
 
-```yaml
+```bash
 # create an http route to the sample app
 kubectl apply -n demo -f - <<EOF
----
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -136,14 +134,13 @@ Let's deploy `cert-manager` to manage the certificate we need.
 
 Install cert-manager:
 
-```yaml
+```bash
 # install cert-manager
 helm install cert-manager                         \
   --namespace cert-manager --create-namespace     \
   --wait                                          \
   --repo https://charts.jetstack.io cert-manager  \
   --values - <<EOF
----
 crds:
   enabled: true
 EOF
@@ -151,10 +148,9 @@ EOF
 
 Create a certificate issuer:
 
-```yaml
+```bash
 # create a certificate issuer
 kubectl apply -f - <<EOF
----
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
@@ -179,14 +175,13 @@ kubectl apply \
 
 Now we can deploy the Kyverno Authz Server.
 
-```yaml
+```bash
 # deploy the kyverno authz server
 helm install kyverno-authz-server                                       \
   --namespace kyverno --create-namespace                                \
   --wait                                                                \
   --repo https://kyverno.github.io/kyverno-authz kyverno-authz-server   \
   --values - <<EOF
----
 config:
   type: envoy
 validatingWebhookConfiguration:
@@ -206,10 +201,9 @@ In summary the policy below does the following:
 - Checks that the JWT token is valid
 - Checks that the action is allowed based on the token payload `role` and the request path
 
-```yaml
+```bash
 # deploy kyverno authorization policy
 kubectl apply -f - <<EOF
----
 apiVersion: policies.kyverno.io/v1alpha1
 kind: ValidatingPolicy
 metadata:
@@ -252,10 +246,9 @@ EOF
 
 A `SecurityPolicy` is the custom Envoy Gateway resource to configure underlying Envoy Proxy to use an external auth server (the Kyverno Authz Server we installed in a prior step).
 
-```yaml
+```bash
 # deploy envoy gateway security policy
 kubectl apply -n demo -f - <<EOF
----
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: SecurityPolicy
 metadata:
@@ -306,10 +299,9 @@ Also notice that the security policy applies to the `demo` HTTPRoute:
 
 Last thing we need to configure is to grant access to the Kyverno Authz Server service for our SecurityPolicy to take effect.
 
-```yaml
+```bash
 # grant access
 kubectl apply -n kyverno -f - <<EOF
----
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: ReferenceGrant
 metadata:

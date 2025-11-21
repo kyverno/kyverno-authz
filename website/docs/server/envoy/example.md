@@ -67,20 +67,24 @@ meshConfig:
 
 The Kyverno Authz Server comes with a validation webhook and needs a certificate to let the api server call into it.
 
-Let's deploy `cert-manager` to manage the certificate we need.
+Install cert-manager:
 
 ```bash
 # install cert-manager
-helm install cert-manager \
-  --namespace cert-manager --create-namespace \
-  --wait \
-  --repo https://charts.jetstack.io cert-manager \
+helm install cert-manager                         \
+  --namespace cert-manager --create-namespace     \
+  --wait                                          \
+  --repo https://charts.jetstack.io cert-manager  \
   --values - <<EOF
 crds:
   enabled: true
 EOF
+```
 
-# create a self-signed cluster issuer
+Create a certificate issuer:
+
+```bash
+# create a certificate issuer
 kubectl apply -f - <<EOF
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
@@ -108,9 +112,9 @@ Now we can deploy the Kyverno Authz Server.
 
 ```bash
 # deploy the kyverno authz server
-helm install kyverno-authz-server \
-  --namespace kyverno --create-namespace \
-  --wait \
+helm install kyverno-authz-server                                     \
+  --namespace kyverno --create-namespace                              \
+  --wait                                                              \
   --repo https://kyverno.github.io/kyverno-authz kyverno-authz-server \
   --values - <<EOF
 config:
@@ -138,7 +142,7 @@ kubectl label namespace demo istio-injection=enabled
 
 # deploy the httpbin application
 kubectl apply \
-  -n demo \
+  -n demo     \
   -f https://raw.githubusercontent.com/istio/istio/master/samples/httpbin/httpbin.yaml
 ```
 
