@@ -4,11 +4,7 @@ updates:
     directory: /
     schedule:
       interval: daily
-    labels:
-      - bot
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: daily
-    labels:
-      - bot
