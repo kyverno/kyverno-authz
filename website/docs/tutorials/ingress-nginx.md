@@ -89,8 +89,6 @@ spec:
 EOF
 ```
 
-The `nginx.ingress.kubernetes.io/auth-url` annotation points to `localhost:9081` because the Kyverno Authz Server sidecar is injected into the Ingress NGINX controller pod and runs locally on port 9081 (HTTP). The Ingress is configured for host `myapp.com` and path `/api/v1/*` to match the ValidatingPolicy conditions.
-
 ### Deploy cert-manager
 
 The Kyverno Authz Server comes with a validation webhook and needs a certificate to let the api server call into it.
