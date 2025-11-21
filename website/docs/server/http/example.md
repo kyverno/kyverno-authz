@@ -23,17 +23,26 @@ kind create cluster --image $KIND_IMAGE --wait 1m
 
 ### Deploy cert-manager
 
-The Kyverno HTTP Authorizer components need certificates for their webhooks.
+The Kyverno Authz Server comes with a validation webhook and needs a certificate to let the api server call into it.
+
+Install cert-manager:
 
 ```bash
 # install cert-manager
-helm install cert-manager \
-  --namespace cert-manager --create-namespace \
-  --wait \
-  --repo https://charts.jetstack.io cert-manager \
-  --set crds.enabled=true
+helm install cert-manager                         \
+  --namespace cert-manager --create-namespace     \
+  --wait                                          \
+  --repo https://charts.jetstack.io cert-manager  \
+  --values - <<EOF
+crds:
+  enabled: true
+EOF
+```
 
-# create a self-signed cluster issuer
+Create a certificate issuer:
+
+```bash
+# create a certificate issuer
 kubectl apply -f - <<EOF
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
@@ -46,18 +55,36 @@ EOF
 
 For more certificate management options, refer to [Certificates management](../../quick-start/kube-install.md#certificates-management).
 
+### Install Kyverno ValidatingPolicy CRD
+
+Before deploying the Kyverno Authz Server, we need to install the Kyverno ValidatingPolicy CRD.
+
+```bash
+kubectl apply \
+  -f https://raw.githubusercontent.com/kyverno/kyverno/refs/heads/main/config/crds/policies.kyverno.io/policies.kyverno.io_validatingpolicies.yaml
+```
+
 ### Deploy the Authz server
+
+Now we can deploy the Kyverno Authz Server.
 
 ```bash
 # deploy the kyverno authz server
-helm install kyverno-authz-server                                       \
-  --namespace kyverno --create-namespace                                \
-  --wait                                                                \
-  --repo https://kyverno.github.io/kyverno-authz kyverno-authz-server   \
-  --set config.type=http                                                \
-  --set certManager.issuerRef.name=selfsigned-issuer                    \
-  --set certManager.issuerRef.kind=ClusterIssuer                        \
-  --set certManager.issuerRef.group=cert-manager.io
+helm install kyverno-authz-server                                     \
+  --namespace kyverno --create-namespace                              \
+  --wait                                                              \
+  --repo https://kyverno.github.io/kyverno-authz kyverno-authz-server \
+  --values - <<EOF
+config:
+  type: http
+validatingWebhookConfiguration:
+  certificates:
+    certManager:
+      issuerRef:
+        group: cert-manager.io
+        kind: ClusterIssuer
+        name: selfsigned-issuer
+EOF
 ```
 
 ### Deploy a ValidatingPolicy

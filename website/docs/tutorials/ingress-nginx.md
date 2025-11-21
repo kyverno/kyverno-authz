@@ -27,14 +27,13 @@ kind create cluster --image $KIND_IMAGE --wait 1m
 
 First we need to install Ingress NGINX in the cluster.
 
-```yaml
+```bash
 # install ingress-nginx
 helm install ingress-nginx                                        \
   --namespace ingress-nginx --create-namespace                    \
   --wait                                                          \
   --repo https://kubernetes.github.io/ingress-nginx ingress-nginx \
   --values - <<EOF
----
 controller:
   service:
     type: ClusterIP
@@ -61,10 +60,9 @@ kubectl apply \
 
 Now create a separate Ingress resource for `myapp.com` with external authentication enabled.
 
-```yaml
+```bash
 # create ingress with external auth for myapp.com
 kubectl apply -n demo -f - <<EOF
----
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -95,23 +93,25 @@ The Kyverno Authz Server comes with a validation webhook and needs a certificate
 
 Let's deploy `cert-manager` to manage the certificate we need.
 
-```yaml
+Install cert-manager:
+
+```bash
 # install cert-manager
 helm install cert-manager                         \
   --namespace cert-manager --create-namespace     \
   --wait                                          \
   --repo https://charts.jetstack.io cert-manager  \
   --values - <<EOF
----
 crds:
   enabled: true
 EOF
 ```
 
-```yaml
-# create a self-signed cluster issuer
+Create a certificate issuer:
+
+```bash
+# create a certificate issuer
 kubectl apply -f - <<EOF
----
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
@@ -136,14 +136,13 @@ kubectl apply \
 
 Now we can deploy the Kyverno Authz Server.
 
-```yaml
+```bash
 # deploy the kyverno authz server
 helm install kyverno-authz-server                                     \
   --namespace kyverno --create-namespace                              \
   --wait                                                              \
   --repo https://kyverno.github.io/kyverno-authz kyverno-authz-server \
   --values - <<EOF
----
 config:
   type: http
   http:
@@ -183,9 +182,8 @@ In summary the policy below does the following:
 - Checks that the JWT token is valid
 - Checks that the action is allowed based on the token payload `role` and the request path
 
-```yaml
+```bash
 kubectl apply -f - <<EOF
----
 apiVersion: policies.kyverno.io/v1alpha1
 kind: ValidatingPolicy
 metadata:

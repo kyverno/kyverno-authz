@@ -33,16 +33,13 @@ helm install istio-base                       \
   --namespace istio-system --create-namespace \
   --wait                                      \
   --repo https://istio-release.storage.googleapis.com/charts base
-```
 
-```yaml
 # install istiod chart
 helm install istiod                                                 \
   --namespace istio-system --create-namespace                       \
   --wait                                                            \
   --repo https://istio-release.storage.googleapis.com/charts istiod \
   --values - <<EOF
----
 meshConfig:
   accessLogFile: /dev/stdout
   extensionProviders:
@@ -73,14 +70,13 @@ Let's deploy `cert-manager` to manage the certificate we need.
 
 Install cert-manager:
 
-```yaml
+```bash
 # install cert-manager
 helm install cert-manager                         \
   --namespace cert-manager --create-namespace     \
   --wait                                          \
   --repo https://charts.jetstack.io cert-manager  \
   --values - <<EOF
----
 crds:
   enabled: true
 EOF
@@ -88,10 +84,9 @@ EOF
 
 Create a certificate issuer:
 
-```yaml
+```bash
 # create a certificate issuer
 kubectl apply -f - <<EOF
----
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
@@ -116,14 +111,13 @@ kubectl apply \
 
 Now we can deploy the Kyverno Authz Server.
 
-```yaml
+```bash
 # deploy the kyverno authz server
 helm install kyverno-authz-server                                     \
   --namespace kyverno --create-namespace                              \
   --wait                                                              \
   --repo https://kyverno.github.io/kyverno-authz kyverno-authz-server \
   --values - <<EOF
----
 config:
   type: envoy
 validatingWebhookConfiguration:
@@ -157,10 +151,9 @@ kubectl apply \
 
 An `AuthorizationPolicy` is the custom Istio resource that defines the services that will be protected by the Kyverno Authz Server.
 
-```yaml
+```bash
 # deploy istio authorization policy
 kubectl apply -f - <<EOF
----
 apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:
@@ -191,10 +184,9 @@ In summary the policy below does the following:
 - Checks that the JWT token is valid
 - Checks that the action is allowed based on the token payload `role` and the request path
 
-```yaml
+```bash
 # deploy kyverno authorization policy
 kubectl apply -f - <<EOF
----
 apiVersion: policies.kyverno.io/v1alpha1
 kind: ValidatingPolicy
 metadata:

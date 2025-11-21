@@ -54,14 +54,13 @@ If you don't want to manage the certificate yourself you can rely on [cert-manag
 
 Install cert-manager:
 
-```yaml
+```bash
 # install cert-manager
 helm install cert-manager                         \
   --namespace cert-manager --create-namespace     \
   --wait                                          \
   --repo https://charts.jetstack.io cert-manager  \
   --values - <<EOF
----
 crds:
   enabled: true
 EOF
@@ -69,10 +68,9 @@ EOF
 
 Create a certificate issuer:
 
-```yaml
+```bash
 # create a certificate issuer
 kubectl apply -f - <<EOF
----
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
@@ -88,7 +86,7 @@ Now we can deploy the Kyverno Authz Server.
 
 === "Envoy (static certs)"
 
-    ```yaml
+    ```bash
     # deploy the kyverno authz server
     helm upgrade --install kyverno-authz-server                                   \
       --namespace kyverno --create-namespace                                      \
@@ -97,7 +95,6 @@ Now we can deploy the Kyverno Authz Server.
       --set-file validatingWebhookConfiguration.certificates.static.crt=tls.crt   \
       --set-file validatingWebhookConfiguration.certificates.static.key=tls.key   \
       --values - <<EOF
-    ---
     config:
       type: envoy
     EOF
@@ -105,7 +102,7 @@ Now we can deploy the Kyverno Authz Server.
 
 === "HTTP (static certs)"
 
-    ```yaml
+    ```bash
     # deploy the kyverno authz server
     helm upgrade --install kyverno-authz-server                                   \
       --namespace kyverno --create-namespace                                      \
@@ -114,7 +111,6 @@ Now we can deploy the Kyverno Authz Server.
       --set-file validatingWebhookConfiguration.certificates.static.crt=tls.crt   \
       --set-file validatingWebhookConfiguration.certificates.static.key=tls.key   \
       --values - <<EOF
-    ---
     config:
       type: http
     EOF
@@ -122,14 +118,13 @@ Now we can deploy the Kyverno Authz Server.
 
 === "Envoy (cert manager)"
 
-    ```yaml
+    ```bash
     # deploy the kyverno authz server
     helm upgrade --install kyverno-authz-server                             \
       --namespace kyverno --create-namespace                                \
       --wait                                                                \
       --repo https://kyverno.github.io/kyverno-authz kyverno-authz-server   \
       --values - <<EOF
-    ---
     config:
       type: envoy
     validatingWebhookConfiguration:
@@ -144,14 +139,13 @@ Now we can deploy the Kyverno Authz Server.
 
 === "HTTP (cert manager)"
 
-    ```yaml
+    ```bash
     # deploy the kyverno authz server
     helm upgrade --install kyverno-authz-server                             \
       --namespace kyverno --create-namespace                                \
       --wait                                                                \
       --repo https://kyverno.github.io/kyverno-authz kyverno-authz-server   \
       --values - <<EOF
-    ---
     config:
       type: http
     validatingWebhookConfiguration:
