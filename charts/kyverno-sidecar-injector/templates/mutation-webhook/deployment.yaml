@@ -99,7 +99,7 @@ spec:
       containers:
         {{- with .Values.container }}
         - name: injector
-          image: {{ include "sidecar-injector.image" .image }}
+          image: {{ include "sidecar-injector.image" (mustMerge .image (dict "tag" (default $.Chart.Version $.Chart.AppVersion))) }}
           imagePullPolicy: {{ .image.pullPolicy }}
           {{- with .resources }}
           resources:
