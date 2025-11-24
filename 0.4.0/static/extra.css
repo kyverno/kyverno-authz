@@ -1,0 +1,16 @@
+body>header>nav>a>img {
+    border-radius: 10%;
+    border: 1px solid #555;
+}
+
+td:nth-child(1) {
+    text-wrap: nowrap;
+}
+
+.md-typeset__table {
+   min-width: 100%;
+}
+
+.md-typeset table:not([class]) {
+    display: table;
+}
