@@ -1,7 +1,7 @@
 package engine
 
 import (
-	vpol "github.com/kyverno/kyverno/api/policies.kyverno.io/v1alpha1"
+	vpol "github.com/kyverno/api/api/policies.kyverno.io/v1beta1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 

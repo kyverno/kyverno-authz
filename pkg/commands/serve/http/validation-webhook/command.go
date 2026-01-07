@@ -4,13 +4,15 @@ import (
 	"context"
 	"fmt"
 
+	vpolv1 "github.com/kyverno/api/api/policies.kyverno.io/v1"
+	vpolv1alpha1 "github.com/kyverno/api/api/policies.kyverno.io/v1alpha1"
+	vpolv1beta1 "github.com/kyverno/api/api/policies.kyverno.io/v1beta1"
 	"github.com/kyverno/kyverno-authz/apis/v1alpha1"
 	"github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/http"
 	vpolcompiler "github.com/kyverno/kyverno-authz/pkg/engine/compiler"
 	"github.com/kyverno/kyverno-authz/pkg/probes"
 	"github.com/kyverno/kyverno-authz/pkg/signals"
 	"github.com/kyverno/kyverno-authz/pkg/webhook/validation"
-	vpol "github.com/kyverno/kyverno/api/policies.kyverno.io/v1alpha1"
 	"github.com/spf13/cobra"
 	"go.uber.org/multierr"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -50,7 +52,13 @@ func Command() *cobra.Command {
 					defer group.Wait()
 					// create a controller manager
 					scheme := runtime.NewScheme()
-					if err := vpol.Install(scheme); err != nil {
+					if err := vpolv1alpha1.Install(scheme); err != nil {
+						return err
+					}
+					if err := vpolv1beta1.Install(scheme); err != nil {
+						return err
+					}
+					if err := vpolv1.Install(scheme); err != nil {
 						return err
 					}
 					mgr, err := ctrl.NewManager(config, ctrl.Options{
@@ -64,7 +72,7 @@ func Command() *cobra.Command {
 						return fmt.Errorf("failed to construct manager: %w", err)
 					}
 					httpCompiler := vpolcompiler.NewCompiler[dynamic.Interface, *http.CheckRequest, *http.CheckResponse]()
-					vpolCompileFunc := func(policy *vpol.ValidatingPolicy) field.ErrorList {
+					vpolCompileFunc := func(policy *vpolv1beta1.ValidatingPolicy) field.ErrorList {
 						if policy.Spec.EvaluationMode() == v1alpha1.EvaluationModeHTTP {
 							_, err := httpCompiler.Compile(policy)
 							ctrl.LoggerFrom(ctx).Error(err.ToAggregate(), "Validating policy compilation error")
@@ -73,7 +81,7 @@ func Command() *cobra.Command {
 						return nil
 					}
 					v := validation.NewValidator(vpolCompileFunc)
-					if err := ctrl.NewWebhookManagedBy(mgr).For(&vpol.ValidatingPolicy{}).WithValidator(v).Complete(); err != nil {
+					if err := ctrl.NewWebhookManagedBy(mgr).For(&vpolv1beta1.ValidatingPolicy{}).WithValidator(v).Complete(); err != nil {
 						return fmt.Errorf("failed to create webhook: %w", err)
 					}
 					// create a cancellable context

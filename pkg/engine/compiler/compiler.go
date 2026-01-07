@@ -5,12 +5,12 @@ import (
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
+	vpol "github.com/kyverno/api/api/policies.kyverno.io/v1beta1"
 	"github.com/kyverno/kyverno-authz/apis/v1alpha1"
 	authzcel "github.com/kyverno/kyverno-authz/pkg/cel"
 	envoy "github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/envoy"
 	httpauth "github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/http"
 	"github.com/kyverno/kyverno-authz/sdk/extensions/policy"
-	vpol "github.com/kyverno/kyverno/api/policies.kyverno.io/v1alpha1"
 	"github.com/kyverno/kyverno/pkg/cel/libs/http"
 	"github.com/kyverno/kyverno/pkg/cel/libs/imagedata"
 	"github.com/kyverno/kyverno/pkg/cel/libs/resource"
@@ -39,7 +39,7 @@ func (c *compiler[DATA, IN, OUT]) Compile(policy *vpol.ValidatingPolicy) (policy
 		return compiledPolicy[DATA, IN, OUT]{}, err
 	}
 	return compiledPolicy[DATA, IN, OUT]{
-		failurePolicy:   policy.GetFailurePolicy(),
+		failurePolicy:   policy.GetFailurePolicy(false),
 		variables:       variables,
 		matchConditions: matchConditions,
 		rules:           rules,
