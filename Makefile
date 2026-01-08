@@ -99,7 +99,7 @@ codegen-crds: $(REGISTER_GEN)
 	@$(CONTROLLER_GEN) paths=./apis/v1alpha1/... \
 		crd:crdVersions=v1,ignoreUnexportedFields=true,generateEmbeddedObjectMeta=false \
 		output:dir=$(CRDS_PATH)/authz.kyverno.io
-	@$(CONTROLLER_GEN) paths=github.com/kyverno/kyverno/api/policies.kyverno.io/v1alpha1/... \
+	@$(CONTROLLER_GEN) paths=github.com/kyverno/api/api/policies.kyverno.io/... \
 		crd:crdVersions=v1,ignoreUnexportedFields=true,generateEmbeddedObjectMeta=false \
 		output:dir=$(CRDS_PATH)/policies.kyverno.io
 	@$(REGISTER_GEN) --go-header-file=./.hack/boilerplate.go.txt --output-file zz_generated.register.go ./apis/...
@@ -108,6 +108,7 @@ codegen-crds: $(REGISTER_GEN)
 	@rm $(CRDS_PATH)/policies.kyverno.io/policies.kyverno.io_imagevalidatingpolicies.yaml
 	@rm $(CRDS_PATH)/policies.kyverno.io/policies.kyverno.io_mutatingpolicies.yaml
 	@rm $(CRDS_PATH)/policies.kyverno.io/policies.kyverno.io_policyexceptions.yaml
+	@rm $(CRDS_PATH)/policies.kyverno.io/policies.kyverno.io_namespaced*.yaml
 	@echo Copy generated CRDs to embed in the binary... >&2
 	@rm -rf pkg/data/crds && mkdir -p pkg/data/crds
 	@cp $(CRDS_PATH)/policies.kyverno.io/* pkg/data/crds

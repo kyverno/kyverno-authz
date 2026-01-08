@@ -6,11 +6,13 @@ import (
 	"io/fs"
 	"sync"
 
+	vpolv1 "github.com/kyverno/api/api/policies.kyverno.io/v1"
+	vpolv1alpha1 "github.com/kyverno/api/api/policies.kyverno.io/v1alpha1"
+	vpolv1beta1 "github.com/kyverno/api/api/policies.kyverno.io/v1beta1"
 	"github.com/kyverno/kyverno-authz/pkg/data"
 	"github.com/kyverno/kyverno-authz/pkg/engine"
 	"github.com/kyverno/kyverno-authz/sdk/core"
 	"github.com/kyverno/kyverno-authz/sdk/core/sources"
-	vpol "github.com/kyverno/kyverno/api/policies.kyverno.io/v1alpha1"
 	"github.com/kyverno/pkg/ext/file"
 	"github.com/kyverno/pkg/ext/resource/convert"
 	"github.com/kyverno/pkg/ext/resource/loader"
@@ -19,7 +21,9 @@ import (
 )
 
 var (
-	vpolGVK = vpol.SchemeGroupVersion.WithKind("ValidatingPolicy")
+	vpolGVKv1alpha1 = vpolv1alpha1.SchemeGroupVersion.WithKind("ValidatingPolicy")
+	vpolGVKv1beta1  = vpolv1beta1.SchemeGroupVersion.WithKind("ValidatingPolicy")
+	vpolGVKv1       = vpolv1.SchemeGroupVersion.WithKind("ValidatingPolicy")
 )
 
 type document = []byte
@@ -57,7 +61,7 @@ func NewFs[POLICY any](f fs.FS, compiler engine.Compiler[POLICY]) core.Source[PO
 	flatten := sources.NewFlatten(transform)
 	load := sources.NewTransformErr(
 		flatten,
-		func(document document) (*vpol.ValidatingPolicy, error) {
+		func(document document) (*vpolv1beta1.ValidatingPolicy, error) {
 			ldr, err := DefaultLoader()
 			if err != nil {
 				return nil, fmt.Errorf("failed to load CRDs: %w", err)
@@ -67,8 +71,8 @@ func NewFs[POLICY any](f fs.FS, compiler engine.Compiler[POLICY]) core.Source[PO
 				return nil, err
 			}
 			switch gvk {
-			case vpolGVK:
-				typed, err := convert.To[vpol.ValidatingPolicy](untyped)
+			case vpolGVKv1alpha1, vpolGVKv1beta1, vpolGVKv1:
+				typed, err := convert.To[vpolv1beta1.ValidatingPolicy](untyped)
 				if err != nil {
 					return nil, fmt.Errorf("failed to convert to ValidatingPolicy: %w", err)
 				}
@@ -78,14 +82,14 @@ func NewFs[POLICY any](f fs.FS, compiler engine.Compiler[POLICY]) core.Source[PO
 		})
 	filter := sources.NewFilter(
 		load,
-		func(p *vpol.ValidatingPolicy) bool {
+		func(p *vpolv1beta1.ValidatingPolicy) bool {
 			return p != nil
 		},
 	)
 	// TODO: sort by policy name
 	compile := sources.NewTransformErr(
 		filter,
-		func(p *vpol.ValidatingPolicy) (POLICY, error) {
+		func(p *vpolv1beta1.ValidatingPolicy) (POLICY, error) {
 			c, errs := compiler.Compile(p)
 			if len(errs) > 0 {
 				return c, fmt.Errorf("failed to compile ValidatingPolicy: %w", errs.ToAggregate())

@@ -41,5 +41,5 @@ stripPrefix:
 apis:
   - name: policies.kyverno.io
     title: policies.kyverno.io (v1alpha1)
-    package: github.com/kyverno/kyverno
+    package: github.com/kyverno/api
     path: api/policies.kyverno.io/v1alpha1

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	vpol "github.com/kyverno/kyverno/api/policies.kyverno.io/v1alpha1"
+	vpol "github.com/kyverno/api/api/policies.kyverno.io/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"

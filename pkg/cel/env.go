@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/ext"
+	vpol "github.com/kyverno/api/api/policies.kyverno.io/v1beta1"
 	"github.com/kyverno/kyverno-authz/apis/v1alpha1"
 	impl "github.com/kyverno/kyverno-authz/pkg/cel/impl"
 	"github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/envoy"
@@ -12,7 +13,6 @@ import (
 	jsoncel "github.com/kyverno/kyverno-authz/pkg/cel/libs/json"
 	"github.com/kyverno/kyverno-authz/pkg/cel/libs/jwt"
 	"github.com/kyverno/kyverno-authz/pkg/cel/libs/mcp"
-	vpol "github.com/kyverno/kyverno/api/policies.kyverno.io/v1alpha1"
 	"github.com/kyverno/kyverno/pkg/cel/libs/http"
 	"github.com/kyverno/kyverno/pkg/cel/libs/image"
 	"github.com/kyverno/kyverno/pkg/cel/libs/imagedata"
@@ -72,12 +72,12 @@ func NewEnv(evalMode vpol.EvaluationMode) (*cel.Env, error) {
 	}
 	// create new cel env
 	return base.Extend(
-		http.Lib(),
+		http.Lib(nil),
 		jwt.Lib(),
 		jsoncel.Lib(&impl.JsonImpl{}),
 		mcp.Lib(&impl.MCPImpl{}),
-		resource.Lib(),
-		image.Lib(),
-		imagedata.Lib(),
+		resource.Lib("", nil),
+		image.Lib(nil),
+		imagedata.Lib(nil),
 	)
 }
