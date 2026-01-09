@@ -314,8 +314,8 @@ github.com/kylelemons/godebug v1.1.0 h1:RPNrshWIDI6G2gRW9EHilWtl7Z6Sb1BR0xunSBf0
 github.com/kylelemons/godebug v1.1.0/go.mod h1:9/0rRGxNHcop5bhtWyNeEfOS8JIWk580+fNqagV/RAw=
 github.com/kyverno/api v0.0.0-20260107110632-1c7ada92d084 h1:kimWZdtmFByDVkK7Lr17Kjv80Nqom8pn2hyTF6I0+ls=
 github.com/kyverno/api v0.0.0-20260107110632-1c7ada92d084/go.mod h1:tr0oeKATvtamJJtFVv90kXscqdQhtYZom4IUD7sVTXs=
-github.com/kyverno/kyverno v1.5.0-rc1.0.20260107150737-18b7263a0902 h1:r2fgYwTpPAfZh3WDuqAYsbOIP5ZzGHrDxgy0YLVittg=
-github.com/kyverno/kyverno v1.5.0-rc1.0.20260107150737-18b7263a0902/go.mod h1:gfZ3pyIiiwVKRv4OmRsV/qmjY9TfspUr7j4beQEKJps=
+github.com/kyverno/kyverno v1.16.2 h1:jZF9LpnhDVLwnPvapnV/g//bUE45bBw1tdaeHom4bR0=
+github.com/kyverno/kyverno v1.16.2/go.mod h1:9utZXd/uycuoqDVYi8ABlgcgMcjHg4sYl11AOY6IH/A=
 github.com/kyverno/pkg/ext v0.0.0-20250303002756-48769d003e55 h1:0EnvOmQqzChsnza54+CXcRS42WBi1cc6eaS8Pb+ye20=
 github.com/kyverno/pkg/ext v0.0.0-20250303002756-48769d003e55/go.mod h1:02vxM0GNXz9+B/i6+rMfWAIwibUuAH+qFsd73IFskgQ=
 github.com/lestrrat-go/blackmagic v1.0.4 h1:IwQibdnf8l2KoO+qC3uT4OaTWsW7tuRQXy9TRN9QanA=
@@ -367,8 +367,8 @@ github.com/nlepage/go-tarfs v1.2.1/go.mod h1:rno18mpMy9aEH1IiJVftFsqPyIpwqSUiAOp
 github.com/onsi/ginkgo v1.16.5 h1:8xi0RTUf59SOSfEtZMvwTvXYMzG4gV23XVHOZiXNtnE=
 github.com/onsi/ginkgo/v2 v2.27.2 h1:LzwLj0b89qtIy6SSASkzlNvX6WktqurSHwkk2ipF/Ns=
 github.com/onsi/ginkgo/v2 v2.27.2/go.mod h1:ArE1D/XhNXBXCBkKOLkbsb2c81dQHCRcF5zwn/ykDRo=
-github.com/onsi/gomega v1.38.3 h1:eTX+W6dobAYfFeGC2PV6RwXRu/MyT+cQguijutvkpSM=
-github.com/onsi/gomega v1.38.3/go.mod h1:ZCU1pkQcXDO5Sl9/VVEGlDyp+zm0m1cmeG5TOzLgdh4=
+github.com/onsi/gomega v1.38.2 h1:eZCjf2xjZAqe+LeWvKb5weQ+NcPwX84kqJ0cZNxok2A=
+github.com/onsi/gomega v1.38.2/go.mod h1:W2MJcYxRGV63b418Ai34Ud0hEdTVXq9NW9+Sx6uXf3k=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
 github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
 github.com/opencontainers/image-spec v1.1.1 h1:y0fUlFfIZhPF1W537XOLg0/fcx6zcHCJwooC2xJA040=
