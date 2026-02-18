@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/google/cel-go/cel"
-	"github.com/kyverno/kyverno-authz/apis/v1alpha1"
+	v1alpha1 "github.com/kyverno/kyverno-authz/apis"
 	kcel "github.com/kyverno/kyverno-authz/pkg/cel"
 	httpcel "github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/http"
 	httpserver "github.com/kyverno/kyverno-authz/pkg/cel/libs/httpserver"

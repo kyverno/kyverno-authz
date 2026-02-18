@@ -1,4 +1,4 @@
-package v1alpha1
+package apis
 
 import (
 	vpol "github.com/kyverno/api/api/policies.kyverno.io/v1beta1"
