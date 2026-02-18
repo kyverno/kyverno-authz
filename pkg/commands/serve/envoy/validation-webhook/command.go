@@ -73,7 +73,7 @@ func Command() *cobra.Command {
 						return nil
 					}
 					v := validation.NewValidator(vpolCompileFunc)
-					if err := ctrl.NewWebhookManagedBy(mgr).For(&vpolv1beta1.ValidatingPolicy{}).WithValidator(v).Complete(); err != nil {
+					if err := ctrl.NewWebhookManagedBy(mgr, &vpolv1beta1.ValidatingPolicy{}).WithValidator(v).Complete(); err != nil {
 						return fmt.Errorf("failed to create webhook: %w", err)
 					}
 					// create a cancellable context
