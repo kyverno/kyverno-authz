@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	vpolv1beta1 "github.com/kyverno/api/api/policies.kyverno.io/v1beta1"
-	"github.com/kyverno/kyverno-authz/apis/v1alpha1"
+	v1alpha1 "github.com/kyverno/kyverno-authz/apis"
 	"github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/http"
 	vpolcompiler "github.com/kyverno/kyverno-authz/pkg/engine/compiler"
 	"github.com/kyverno/kyverno-authz/pkg/probes"

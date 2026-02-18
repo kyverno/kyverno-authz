@@ -35,8 +35,6 @@ KO                                 ?= $(TOOLS_DIR)/ko
 KO_VERSION                         ?= v0.18.1
 CONTROLLER_GEN                     ?= $(TOOLS_DIR)/controller-gen
 CONTROLLER_GEN_VERSION             := v0.20.0
-REGISTER_GEN                       ?= $(TOOLS_DIR)/register-gen
-REGISTER_GEN_VERSION               := v0.35.0
 REFERENCE_DOCS                     := $(TOOLS_DIR)/genref
 REFERENCE_DOCS_VERSION             := latest
 PIP                                ?= "pip"
@@ -63,10 +61,6 @@ $(CONTROLLER_GEN):
 	@echo Install controller-gen... >&2
 	@GOBIN=$(TOOLS_DIR) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_GEN_VERSION)
 
-$(REGISTER_GEN):
-	@echo Install register-gen... >&2
-	@GOBIN=$(TOOLS_DIR) go install k8s.io/code-generator/cmd/register-gen@$(REGISTER_GEN_VERSION)
-
 $(REFERENCE_DOCS):
 	@echo Install genref... >&2
 	@GOBIN=$(TOOLS_DIR) go install github.com/kubernetes-sigs/reference-docs/genref@$(REFERENCE_DOCS_VERSION)
@@ -77,7 +71,6 @@ install-tools: $(HELM)
 install-tools: $(KIND)
 install-tools: $(KO)
 install-tools: $(CONTROLLER_GEN)
-install-tools: $(REGISTER_GEN)
 install-tools: $(REFERENCE_DOCS)
 
 .PHONY: clean-tools
@@ -95,10 +88,6 @@ codegen-crds: $(CONTROLLER_GEN)
 codegen-crds: $(REGISTER_GEN)
 	@echo Generate CRDs... >&2
 	@rm -rf .crds && mkdir -p .crds
-	@$(CONTROLLER_GEN) paths=./apis/v1alpha1/... object
-	@$(CONTROLLER_GEN) paths=./apis/v1alpha1/... \
-		crd:crdVersions=v1,ignoreUnexportedFields=true,generateEmbeddedObjectMeta=false \
-		output:dir=$(CRDS_PATH)/authz.kyverno.io
 	@$(CONTROLLER_GEN) paths=github.com/kyverno/api/api/policies.kyverno.io/... \
 		crd:crdVersions=v1,ignoreUnexportedFields=true,generateEmbeddedObjectMeta=false \
 		output:dir=$(CRDS_PATH)/policies.kyverno.io
