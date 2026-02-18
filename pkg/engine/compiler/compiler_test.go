@@ -7,7 +7,7 @@ import (
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	vpol "github.com/kyverno/api/api/policies.kyverno.io/v1beta1"
-	v1alpha1 "github.com/kyverno/kyverno-authz/apis"
+	"github.com/kyverno/kyverno-authz/apis"
 	"github.com/kyverno/kyverno-authz/pkg/engine/compiler"
 	"github.com/stretchr/testify/assert"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
@@ -17,7 +17,7 @@ import (
 var pol = &vpol.ValidatingPolicy{
 	Spec: vpol.ValidatingPolicySpec{
 		EvaluationConfiguration: &vpol.EvaluationConfiguration{
-			Mode: v1alpha1.EvaluationModeEnvoy,
+			Mode: apis.EvaluationModeEnvoy,
 		},
 		Variables: []admissionregistrationv1.Variable{
 			{

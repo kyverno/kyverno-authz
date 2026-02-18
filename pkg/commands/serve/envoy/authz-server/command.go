@@ -11,7 +11,7 @@ import (
 	"github.com/hairyhenderson/go-fsimpl/filefs"
 	"github.com/hairyhenderson/go-fsimpl/gitfs"
 	vpol "github.com/kyverno/api/api/policies.kyverno.io/v1beta1"
-	v1alpha1 "github.com/kyverno/kyverno-authz/apis"
+	"github.com/kyverno/kyverno-authz/apis"
 	"github.com/kyverno/kyverno-authz/pkg/authz/envoy"
 	"github.com/kyverno/kyverno-authz/pkg/engine"
 	vpolcompiler "github.com/kyverno/kyverno-authz/pkg/engine/compiler"
@@ -19,8 +19,8 @@ import (
 	"github.com/kyverno/kyverno-authz/pkg/probes"
 	"github.com/kyverno/kyverno-authz/pkg/signals"
 	"github.com/kyverno/kyverno-authz/pkg/utils/ocifs"
-	"github.com/kyverno/kyverno-authz/sdk/core"
-	sdksources "github.com/kyverno/kyverno-authz/sdk/core/sources"
+	"github.com/kyverno/sdk/core"
+	sdksources "github.com/kyverno/sdk/core/sources"
 	"github.com/spf13/cobra"
 	"go.uber.org/multierr"
 	"k8s.io/apimachinery/pkg/fields"
@@ -116,7 +116,7 @@ func Command() *cobra.Command {
 								Cache: cache.Options{
 									ByObject: map[client.Object]cache.ByObject{
 										&vpol.ValidatingPolicy{}: {
-											Field: fields.OneTermEqualSelector("spec.evaluation.mode", string(v1alpha1.EvaluationModeEnvoy)),
+											Field: fields.OneTermEqualSelector("spec.evaluation.mode", string(apis.EvaluationModeEnvoy)),
 										},
 									},
 								},

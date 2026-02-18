@@ -11,12 +11,12 @@ import (
 	vpolv1beta1 "github.com/kyverno/api/api/policies.kyverno.io/v1beta1"
 	"github.com/kyverno/kyverno-authz/pkg/data"
 	"github.com/kyverno/kyverno-authz/pkg/engine"
-	"github.com/kyverno/kyverno-authz/sdk/core"
-	"github.com/kyverno/kyverno-authz/sdk/core/sources"
 	"github.com/kyverno/pkg/ext/file"
 	"github.com/kyverno/pkg/ext/resource/convert"
 	"github.com/kyverno/pkg/ext/resource/loader"
 	"github.com/kyverno/pkg/ext/yaml"
+	"github.com/kyverno/sdk/core"
+	"github.com/kyverno/sdk/core/sources"
 	"sigs.k8s.io/kubectl-validate/pkg/openapiclient"
 )
 

@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	vpolv1beta1 "github.com/kyverno/api/api/policies.kyverno.io/v1beta1"
-	v1alpha1 "github.com/kyverno/kyverno-authz/apis"
+	"github.com/kyverno/kyverno-authz/apis"
 	"github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/http"
 	vpolcompiler "github.com/kyverno/kyverno-authz/pkg/engine/compiler"
 	"github.com/kyverno/kyverno-authz/pkg/probes"
@@ -65,7 +65,7 @@ func Command() *cobra.Command {
 					}
 					httpCompiler := vpolcompiler.NewCompiler[dynamic.Interface, *http.CheckRequest, *http.CheckResponse]()
 					vpolCompileFunc := func(policy *vpolv1beta1.ValidatingPolicy) field.ErrorList {
-						if policy.Spec.EvaluationMode() == v1alpha1.EvaluationModeHTTP {
+						if policy.Spec.EvaluationMode() == apis.EvaluationModeHTTP {
 							_, err := httpCompiler.Compile(policy)
 							ctrl.LoggerFrom(ctx).Error(err.ToAggregate(), "Validating policy compilation error")
 							return err
@@ -73,7 +73,7 @@ func Command() *cobra.Command {
 						return nil
 					}
 					v := validation.NewValidator(vpolCompileFunc)
-					if err := ctrl.NewWebhookManagedBy(mgr).For(&vpolv1beta1.ValidatingPolicy{}).WithValidator(v).Complete(); err != nil {
+					if err := ctrl.NewWebhookManagedBy(mgr, &vpolv1beta1.ValidatingPolicy{}).WithValidator(v).Complete(); err != nil {
 						return fmt.Errorf("failed to create webhook: %w", err)
 					}
 					// create a cancellable context

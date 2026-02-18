@@ -6,23 +6,23 @@ import (
 	"net/http"
 
 	"github.com/google/cel-go/cel"
-	v1alpha1 "github.com/kyverno/kyverno-authz/apis"
+	"github.com/kyverno/kyverno-authz/apis"
 	kcel "github.com/kyverno/kyverno-authz/pkg/cel"
 	httpcel "github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/http"
 	httpserver "github.com/kyverno/kyverno-authz/pkg/cel/libs/httpserver"
 	"github.com/kyverno/kyverno-authz/pkg/engine"
 	"github.com/kyverno/kyverno-authz/pkg/server"
-	"github.com/kyverno/kyverno-authz/sdk/core"
-	"github.com/kyverno/kyverno-authz/sdk/core/dispatchers"
-	"github.com/kyverno/kyverno-authz/sdk/core/handlers"
-	"github.com/kyverno/kyverno-authz/sdk/core/resulters"
-	"github.com/kyverno/kyverno-authz/sdk/extensions/policy"
+	"github.com/kyverno/sdk/core"
+	"github.com/kyverno/sdk/core/dispatchers"
+	"github.com/kyverno/sdk/core/handlers"
+	"github.com/kyverno/sdk/core/resulters"
+	"github.com/kyverno/sdk/extensions/policy"
 	"k8s.io/client-go/dynamic"
 )
 
 func NewServer(config Config, source engine.HTTPSource, dyn dynamic.Interface) server.ServerFunc {
 	return func(ctx context.Context) error {
-		base, err := kcel.NewEnv(v1alpha1.EvaluationModeHTTP)
+		base, err := kcel.NewEnv(apis.EvaluationModeHTTP)
 		if err != nil {
 			return err
 		}

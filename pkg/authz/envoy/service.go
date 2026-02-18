@@ -6,8 +6,8 @@ import (
 
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"github.com/kyverno/kyverno-authz/pkg/metrics"
-	"github.com/kyverno/kyverno-authz/sdk/core"
-	"github.com/kyverno/kyverno-authz/sdk/extensions/policy"
+	"github.com/kyverno/sdk/core"
+	"github.com/kyverno/sdk/extensions/policy"
 	"k8s.io/client-go/dynamic"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
