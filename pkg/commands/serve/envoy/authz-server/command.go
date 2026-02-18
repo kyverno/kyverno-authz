@@ -11,7 +11,7 @@ import (
 	"github.com/hairyhenderson/go-fsimpl/filefs"
 	"github.com/hairyhenderson/go-fsimpl/gitfs"
 	vpol "github.com/kyverno/api/api/policies.kyverno.io/v1beta1"
-	"github.com/kyverno/kyverno-authz/apis/v1alpha1"
+	v1alpha1 "github.com/kyverno/kyverno-authz/apis"
 	"github.com/kyverno/kyverno-authz/pkg/authz/envoy"
 	"github.com/kyverno/kyverno-authz/pkg/engine"
 	vpolcompiler "github.com/kyverno/kyverno-authz/pkg/engine/compiler"
