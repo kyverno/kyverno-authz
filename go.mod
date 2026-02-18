@@ -7,7 +7,7 @@ require (
 	github.com/chrismellard/docker-credential-acr-env v0.0.0-20230304212654-82a0ddb27589
 	github.com/envoyproxy/go-control-plane/envoy v1.36.0
 	github.com/go-logr/logr v1.4.3
-	github.com/google/cel-go v0.26.1
+	github.com/google/cel-go v0.27.0
 	github.com/google/go-containerregistry v0.20.7
 	github.com/google/go-containerregistry/pkg/authn/kubernetes v0.0.0-20251124222020-e075f209120b
 	github.com/hairyhenderson/go-fsimpl v0.3.3
@@ -40,7 +40,7 @@ require (
 require github.com/aws/aws-sdk-go-v2/service/signin v1.0.5 // indirect
 
 require (
-	cel.dev/expr v0.24.0 // indirect
+	cel.dev/expr v0.25.1 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	dario.cat/mergo v1.0.2 // indirect
 	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible // indirect
@@ -186,7 +186,6 @@ require (
 	github.com/skeema/knownhosts v1.3.1 // indirect
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
-	github.com/stoewer/go-strcase v1.3.1 // indirect
 	github.com/valyala/fastjson v1.6.7 // indirect
 	github.com/vbatts/tar-split v0.12.2 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
