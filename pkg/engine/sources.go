@@ -1,7 +1,7 @@
 package engine
 
 import (
-	"github.com/kyverno/kyverno-authz/sdk/core"
+	"github.com/kyverno/sdk/core"
 )
 
 type EnvoySource = core.Source[EnvoyPolicy]

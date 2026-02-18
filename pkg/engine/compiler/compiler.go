@@ -6,14 +6,14 @@ import (
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
 	vpol "github.com/kyverno/api/api/policies.kyverno.io/v1beta1"
-	v1alpha1 "github.com/kyverno/kyverno-authz/apis"
+	"github.com/kyverno/kyverno-authz/apis"
 	authzcel "github.com/kyverno/kyverno-authz/pkg/cel"
 	envoy "github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/envoy"
 	httpauth "github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/http"
-	"github.com/kyverno/kyverno-authz/sdk/extensions/policy"
 	"github.com/kyverno/kyverno/pkg/cel/libs/http"
 	"github.com/kyverno/kyverno/pkg/cel/libs/imagedata"
 	"github.com/kyverno/kyverno/pkg/cel/libs/resource"
+	"github.com/kyverno/sdk/extensions/policy"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/dynamic"
@@ -54,9 +54,9 @@ func (c *compiler[DATA, IN, OUT]) compiledEnvironment(policy *vpol.ValidatingPol
 	}
 	var objectKey cel.EnvOption
 	switch policy.Spec.EvaluationMode() {
-	case v1alpha1.EvaluationModeEnvoy:
+	case apis.EvaluationModeEnvoy:
 		objectKey = cel.Variable(ObjectKey, envoy.CheckRequest)
-	case v1alpha1.EvaluationModeHTTP:
+	case apis.EvaluationModeHTTP:
 		objectKey = cel.Variable(ObjectKey, httpauth.RequestType)
 	default:
 		return nil, nil, nil, append(allErrs, field.InternalError(nil, fmt.Errorf("invalid policy evaluation mode: %s", policy.Spec.EvaluationMode())))
@@ -134,12 +134,12 @@ func (c *compiler[DATA, IN, OUT]) compileAuthorization(path *field.Path, evalMod
 			return nil, append(allErrs, field.Invalid(path, rule.Expression, err.Error()))
 		}
 		switch evalMode {
-		case v1alpha1.EvaluationModeEnvoy:
+		case apis.EvaluationModeEnvoy:
 			if !ast.OutputType().IsExactType(envoy.CheckResponse) && !ast.OutputType().IsExactType(types.NullType) {
 				msg := fmt.Sprintf("rule response output is expected to be of type %s", envoy.CheckResponse.TypeName())
 				return nil, append(allErrs, field.Invalid(path, rule.Expression, msg))
 			}
-		case v1alpha1.EvaluationModeHTTP:
+		case apis.EvaluationModeHTTP:
 			if !ast.OutputType().IsExactType(httpauth.ResponseType) && !ast.OutputType().IsExactType(types.NullType) {
 				msg := fmt.Sprintf("rule response output is expected to be of type %s", httpauth.ResponseType.TypeName())
 				return nil, append(allErrs, field.Invalid(path, rule.Expression, msg))

@@ -6,7 +6,7 @@ import (
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/ext"
 	vpol "github.com/kyverno/api/api/policies.kyverno.io/v1beta1"
-	v1alpha1 "github.com/kyverno/kyverno-authz/apis"
+	"github.com/kyverno/kyverno-authz/apis"
 	impl "github.com/kyverno/kyverno-authz/pkg/cel/impl"
 	"github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/envoy"
 	httpauth "github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/http"
@@ -56,11 +56,11 @@ func NewEnv(evalMode vpol.EvaluationMode) (*cel.Env, error) {
 	}
 	// register our libs
 	switch evalMode {
-	case v1alpha1.EvaluationModeEnvoy:
+	case apis.EvaluationModeEnvoy:
 		base, err = base.Extend(
 			envoy.Lib(),
 		)
-	case v1alpha1.EvaluationModeHTTP:
+	case apis.EvaluationModeHTTP:
 		base, err = base.Extend(
 			httpauth.Lib(),
 		)

@@ -5,9 +5,9 @@ import (
 
 	"github.com/kyverno/api/api/policies.kyverno.io/v1beta1"
 	"github.com/kyverno/kyverno-authz/pkg/engine"
-	"github.com/kyverno/kyverno-authz/sdk/core"
-	"github.com/kyverno/kyverno-authz/sdk/core/sources"
-	controllerruntime "github.com/kyverno/kyverno-authz/sdk/extensions/controller-runtime"
+	"github.com/kyverno/sdk/core"
+	"github.com/kyverno/sdk/core/sources"
+	controllerruntime "github.com/kyverno/sdk/extensions/controller-runtime"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
