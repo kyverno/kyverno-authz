@@ -1,0 +1,10 @@
+version: "2"
+linters:
+  disable:
+    - staticcheck
+  settings:
+    gosec:
+      excludes:
+        - G401 # Use of weak cryptographic primitive
+        - G501 # Blocklisted import crypto/md5
+        - G505 # Import blocklist: crypto/sha1

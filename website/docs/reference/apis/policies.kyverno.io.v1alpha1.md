@@ -125,6 +125,7 @@ auto_generated: true
 **Appears in:**
     
 - [EvaluationConfiguration](#policies-kyverno-io-v1alpha1-EvaluationConfiguration)
+- [MutatingPolicyEvaluationConfiguration](#policies-kyverno-io-v1alpha1-MutatingPolicyEvaluationConfiguration)
 
 | Field | Type | Required | Inline | Description |
 |---|---|---|---|---|
@@ -260,17 +261,9 @@ auto_generated: true
 
 | Field | Type | Required | Inline | Description |
 |---|---|---|---|---|
-| `mode` | [`EvaluationMode`](#policies-kyverno-io-v1alpha1-EvaluationMode) |  |  | <p>Mode is the mode of policy evaluation. Allowed values are "Kubernetes" or "JSON". Optional. Default value is "Kubernetes".</p> |
+| `mode` | `string` |  |  | <p>Mode is the mode of policy evaluation. Allowed values are "Kubernetes" or "JSON". Optional. Default value is "Kubernetes".</p> |
 | `admission` | [`AdmissionConfiguration`](#policies-kyverno-io-v1alpha1-AdmissionConfiguration) |  |  | <p>Admission controls policy evaluation during admission.</p> |
 | `background` | [`BackgroundConfiguration`](#policies-kyverno-io-v1alpha1-BackgroundConfiguration) |  |  | <p>Background  controls policy evaluation during background scan.</p> |
-
-## EvaluationMode     {#policies-kyverno-io-v1alpha1-EvaluationMode}
-
-(Alias of `string`)
-
-**Appears in:**
-    
-- [EvaluationConfiguration](#policies-kyverno-io-v1alpha1-EvaluationConfiguration)
 
 ## GenerateExistingConfiguration     {#policies-kyverno-io-v1alpha1-GenerateExistingConfiguration}
 
@@ -555,7 +548,9 @@ against which to verify.</p>
 
 | Field | Type | Required | Inline | Description |
 |---|---|---|---|---|
+| `mode` | `string` |  |  | <p>Mode is the mode of policy evaluation. Allowed values are "Kubernetes" or "JSON". Optional. Default value is "Kubernetes".</p> |
 | `admission` | [`AdmissionConfiguration`](#policies-kyverno-io-v1alpha1-AdmissionConfiguration) |  |  | <p>Admission controls policy evaluation during admission.</p> |
+| `background` | [`BackgroundConfiguration`](#policies-kyverno-io-v1alpha1-BackgroundConfiguration) |  |  | <p>Background controls policy evaluation during background scan.</p> |
 | `mutateExisting` | [`MutateExistingConfiguration`](#policies-kyverno-io-v1alpha1-MutateExistingConfiguration) |  |  | <p>MutateExisting controls whether existing resources are mutated.</p> |
 
 ## MutatingPolicySpec     {#policies-kyverno-io-v1alpha1-MutatingPolicySpec}
@@ -570,10 +565,10 @@ against which to verify.</p>
 
 | Field | Type | Required | Inline | Description |
 |---|---|---|---|---|
-| `matchConstraints` | [`admissionregistration/v1alpha1.MatchResources`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#matchresources-v1alpha1-admissionregistration) | :white_check_mark: |  | <p>MatchConstraints specifies what resources this policy is designed to evaluate. The AdmissionPolicy cares about a request if it matches _all_ Constraints. Required.</p> |
-| `failurePolicy` | [`admissionregistration/v1alpha1.FailurePolicyType`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#failurepolicytype-v1alpha1-admissionregistration) |  |  | <p>failurePolicy defines how to handle failures for the admission policy. Failures can occur from CEL expression parse errors, type check errors, runtime errors and invalid or mis-configured policy definitions or bindings. failurePolicy does not define how validations that evaluate to false are handled. When failurePolicy is set to Fail, the validationActions field define how failures are enforced. Allowed values are Ignore or Fail. Defaults to Fail.</p> |
-| `matchConditions` | [`[]admissionregistration/v1alpha1.MatchCondition`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#matchcondition-v1alpha1-admissionregistration) |  |  | <p>MatchConditions is a list of conditions that must be met for a request to be validated. Match conditions filter requests that have already been matched by the rules, namespaceSelector, and objectSelector. An empty list of matchConditions matches all requests. There are a maximum of 64 match conditions allowed. The exact matching logic is (in order):   1. If ANY matchCondition evaluates to FALSE, the policy is skipped.   2. If ALL matchConditions evaluate to TRUE, the policy is evaluated.   3. If any matchCondition evaluates to an error (but none are FALSE):      - If failurePolicy=Fail, reject the request      - If failurePolicy=Ignore, the policy is skipped</p> |
-| `variables` | [`[]admissionregistration/v1alpha1.Variable`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#variable-v1alpha1-admissionregistration) |  |  | <p>Variables contain definitions of variables that can be used in composition of other expressions. Each variable is defined as a named CEL expression. The variables defined here will be available under `variables` in other expressions of the policy except MatchConditions because MatchConditions are evaluated before the rest of the policy. The expression of a variable can refer to other variables defined earlier in the list but not those after. Thus, Variables must be sorted by the order of first appearance and acyclic.</p> |
+| `matchConstraints` | [`admissionregistration/v1.MatchResources`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#matchresources-v1-admissionregistration) | :white_check_mark: |  | <p>MatchConstraints specifies what resources this policy is designed to evaluate. The AdmissionPolicy cares about a request if it matches _all_ Constraints. Required.</p> |
+| `failurePolicy` | [`admissionregistration/v1.FailurePolicyType`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#failurepolicytype-v1-admissionregistration) |  |  | <p>failurePolicy defines how to handle failures for the admission policy. Failures can occur from CEL expression parse errors, type check errors, runtime errors and invalid or mis-configured policy definitions or bindings. failurePolicy does not define how validations that evaluate to false are handled. When failurePolicy is set to Fail, the validationActions field define how failures are enforced. Allowed values are Ignore or Fail. Defaults to Fail.</p> |
+| `matchConditions` | [`[]admissionregistration/v1.MatchCondition`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#matchcondition-v1-admissionregistration) |  |  | <p>MatchConditions is a list of conditions that must be met for a request to be validated. Match conditions filter requests that have already been matched by the rules, namespaceSelector, and objectSelector. An empty list of matchConditions matches all requests. There are a maximum of 64 match conditions allowed. The exact matching logic is (in order):   1. If ANY matchCondition evaluates to FALSE, the policy is skipped.   2. If ALL matchConditions evaluate to TRUE, the policy is evaluated.   3. If any matchCondition evaluates to an error (but none are FALSE):      - If failurePolicy=Fail, reject the request      - If failurePolicy=Ignore, the policy is skipped</p> |
+| `variables` | [`[]admissionregistration/v1.Variable`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#variable-v1-admissionregistration) |  |  | <p>Variables contain definitions of variables that can be used in composition of other expressions. Each variable is defined as a named CEL expression. The variables defined here will be available under `variables` in other expressions of the policy except MatchConditions because MatchConditions are evaluated before the rest of the policy. The expression of a variable can refer to other variables defined earlier in the list but not those after. Thus, Variables must be sorted by the order of first appearance and acyclic.</p> |
 | `autogen` | [`MutatingPolicyAutogenConfiguration`](#policies-kyverno-io-v1alpha1-MutatingPolicyAutogenConfiguration) |  |  | <p>AutogenConfiguration defines the configuration for the generation controller.</p> |
 | `targetMatchConstraints` | [`TargetMatchConstraints`](#policies-kyverno-io-v1alpha1-TargetMatchConstraints) |  |  | <p>TargetMatchConstraints specifies what target mutation resources this policy is designed to evaluate.</p> |
 | `mutations` | [`[]admissionregistration/v1alpha1.Mutation`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#mutation-v1alpha1-admissionregistration) |  |  | <p>mutations contain operations to perform on matching objects. mutations may not be empty; a minimum of one mutation is required. mutations are evaluated in order, and are reinvoked according to the reinvocationPolicy. The mutations of a policy are invoked for each binding of this policy and reinvocation of mutations occurs on a per binding basis.</p> |
