@@ -44,6 +44,11 @@ func Command() *cobra.Command {
 					if err != nil {
 						return err
 					}
+					// create dynamic client
+					dynclient, err := dynamic.NewForConfig(config)
+					if err != nil {
+						return err
+					}
 					// create a wait group
 					var group wait.Group
 					// wait all tasks in the group are over
@@ -63,7 +68,7 @@ func Command() *cobra.Command {
 					if err != nil {
 						return fmt.Errorf("failed to construct manager: %w", err)
 					}
-					envoyCompiler := vpolcompiler.NewCompiler[dynamic.Interface, *authv3.CheckRequest, *authv3.CheckResponse]()
+					envoyCompiler := vpolcompiler.NewCompiler[dynamic.Interface, *authv3.CheckRequest, *authv3.CheckResponse](dynclient)
 					vpolCompileFunc := func(policy *vpolv1beta1.ValidatingPolicy) field.ErrorList {
 						if policy.Spec.EvaluationMode() == apis.EvaluationModeEnvoy {
 							_, err := envoyCompiler.Compile(policy)

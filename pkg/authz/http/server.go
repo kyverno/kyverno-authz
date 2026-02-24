@@ -22,7 +22,7 @@ import (
 
 func NewServer(config Config, source engine.HTTPSource, dyn dynamic.Interface) server.ServerFunc {
 	return func(ctx context.Context) error {
-		base, err := kcel.NewEnv(apis.EvaluationModeHTTP)
+		base, err := kcel.NewEnv(apis.EvaluationModeHTTP, dyn)
 		if err != nil {
 			return err
 		}

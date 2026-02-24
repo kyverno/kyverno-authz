@@ -10,9 +10,9 @@ import (
 	authzcel "github.com/kyverno/kyverno-authz/pkg/cel"
 	envoy "github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/envoy"
 	httpauth "github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/http"
-	"github.com/kyverno/kyverno/pkg/cel/libs/http"
-	"github.com/kyverno/kyverno/pkg/cel/libs/imagedata"
-	"github.com/kyverno/kyverno/pkg/cel/libs/resource"
+	"github.com/kyverno/sdk/cel/libs/http"
+	"github.com/kyverno/sdk/cel/libs/imagedata"
+	"github.com/kyverno/sdk/cel/libs/resource"
 	"github.com/kyverno/sdk/extensions/policy"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -27,11 +27,15 @@ const (
 	ResourceKey  = "resource"
 )
 
-func NewCompiler[DATA dynamic.Interface, IN, OUT any]() *compiler[DATA, IN, OUT] {
-	return &compiler[DATA, IN, OUT]{}
+func NewCompiler[DATA dynamic.Interface, IN, OUT any](client DATA) *compiler[DATA, IN, OUT] {
+	return &compiler[DATA, IN, OUT]{
+		client: client,
+	}
 }
 
-type compiler[DATA dynamic.Interface, IN, OUT any] struct{}
+type compiler[DATA dynamic.Interface, IN, OUT any] struct {
+	client DATA
+}
 
 func (c *compiler[DATA, IN, OUT]) Compile(policy *vpol.ValidatingPolicy) (policy.Policy[DATA, IN, OUT], field.ErrorList) {
 	matchConditions, variables, rules, err := c.compiledEnvironment(policy)
@@ -48,7 +52,7 @@ func (c *compiler[DATA, IN, OUT]) Compile(policy *vpol.ValidatingPolicy) (policy
 
 func (c *compiler[DATA, IN, OUT]) compiledEnvironment(policy *vpol.ValidatingPolicy) ([]cel.Program, map[string]cel.Program, []cel.Program, field.ErrorList) {
 	var allErrs field.ErrorList
-	base, err := authzcel.NewEnv(policy.Spec.EvaluationMode())
+	base, err := authzcel.NewEnv(policy.Spec.EvaluationMode(), c.client)
 	if err != nil {
 		return nil, nil, nil, append(allErrs, field.InternalError(nil, err))
 	}

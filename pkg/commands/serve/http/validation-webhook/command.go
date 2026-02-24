@@ -63,7 +63,7 @@ func Command() *cobra.Command {
 					if err != nil {
 						return fmt.Errorf("failed to construct manager: %w", err)
 					}
-					httpCompiler := vpolcompiler.NewCompiler[dynamic.Interface, *http.CheckRequest, *http.CheckResponse]()
+					httpCompiler := vpolcompiler.NewCompiler[dynamic.Interface, *http.CheckRequest, *http.CheckResponse](nil)
 					vpolCompileFunc := func(policy *vpolv1beta1.ValidatingPolicy) field.ErrorList {
 						if policy.Spec.EvaluationMode() == apis.EvaluationModeHTTP {
 							_, err := httpCompiler.Compile(policy)
