@@ -3,7 +3,7 @@ package mcp
 import (
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
-	"github.com/kyverno/kyverno/pkg/cel/utils"
+	"github.com/kyverno/sdk/cel/utils"
 )
 
 type impl struct {

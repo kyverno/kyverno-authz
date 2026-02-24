@@ -74,8 +74,6 @@ func Command() *cobra.Command {
 					var group wait.Group
 					// wait all tasks in the group are over
 					defer group.Wait()
-					// initialize compiler
-					compiler := vpolcompiler.NewCompiler[dynamic.Interface, *authv3.CheckRequest, *authv3.CheckResponse]()
 					// load sources
 					var source engine.EnvoySource
 					var dyn dynamic.Interface
@@ -85,6 +83,14 @@ func Command() *cobra.Command {
 						if err != nil {
 							return err
 						}
+						// create dynamic client
+						dynclient, err := dynamic.NewForConfig(config)
+						if err != nil {
+							return err
+						}
+						dyn = dynclient
+						// initialize compiler
+						compiler := vpolcompiler.NewCompiler[dynamic.Interface, *authv3.CheckRequest, *authv3.CheckResponse](dynclient)
 						namespace, _, err := kubeConfig.Namespace()
 						if err != nil {
 							return fmt.Errorf("failed to get namespace from kubeconfig: %w", err)
@@ -140,16 +146,13 @@ func Command() *cobra.Command {
 								return fmt.Errorf("failed to wait for envoy cache sync")
 							}
 						}
-						dynclient, err := dynamic.NewForConfig(config)
-						if err != nil {
-							return err
-						}
-						dyn = dynclient
 					} else {
 						rOpts, nOpts, err := ocifs.RegistryOpts(nil, allowInsecureRegistry)
 						if err != nil {
 							return fmt.Errorf("failed to initialize registry opts: %w", err)
 						}
+						// initialize compiler
+						compiler := vpolcompiler.NewCompiler[dynamic.Interface, *authv3.CheckRequest, *authv3.CheckResponse](nil)
 						extSources, err := getExternalSources(compiler, nOpts, rOpts, externalPolicySources...)
 						if err != nil {
 							return err

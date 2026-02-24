@@ -13,11 +13,13 @@ import (
 	jsoncel "github.com/kyverno/kyverno-authz/pkg/cel/libs/json"
 	"github.com/kyverno/kyverno-authz/pkg/cel/libs/jwt"
 	"github.com/kyverno/kyverno-authz/pkg/cel/libs/mcp"
-	"github.com/kyverno/kyverno/pkg/cel/libs/http"
-	"github.com/kyverno/kyverno/pkg/cel/libs/image"
-	"github.com/kyverno/kyverno/pkg/cel/libs/imagedata"
-	"github.com/kyverno/kyverno/pkg/cel/libs/resource"
+	"github.com/kyverno/kyverno-authz/pkg/engine/variables"
+	"github.com/kyverno/sdk/cel/libs/http"
+	"github.com/kyverno/sdk/cel/libs/image"
+	"github.com/kyverno/sdk/cel/libs/imagedata"
+	"github.com/kyverno/sdk/cel/libs/resource"
 	"k8s.io/apiserver/pkg/cel/library"
+	"k8s.io/client-go/dynamic"
 )
 
 func NewBaseEnv() (*cel.Env, error) {
@@ -49,7 +51,7 @@ func NewBaseEnv() (*cel.Env, error) {
 	)
 }
 
-func NewEnv(evalMode vpol.EvaluationMode) (*cel.Env, error) {
+func NewEnv(evalMode vpol.EvaluationMode, d dynamic.Interface) (*cel.Env, error) {
 	base, err := NewBaseEnv()
 	if err != nil {
 		return nil, err
@@ -70,14 +72,18 @@ func NewEnv(evalMode vpol.EvaluationMode) (*cel.Env, error) {
 	if err != nil {
 		return nil, err
 	}
+	loader, err := variables.ImageData(nil)
+	if err != nil {
+		return nil, err
+	}
 	// create new cel env
 	return base.Extend(
-		http.Lib(nil),
+		http.Lib(http.Context{ContextInterface: http.NewHTTP(nil)}, nil),
 		jwt.Lib(),
 		jsoncel.Lib(&impl.JsonImpl{}),
 		mcp.Lib(&impl.MCPImpl{}),
-		resource.Lib("", nil),
+		resource.Lib(resource.Context{ContextInterface: variables.NewResourceProvider(d)}, "", nil),
 		image.Lib(nil),
-		imagedata.Lib(nil),
+		imagedata.Lib(imagedata.Context{ContextInterface: loader}, nil),
 	)
 }

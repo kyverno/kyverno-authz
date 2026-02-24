@@ -78,8 +78,6 @@ func Command() *cobra.Command {
 					var group wait.Group
 					// wait all tasks in the group are over
 					defer group.Wait()
-					// initialize compiler
-					compiler := vpolcompiler.NewCompiler[dynamic.Interface, *httplib.CheckRequest, *httplib.CheckResponse]()
 					// load sources
 					var source engine.HTTPSource
 					var dyn dynamic.Interface
@@ -89,6 +87,15 @@ func Command() *cobra.Command {
 						if err != nil {
 							return err
 						}
+						// create dynamic client
+						dynclient, err := dynamic.NewForConfig(config)
+						if err != nil {
+							return err
+						}
+						dyn = dynclient
+						// initialize compiler
+						compiler := vpolcompiler.NewCompiler[dynamic.Interface, *httplib.CheckRequest, *httplib.CheckResponse](dynclient)
+
 						namespace, _, err := kubeConfig.Namespace()
 						if err != nil {
 							return fmt.Errorf("failed to get namespace from kubeconfig: %w", err)
@@ -144,12 +151,9 @@ func Command() *cobra.Command {
 								return fmt.Errorf("failed to wait for http cache sync")
 							}
 						}
-						dynclient, err := dynamic.NewForConfig(config)
-						if err != nil {
-							return err
-						}
-						dyn = dynclient
 					} else {
+						compiler := vpolcompiler.NewCompiler[dynamic.Interface, *httplib.CheckRequest, *httplib.CheckResponse](nil)
+
 						rOpts, nOpts, err := ocifs.RegistryOpts(nil, allowInsecureRegistry)
 						if err != nil {
 							return fmt.Errorf("failed to initialize registry opts: %w", err)

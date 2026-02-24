@@ -9,10 +9,6 @@ import (
 	"github.com/google/cel-go/common/types/ref"
 	authzcel "github.com/kyverno/kyverno-authz/pkg/cel"
 	"github.com/kyverno/kyverno-authz/pkg/cel/utils"
-	"github.com/kyverno/kyverno-authz/pkg/engine/variables"
-	"github.com/kyverno/kyverno/pkg/cel/libs/http"
-	"github.com/kyverno/kyverno/pkg/cel/libs/imagedata"
-	"github.com/kyverno/kyverno/pkg/cel/libs/resource"
 	"go.uber.org/multierr"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/apiserver/pkg/cel/lazy"
@@ -26,9 +22,9 @@ type compiledPolicy[DATA dynamic.Interface, IN, OUT any] struct {
 	rules           []cel.Program
 }
 
-func (p compiledPolicy[DATA, IN, OUT]) Evaluate(ctx context.Context, dynclient DATA, r IN) (OUT, error) {
+func (p compiledPolicy[DATA, IN, OUT]) Evaluate(ctx context.Context, _ DATA, r IN) (OUT, error) {
 	var zero OUT // create a zero variable of the output type
-	response, err := p.evaluateRules(r, dynclient)
+	response, err := p.evaluateRules(r)
 	if err != nil && p.failurePolicy == admissionregistrationv1.Fail {
 		return zero, err
 	}
@@ -63,17 +59,10 @@ func (p compiledPolicy[DATA, IN, OUT]) match(r IN) (bool, error) {
 	return true, multierr.Combine(errs...)
 }
 
-func (p compiledPolicy[DATA, IN, OUT]) setupVariables(r IN, d DATA) (map[string]any, error) {
-	loader, err := variables.ImageData(nil)
-	if err != nil {
-		return nil, err
-	}
+func (p compiledPolicy[DATA, IN, OUT]) setupVariables(r IN) (map[string]any, error) {
 	vars := lazy.NewMapValue(authzcel.VariablesType)
 	data := map[string]any{
-		HttpKey:      http.Context{ContextInterface: http.NewHTTP(nil)},
-		ImageDataKey: imagedata.Context{ContextInterface: loader},
 		ObjectKey:    r,
-		ResourceKey:  resource.Context{ContextInterface: variables.NewResourceProvider(d)},
 		VariablesKey: vars,
 	}
 	for name, variable := range p.variables {
@@ -91,14 +80,14 @@ func (p compiledPolicy[DATA, IN, OUT]) setupVariables(r IN, d DATA) (map[string]
 	return data, nil
 }
 
-func (p compiledPolicy[DATA, IN, OUT]) evaluateRules(r IN, dynclient DATA) (OUT, error) {
+func (p compiledPolicy[DATA, IN, OUT]) evaluateRules(r IN) (OUT, error) {
 	var zero OUT // create a zero variable of the output type
 	if match, err := p.match(r); err != nil {
 		return zero, err
 	} else if !match {
 		return zero, nil
 	}
-	data, err := p.setupVariables(r, dynclient)
+	data, err := p.setupVariables(r)
 	if err != nil {
 		return zero, err
 	}

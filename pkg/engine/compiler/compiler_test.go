@@ -48,7 +48,7 @@ var pol = &vpol.ValidatingPolicy{
 }
 
 func TestCompiler(t *testing.T) {
-	compiler := compiler.NewCompiler[dynamic.Interface, *authv3.CheckRequest, *authv3.CheckResponse]()
+	compiler := compiler.NewCompiler[dynamic.Interface, *authv3.CheckRequest, *authv3.CheckResponse](nil)
 
 	compiled, errList := compiler.Compile(pol)
 	assert.NoError(t, errList.ToAggregate())
