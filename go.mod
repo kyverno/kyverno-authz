@@ -16,7 +16,7 @@ require (
 	github.com/kyverno/sdk v0.0.0-20260224102515-cd8199098f38
 	github.com/kyverno/sdk/cel v0.0.0-20260224090256-362dfd494268
 	github.com/lestrrat-go/jwx/v3 v3.0.13
-	github.com/mark3labs/mcp-go v0.43.2
+	github.com/mark3labs/mcp-go v0.44.0
 	github.com/nlepage/go-tarfs v1.2.1
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
