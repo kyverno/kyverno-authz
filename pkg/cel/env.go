@@ -78,12 +78,12 @@ func NewEnv(evalMode vpol.EvaluationMode, d dynamic.Interface) (*cel.Env, error)
 	}
 	// create new cel env
 	return base.Extend(
-		http.Lib(http.Context{ContextInterface: http.NewHTTP(nil)}, nil),
+		http.Lib(http.Context{ContextInterface: http.NewHTTP(nil)}, http.Latest()),
 		jwt.Lib(),
 		jsoncel.Lib(&impl.JsonImpl{}),
 		mcp.Lib(&impl.MCPImpl{}),
-		resource.Lib(resource.Context{ContextInterface: variables.NewResourceProvider(d)}, "", nil),
-		image.Lib(nil),
-		imagedata.Lib(imagedata.Context{ContextInterface: loader}, nil),
+		resource.Lib(resource.Context{ContextInterface: variables.NewResourceProvider(d)}, "", resource.Latest()),
+		image.Lib(image.Latest()),
+		imagedata.Lib(imagedata.Context{ContextInterface: loader}, image.Latest()),
 	)
 }
