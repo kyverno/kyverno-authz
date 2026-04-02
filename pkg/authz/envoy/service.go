@@ -5,6 +5,7 @@ import (
 	"time"
 
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
+	"github.com/kyverno/kyverno-authz/pkg/events"
 	"github.com/kyverno/kyverno-authz/pkg/metrics"
 	"github.com/kyverno/sdk/core"
 	"github.com/kyverno/sdk/extensions/policy"
@@ -13,8 +14,9 @@ import (
 )
 
 type service struct {
-	engine    core.Engine[dynamic.Interface, *authv3.CheckRequest, policy.Evaluation[*authv3.CheckResponse]]
-	dynclient dynamic.Interface
+	engine       core.Engine[dynamic.Interface, *authv3.CheckRequest, policy.Evaluation[*authv3.CheckResponse]]
+	dynclient    dynamic.Interface
+	eventHandler events.EventIface[*authv3.CheckRequest]
 }
 
 func (s *service) Check(ctx context.Context, r *authv3.CheckRequest) (*authv3.CheckResponse, error) {
@@ -24,9 +26,13 @@ func (s *service) Check(ctx context.Context, r *authv3.CheckRequest) (*authv3.Ch
 	// log error if any
 	if err != nil {
 		metrics.RecordEnvoyRequestError(ctx, r, err)
+		s.eventHandler.Push(ctx, time.Now(), r, events.NewResultAccessor(nil, err))
 		ctrl.LoggerFrom(ctx).Error(err, "Check failed")
 	} else {
-		defer metrics.RecordEnvoyRequest(ctx, start, r, response)
+		defer func() {
+			s.eventHandler.Push(ctx, time.Now(), r, events.NewResultAccessor(response, nil))
+			metrics.RecordEnvoyRequest(ctx, start, r, response)
+		}()
 	}
 	// return response and error
 	return response, err

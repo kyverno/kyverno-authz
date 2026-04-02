@@ -3,6 +3,7 @@ package authzserver
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
@@ -16,6 +17,7 @@ import (
 	"github.com/kyverno/kyverno-authz/pkg/engine"
 	vpolcompiler "github.com/kyverno/kyverno-authz/pkg/engine/compiler"
 	"github.com/kyverno/kyverno-authz/pkg/engine/sources"
+	"github.com/kyverno/kyverno-authz/pkg/events"
 	"github.com/kyverno/kyverno-authz/pkg/probes"
 	"github.com/kyverno/kyverno-authz/pkg/signals"
 	"github.com/kyverno/kyverno-authz/pkg/utils/ocifs"
@@ -36,19 +38,28 @@ import (
 )
 
 func Command() *cobra.Command {
-	var probesAddress string
-	var metricsAddress string
-	var serverAddress string
-	var kubeConfigOverrides clientcmd.ConfigOverrides
-	var externalPolicySources []string
-	var kubePolicySource bool
-	var imagePullSecrets []string
-	var allowInsecureRegistry bool
-	var nestedRequest bool
-	var certFile string
-	var keyFile string
-	var inputExpression string
-	var outputExpression string
+	// TODO: have a more sane way to store flag values
+	var (
+		probesAddress         string
+		metricsAddress        string
+		serverAddress         string
+		kubeConfigOverrides   clientcmd.ConfigOverrides
+		externalPolicySources []string
+		kubePolicySource      bool
+		imagePullSecrets      []string
+		allowInsecureRegistry bool
+		nestedRequest         bool
+		certFile              string
+		keyFile               string
+		inputExpression       string
+		outputExpression      string
+		msgFormat             string
+		eventsEnabled         bool
+		openreportsEnabled    bool
+		reportFlushInterval   string
+		resultBufSize         int
+	)
+
 	command := &cobra.Command{
 		Use:   "authz-server",
 		Short: "Start the Kyverno Authz Server",
@@ -78,6 +89,14 @@ func Command() *cobra.Command {
 					var group wait.Group
 					// wait all tasks in the group are over
 					defer group.Wait()
+
+					httpEventHandlers := []events.EventIface[httplib.CheckRequest]{}
+					httpEventHandlers = append(httpEventHandlers, events.NewWriterEventSubscriber[httplib.CheckRequest](
+						os.Stdout,
+						logger,
+						msgFormat,
+					))
+
 					// load sources
 					var source engine.HTTPSource
 					var dyn dynamic.Interface
@@ -93,6 +112,15 @@ func Command() *cobra.Command {
 							return err
 						}
 						dyn = dynclient
+						// if events and openreports are enabled
+						if true {
+							httpEventHandlers = append(httpEventHandlers, events.NewK8sEventSubscriber[httplib.CheckRequest](
+								kubeclient,
+								"default",
+								logger,
+								msgFormat,
+							))
+						}
 						// initialize compiler
 						compiler := vpolcompiler.NewCompiler[dynamic.Interface, *httplib.CheckRequest, *httplib.CheckResponse](dynclient)
 
@@ -181,7 +209,9 @@ func Command() *cobra.Command {
 						InputExpression:  inputExpression,
 						OutputExpression: outputExpression,
 					}
-					authServer := http.NewServer(httpConfig, source, dyn)
+
+					ev := events.NewComposite[httplib.CheckRequest]()
+					authServer := http.NewServer(httpConfig, source, dyn, ev)
 					group.StartWithContext(ctx, func(ctx context.Context) {
 						defer cancel()
 						serverErr = authServer.Run(ctx)
@@ -204,6 +234,11 @@ func Command() *cobra.Command {
 	command.Flags().StringVar(&outputExpression, "output-expression", "", "CEL expression for transforming responses before being sent to clients")
 	command.Flags().StringVar(&certFile, "cert-file", "", "File containing tls certificate")
 	command.Flags().StringVar(&keyFile, "key-file", "", "File containing tls private key")
+	command.Flags().StringVar(&msgFormat, "log-msg-format", "[%s] http: request %s, response %s", "The format in which request logs would be shown in stdout")
+	command.Flags().BoolVar(&eventsEnabled, "events-enabled", false, "Enable kuberetnetes events on authz, if not running in k8s this flag wont take effect")
+	command.Flags().BoolVar(&openreportsEnabled, "openreports-enabled", false, "Enable reporting in the openreports format, if not running in k8s or the openreports CRD is not installed this flag wont take effect")
+	command.Flags().StringVar(&reportFlushInterval, "report-flush-interval", "", "how often do results get flushed into the openreports report (if active)")
+	command.Flags().IntVar(&resultBufSize, "result-buffer-size", 500, "Event buffer size for openreports, note that if the total exceeded the 1MB etcd limit, report flushing will error")
 	clientcmd.BindOverrideFlags(&kubeConfigOverrides, command.Flags(), clientcmd.RecommendedConfigOverrideFlags("kube-"))
 	return command
 }

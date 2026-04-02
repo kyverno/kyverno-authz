@@ -2,6 +2,7 @@ package http
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -11,6 +12,7 @@ import (
 	httpcel "github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/http"
 	httpserver "github.com/kyverno/kyverno-authz/pkg/cel/libs/httpserver"
 	"github.com/kyverno/kyverno-authz/pkg/cel/utils"
+	"github.com/kyverno/kyverno-authz/pkg/events"
 	"github.com/kyverno/kyverno-authz/pkg/metrics"
 	"github.com/kyverno/sdk/core"
 	"github.com/kyverno/sdk/extensions/policy"
@@ -24,6 +26,24 @@ type authorizer struct {
 	inputProgram  cel.Program
 	outputProgram cel.Program
 	nestedRequest bool
+	eventHandler  events.EventIface[httpcel.CheckRequest]
+}
+
+func NewAuthorizer(
+	e core.Engine[dynamic.Interface, *httpcel.CheckRequest, policy.Evaluation[*httpcel.CheckResponse]],
+	dyn dynamic.Interface,
+	inputProg cel.Program,
+	outputProg cel.Program,
+	nestedRequest bool,
+	eventIface events.EventIface[httpcel.CheckRequest]) *authorizer {
+	return &authorizer{
+		engine:        e,
+		dyn:           dyn,
+		inputProgram:  inputProg,
+		outputProgram: outputProg,
+		nestedRequest: nestedRequest,
+		eventHandler:  eventIface,
+	}
 }
 
 func (a *authorizer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -62,6 +82,7 @@ func (a *authorizer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	response := a.engine.Handle(r.Context(), a.dyn, &httpReq)
 	if response.Error != nil {
 		metrics.RecordHTTPRequestError(r.Context(), httpReq, response.Error)
+		a.eventHandler.Push(context.Background(), time.Now(), httpReq, events.NewResultAccessor(nil, response.Error))
 		writeErrResp(logger, w, response.Error)
 		return
 	}
@@ -71,6 +92,8 @@ func (a *authorizer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Ok: &httpcel.CheckResponseOk{},
 		}
 	}
+
+	a.eventHandler.Push(context.Background(), time.Now(), httpReq, events.NewResultAccessor(result, nil))
 	defer metrics.RecordHTTPRequest(r.Context(), start, httpReq, result)
 	out, _, err := a.outputProgram.Eval(map[string]any{
 		"object": result,
