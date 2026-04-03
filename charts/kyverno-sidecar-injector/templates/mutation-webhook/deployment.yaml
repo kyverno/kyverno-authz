@@ -90,9 +90,11 @@ spec:
         {{- end }}
       serviceAccountName: {{ template "sidecar-injector.service-account.name" $ }}
       volumes:
+        {{- if .Values.mutatingWebhookConfiguration.certificates.static }}
         - name: certs
           secret:
             secretName: {{ $name }}
+        {{- end }}
         - name: config
           configMap:
             name: {{ $name }}
@@ -129,13 +131,23 @@ spec:
             - serve
             - sidecar-injector
             - --address=:9443
+            - --webhook-namespace={{ $namespace }}
+            - --webhook-service-name={{ $name }}
+            - --webhook-configuration-name={{ $name }}
+            {{- if $.Values.mutatingWebhookConfiguration.certificates.static }}
+            - --internal-cert-management=false
             - --cert-file=/opt/kubernetes-sidecar-injector/certs/tls.crt
             - --key-file=/opt/kubernetes-sidecar-injector/certs/tls.key
+            {{- else }}
+            - --internal-cert-management={{ default true $.Values.mutatingWebhookConfiguration.certificates.internal.enabled }}
+            {{- end }}
             - --config-file=/opt/kubernetes-sidecar-injector/config/sidecar.yaml
           volumeMounts:
+            {{- if $.Values.mutatingWebhookConfiguration.certificates.static }}
             - name: certs
               mountPath: /opt/kubernetes-sidecar-injector/certs
               readOnly: true
+            {{- end }}
             - name: config
               mountPath: /opt/kubernetes-sidecar-injector/config
               readOnly: true

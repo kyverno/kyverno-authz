@@ -260,12 +260,9 @@ validatingWebhookConfiguration:
       # crt: ...
       # key: ...
 
-    # -- Infos for creating certificate with cert manager
-    certManager: {}
-      # issuerRef:
-      #   name: selfsigned-issuer
-      #   kind: ClusterIssuer
-      #   group: cert-manager.io
+    # -- Use internal certificate controller (kyverno/pkg)
+    internal:
+      enabled: true
 
   # -- Webhook failure policy
   failurePolicy: Fail

@@ -36,7 +36,11 @@ require (
 	sigs.k8s.io/yaml v1.6.0
 )
 
-require github.com/aws/aws-sdk-go-v2/service/signin v1.0.6 // indirect
+require (
+	github.com/aws/aws-sdk-go-v2/service/signin v1.0.6 // indirect
+	github.com/kyverno/pkg/certmanager v0.0.10 // indirect
+	github.com/kyverno/pkg/tls v0.0.9 // indirect
+)
 
 require (
 	cel.dev/expr v0.25.1 // indirect
