@@ -13,7 +13,7 @@ require (
 	github.com/hairyhenderson/go-fsimpl v0.3.3
 	github.com/kyverno/api v0.0.1-alpha.2.0.20260129144402-7b64bcf2b1f7
 	github.com/kyverno/pkg/ext v0.0.0-20250303002756-48769d003e55
-	github.com/kyverno/sdk v0.0.0-20260303162510-0f50c090702b
+	github.com/kyverno/sdk v0.0.0-20260403020150-29a100fa834c
 	github.com/lestrrat-go/jwx/v3 v3.0.13
 	github.com/mark3labs/mcp-go v0.43.2
 	github.com/nlepage/go-tarfs v1.2.1
@@ -29,7 +29,7 @@ require (
 	google.golang.org/protobuf v1.36.11
 	k8s.io/api v0.35.2
 	k8s.io/apimachinery v0.35.2
-	k8s.io/apiserver v0.35.1
+	k8s.io/apiserver v0.35.2
 	k8s.io/client-go v0.35.2
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
 	sigs.k8s.io/controller-runtime v0.23.1
