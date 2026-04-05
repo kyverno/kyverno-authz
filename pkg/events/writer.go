@@ -41,9 +41,12 @@ func (s *writerEventSubscriber[Req]) Push(_ context.Context, t time.Time, req Re
 		resultStr = fmt.Sprintf("%v", result)
 	}
 
-	fmt.Fprintf(s.writer, s.msgFormat,
+	_, err = fmt.Fprintf(s.writer, s.msgFormat,
 		t.Format(time.RFC3339),
 		string(jsonStr),
 		resultStr,
-	) //nolint:errcheck
+	)
+	if err != nil {
+		s.logger.Error(err, "error unmarshalling request")
+	}
 }
