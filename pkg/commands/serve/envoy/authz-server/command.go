@@ -138,12 +138,18 @@ func Command() *cobra.Command {
 								if err != nil {
 									logger.Error(err, "failed to instantiate openreports client")
 								} else {
-									// its fine to skip handling the error. because we check for flush interval being nil in
-									// the openreports event subscriber
-									flushInterval, _ := time.ParseDuration(reportFlushInterval)
+									// the parse duration function returns a zero duration on error
+									// hence why we need to create a pointer variable to easily differentiate the absence of this value
+									var intervalPtr *time.Duration
+									flushInterval, err := time.ParseDuration(reportFlushInterval)
+									if err == nil {
+										intervalPtr = &flushInterval
+									} else {
+										logger.Info("error parsing the reports flush interval, will push results to the report immediately")
+									}
 									envoyEventHandlers = append(envoyEventHandlers, events.NewOpenreportsSubscriber[*authv3.CheckRequest](
 										resultBufSize,
-										orClient, &flushInterval, logger,
+										orClient, intervalPtr, logger,
 										"envoy-authz-report", namespace, msgFormat))
 								}
 							}
@@ -157,7 +163,6 @@ func Command() *cobra.Command {
 						if err != nil {
 							return err
 						}
-						// ammar: add other event writers
 						source = sdksources.NewComposite(extSources...)
 						// if kube policy source is enabled
 						if kubePolicySource {
@@ -219,8 +224,10 @@ func Command() *cobra.Command {
 							probesErr = probesServer.Run(ctx)
 						})
 					}
+
+					ev := events.NewComposite(envoyEventHandlers...)
 					// auth server
-					authServer := envoy.NewServer(grpcNetwork, grpcAddress, source, dyn)
+					authServer := envoy.NewServer(grpcNetwork, grpcAddress, source, dyn, ev)
 					group.StartWithContext(ctx, func(ctx context.Context) {
 						// grpc auth server
 						defer cancel()
@@ -243,7 +250,7 @@ func Command() *cobra.Command {
 	command.Flags().BoolVar(&eventsEnabled, "events-enabled", false, "Enable kuberetnetes events on authz, if not running in k8s this flag wont take effect")
 	command.Flags().BoolVar(&openreportsEnabled, "openreports-enabled", false, "Enable reporting in the openreports format, if not running in k8s or the openreports CRD is not installed this flag wont take effect")
 	command.Flags().StringVar(&reportFlushInterval, "report-flush-interval", "", "how often do results get flushed into the openreports report (if active)")
-	command.Flags().StringVar(&msgFormat, "log-msg-format", "[%s] http: request %s, response %s", "The format in which request logs would be shown in stdout")
+	command.Flags().StringVar(&msgFormat, "log-msg-format", "[%s] http: request %s, response: %s\n", "The format in which request logs would be shown in stdout")
 	command.Flags().IntVar(&resultBufSize, "result-buffer-size", 500, "Event buffer size for openreports, note that if the total exceeded the 1MB etcd limit, report flushing will error")
 	clientcmd.BindOverrideFlags(&kubeConfigOverrides, command.Flags(), clientcmd.RecommendedConfigOverrideFlags("kube-"))
 	return command
@@ -274,6 +281,7 @@ func getExternalSources[POLICY any](vpolCompiler engine.Compiler[POLICY], nOpts 
 	return providers, nil
 }
 
+// ammar: move this to a generic utils file
 func crdExists(cfg *rest.Config, crdName string) (bool, error) {
 	client, err := apixv1.NewForConfig(cfg)
 	if err != nil {

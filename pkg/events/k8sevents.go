@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -38,28 +39,38 @@ func (k *k8sEventSubscriber[Req]) Push(ctx context.Context, t time.Time, req Req
 		k.logger.Error(err, "error marshalling request to json for event")
 		return
 	}
-	eventMsg := fmt.Sprintf(k.msgFormat, t, jsonReq)
-	eventName, err := uuid.NewUUID()
-	if err != nil {
-		k.logger.Error(err, "error creating uuid for event name")
-		return
-	}
-	r, err := res.MustGet()
 
+	result, resultErr := res.MustGet()
+
+	var resultStr string
+	if resultErr != nil {
+		resultStr = fmt.Sprintf("%v: %v", result, resultErr)
+	} else {
+		resultStr = fmt.Sprintf("%v", result)
+	}
+
+	eventMsg := fmt.Sprintf(k.msgFormat,
+		t.Format(time.RFC3339),
+		string(jsonReq),
+		resultStr,
+	)
+
+	eventName := strings.ReplaceAll(uuid.New().String(), "-", "")
 	event := &corev1.Event{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      eventName.String(),
+			Name:      eventName,
 			Namespace: k.namespace,
 		},
-		Reason:            err.Error(),
-		Message:           eventMsg,
-		Type:              corev1.EventTypeNormal,
-		EventTime:         metav1.NewMicroTime(t),
-		FirstTimestamp:    metav1.NewTime(t),
-		LastTimestamp:     metav1.NewTime(t),
-		Count:             1,
-		Action:            r,
-		ReportingInstance: "kyverno-authz-server",
+		Reason:              result,
+		Message:             eventMsg,
+		Type:                corev1.EventTypeNormal,
+		EventTime:           metav1.NewMicroTime(t),
+		FirstTimestamp:      metav1.NewTime(t),
+		LastTimestamp:       metav1.NewTime(t),
+		Count:               1,
+		Action:              result,
+		ReportingController: "kyverno-authz-server",
+		ReportingInstance:   "kyverno-authz-server",
 	}
 
 	_, err = k.client.CoreV1().Events(k.namespace).Create(

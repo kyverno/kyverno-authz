@@ -93,7 +93,8 @@ func (a *authorizer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	a.eventHandler.Push(context.Background(), time.Now(), httpReq, events.NewResultAccessor(result, nil))
+	// result will never be nil here because we set it in the block above
+	a.eventHandler.Push(context.Background(), time.Now(), httpReq, events.NewResultAccessor(*result, nil))
 	defer metrics.RecordHTTPRequest(r.Context(), start, httpReq, result)
 	out, _, err := a.outputProgram.Eval(map[string]any{
 		"object": result,

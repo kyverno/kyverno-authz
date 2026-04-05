@@ -102,7 +102,7 @@ has(object.ok)
 			),
 		)
 		// register service
-		a := NewAuthorizer(engine, dyn, inputProgram, outputProgram, config.NestedRequest, nil)
+		a := NewAuthorizer(engine, dyn, inputProgram, outputProgram, config.NestedRequest, eventIface)
 		mux.Handle("POST /{$}", a)
 		// create server
 		s := &http.Server{

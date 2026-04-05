@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
@@ -23,13 +24,18 @@ import (
 	"github.com/kyverno/kyverno-authz/pkg/utils/ocifs"
 	"github.com/kyverno/sdk/core"
 	sdksources "github.com/kyverno/sdk/core/sources"
+	openreportsclient "github.com/openreports/reports-api/pkg/client/clientset/versioned/typed/openreports.io/v1alpha1"
 	"github.com/spf13/cobra"
 	"go.uber.org/multierr"
+	apixv1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -112,15 +118,7 @@ func Command() *cobra.Command {
 							return err
 						}
 						dyn = dynclient
-						// if events and openreports are enabled
-						if true {
-							httpEventHandlers = append(httpEventHandlers, events.NewK8sEventSubscriber[httplib.CheckRequest](
-								kubeclient,
-								"default",
-								logger,
-								msgFormat,
-							))
-						}
+
 						// initialize compiler
 						compiler := vpolcompiler.NewCompiler[dynamic.Interface, *httplib.CheckRequest, *httplib.CheckResponse](dynclient)
 
@@ -131,6 +129,40 @@ func Command() *cobra.Command {
 						if namespace == "" || namespace == "default" {
 							logger.Info(fmt.Sprintf("Using namespace '%s' - consider setting explicit namespace", namespace))
 						}
+
+						if eventsEnabled {
+							httpEventHandlers = append(httpEventHandlers, events.NewK8sEventSubscriber[httplib.CheckRequest](
+								kubeclient,
+								namespace,
+								logger,
+								msgFormat,
+							))
+						}
+
+						if openreportsEnabled {
+							if exists, err := crdExists(config, "reports.openreports.io"); err == nil && exists {
+								orClient, err := openreportsclient.NewForConfig(config)
+								if err != nil {
+									logger.Error(err, "failed to instantiate openreports client")
+								} else {
+									// the parse duration function returns a zero duration on error
+									// hence why we need to create a pointer variable to easily differentiate the absence of this value
+									var intervalPtr *time.Duration
+									flushInterval, err := time.ParseDuration(reportFlushInterval)
+									if err == nil {
+										intervalPtr = &flushInterval
+									} else {
+										logger.Info("error parsing the reports flush interval, will push results to the report immediately")
+									}
+
+									httpEventHandlers = append(httpEventHandlers, events.NewOpenreportsSubscriber[httplib.CheckRequest](
+										resultBufSize,
+										orClient, intervalPtr, logger,
+										"http-authz-report", namespace, msgFormat))
+								}
+							}
+						}
+
 						rOpts, nOpts, err := ocifs.RegistryOpts(kubeclient.CoreV1().Secrets(namespace), allowInsecureRegistry, imagePullSecrets...)
 						if err != nil {
 							return fmt.Errorf("failed to initialize registry opts: %w", err)
@@ -210,7 +242,7 @@ func Command() *cobra.Command {
 						OutputExpression: outputExpression,
 					}
 
-					ev := events.NewComposite[httplib.CheckRequest]()
+					ev := events.NewComposite(httpEventHandlers...)
 					authServer := http.NewServer(httpConfig, source, dyn, ev)
 					group.StartWithContext(ctx, func(ctx context.Context) {
 						defer cancel()
@@ -234,7 +266,7 @@ func Command() *cobra.Command {
 	command.Flags().StringVar(&outputExpression, "output-expression", "", "CEL expression for transforming responses before being sent to clients")
 	command.Flags().StringVar(&certFile, "cert-file", "", "File containing tls certificate")
 	command.Flags().StringVar(&keyFile, "key-file", "", "File containing tls private key")
-	command.Flags().StringVar(&msgFormat, "log-msg-format", "[%s] http: request %s, response %s", "The format in which request logs would be shown in stdout")
+	command.Flags().StringVar(&msgFormat, "log-msg-format", "[%s] http: request %s, response: %s\n", "The format in which request logs would be shown in stdout")
 	command.Flags().BoolVar(&eventsEnabled, "events-enabled", false, "Enable kuberetnetes events on authz, if not running in k8s this flag wont take effect")
 	command.Flags().BoolVar(&openreportsEnabled, "openreports-enabled", false, "Enable reporting in the openreports format, if not running in k8s or the openreports CRD is not installed this flag wont take effect")
 	command.Flags().StringVar(&reportFlushInterval, "report-flush-interval", "", "how often do results get flushed into the openreports report (if active)")
@@ -266,4 +298,25 @@ func getExternalSources[POLICY any](vpolCompiler engine.Compiler[POLICY], nOpts 
 		)
 	}
 	return providers, nil
+}
+
+// ammar: move this to a generic utils file
+func crdExists(cfg *rest.Config, crdName string) (bool, error) {
+	client, err := apixv1.NewForConfig(cfg)
+	if err != nil {
+		return false, err
+	}
+
+	_, err = client.ApiextensionsV1().
+		CustomResourceDefinitions().
+		Get(context.Background(), crdName, metav1.GetOptions{})
+
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	return true, nil
 }

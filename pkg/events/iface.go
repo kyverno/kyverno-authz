@@ -41,7 +41,7 @@ func NewResultAccessor(res any, err error) *resultAccessorImpl {
 }
 
 func (r *resultAccessorImpl) MustGet() (string, error) {
-	if r.err == nil {
+	if r.err != nil {
 		return RequestErrored, r.err
 	}
 

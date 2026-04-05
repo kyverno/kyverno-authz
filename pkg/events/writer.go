@@ -19,8 +19,9 @@ type writerEventSubscriber[Req any] struct {
 // ammar: also provide the option for file writing
 func NewWriterEventSubscriber[Req any](w io.Writer, l logr.Logger, msgFormat string) EventIface[Req] {
 	return &writerEventSubscriber[Req]{
-		writer: w,
-		logger: l,
+		writer:    w,
+		logger:    l,
+		msgFormat: msgFormat,
 	}
 }
 
@@ -31,10 +32,18 @@ func (s *writerEventSubscriber[Req]) Push(_ context.Context, t time.Time, req Re
 		return
 	}
 	result, resultErr := res.MustGet()
+
 	// if the result is an error we will print in the result log placeholder ResultErrored: <the_actual_error>
+	var resultStr string
 	if resultErr != nil {
-		fmt.Fprintf(s.writer, s.msgFormat, t, jsonStr, fmt.Sprintf("%s: %s", result, resultErr))
+		resultStr = fmt.Sprintf("%v: %v", result, resultErr)
 	} else {
-		fmt.Fprintf(s.writer, s.msgFormat, t, jsonStr, result)
+		resultStr = fmt.Sprintf("%v", result)
 	}
+
+	fmt.Fprintf(s.writer, s.msgFormat,
+		t.Format(time.RFC3339),
+		string(jsonStr),
+		resultStr,
+	) //nolint:errcheck
 }

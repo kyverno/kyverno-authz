@@ -14,8 +14,6 @@ import (
 )
 
 type openreportsEventSubscriber[Req any] struct {
-	// ammar: maybe we should have an option to flush on a schedule as well
-	// can we incur a data race of sorts if too many events get pushed ?
 	results       *ringBuffer[openreportsv1alpha1.ReportResult]
 	client        openreportsclient.OpenreportsV1alpha1Interface
 	allowed       int
@@ -38,8 +36,10 @@ func NewOpenreportsSubscriber[Req any](bufferSize int,
 		results:    NewRingBuffer[openreportsv1alpha1.ReportResult](bufferSize),
 		namespace:  ns,
 		reportName: reportName,
+		msgFormat:  msgFormat,
 	}
 	if flushInterval != nil {
+		o.flushInterval = flushInterval
 		go o.flushResultsToReport(context.Background())
 	}
 	return o
@@ -68,9 +68,9 @@ func (o *openreportsEventSubscriber[Req]) newReportResult(t time.Time, r Req, re
 	reportResult := &openreportsv1alpha1.ReportResult{}
 	// ammar: is there a constant provided in the openreports package ?
 	// ammar: we should also have request skipped if it didn't match the conditions
-	resultString, resErr := resultAccessor.MustGet()
+	res, resultErr := resultAccessor.MustGet()
 
-	switch resultString {
+	switch res {
 	case RequestAllowed:
 		reportResult.Result = openreportsv1alpha1.Result("pass")
 		o.allowed++
@@ -89,11 +89,19 @@ func (o *openreportsEventSubscriber[Req]) newReportResult(t time.Time, r Req, re
 	if err != nil {
 		return nil, err
 	}
-	if resErr != nil {
-		reportResult.Description = fmt.Sprintf(o.msgFormat, t, jsonStr, fmt.Sprintf("%s, %s", resultString, resErr.Error()))
+
+	var resultStr string
+	if resultErr != nil {
+		resultStr = fmt.Sprintf("%v: %v", res, resultErr)
 	} else {
-		reportResult.Description = fmt.Sprintf(o.msgFormat, t, jsonStr, resultString)
+		resultStr = fmt.Sprintf("%v", res)
 	}
+
+	reportResult.Description = fmt.Sprintf(o.msgFormat,
+		t.Format(time.RFC3339),
+		string(jsonStr),
+		resultStr,
+	)
 	return reportResult, nil
 }
 
