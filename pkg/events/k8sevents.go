@@ -27,7 +27,7 @@ type k8sEventSubscriber[Req any] struct {
 
 // pass a context to the constructor to make it the context used to cancel the event loop
 func NewK8sEventSubscriber[Req any](ctx context.Context, client kubernetes.Interface, ns string, logger logr.Logger, msgFormat string) EventIface[Req] {
-	eventChan := make(chan event[Req], 10)
+	eventChan := make(chan event[Req], 50)
 	k := &k8sEventSubscriber[Req]{
 		client:    client,
 		namespace: ns,

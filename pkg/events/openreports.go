@@ -42,7 +42,7 @@ func NewOpenreportsSubscriber[Req any](ctx context.Context, bufferSize int,
 		reportName: reportName,
 		msgFormat:  msgFormat,
 		logger:     logger,
-		eventChan:  make(chan event[Req], 10), // we can buffer up to 10 events
+		eventChan:  make(chan event[Req], 50), // we can buffer up to 50 events
 	}
 
 	if flushInterval != nil {
