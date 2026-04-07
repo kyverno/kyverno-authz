@@ -16,6 +16,7 @@ kyverno-authz serve envoy authz-server [flags]
 
 ```
       --allow-insecure-registry              Allow insecure registry
+      --events-enabled                       Enable k8s events on authz, if not running in k8s this flag won't take effect
       --external-policy-source stringArray   External policy sources
       --grpc-address string                  Address to listen on (default ":9081")
       --grpc-network string                  Network to listen on (default "tcp")
@@ -41,8 +42,12 @@ kyverno-authz serve envoy authz-server [flags]
       --kube-token string                    Bearer token for authentication to the API server
       --kube-user string                     The name of the kubeconfig user to use
       --kube-username string                 Username for basic authentication to the API server
+      --log-msg-format string                The format in which request logs would be shown in stdout (default "[%s] http: request %s, response: %s\n")
       --metrics-address string               Address to listen on for metrics (default ":9082")
+      --openreports-enabled                  Enable reporting in the openreports format, if not running in k8s or the openreports CRD is not installed this flag won't take effect
       --probes-address string                Address to listen on for health checks
+      --report-flush-interval string         how often do results get flushed into the openreports report (if active)
+      --result-buffer-size int               Event buffer size for openreports, note that if the total exceeded the 1MB etcd limit, report flushing will error (default 500)
 ```
 
 ### SEE ALSO
