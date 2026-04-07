@@ -26,7 +26,7 @@ func NewWriterEventSubscriber[Req any](w io.Writer, l logr.Logger, msgFormat str
 }
 
 func (s *writerEventSubscriber[Req]) Push(_ context.Context, t time.Time, req Req, res ResultAccessor) {
-	// its ok for the standard output writer to be synchronous
+	// it's ok for the standard output writer to be synchronous
 	jsonStr, err := json.Marshal(req)
 	if err != nil {
 		s.logger.Error(err, "error unmarshalling request")
