@@ -144,7 +144,6 @@ func Command() *cobra.Command {
 									} else {
 										logger.Info("error parsing the reports flush interval, will push results to the report immediately")
 									}
-									// todo: customize the report name based on pod name
 									reportName := "envoy-authz-report"
 									if podName := os.Getenv("POD_NAME"); podName != "" {
 										reportName = fmt.Sprintf("%s-%s", reportName, podName)
