@@ -130,7 +130,9 @@ func Command() *cobra.Command {
 
 						// add the openreports event handler
 						if openreportsEnabled {
-							if exists, err := utils.CrdExists(config, "reports.openreports.io"); err == nil && exists {
+							if exists, err := utils.CrdExists(config, "reports.openreports.io"); err != nil {
+								logger.Error(err, "failed to check if openreports CRD exists")
+							} else if exists {
 								orClient, err := openreportsclient.NewForConfig(config)
 								if err != nil {
 									logger.Error(err, "failed to instantiate openreports client")
