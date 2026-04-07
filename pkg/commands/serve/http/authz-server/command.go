@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/cespare/xxhash/v2"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/hairyhenderson/go-fsimpl"
@@ -156,7 +157,8 @@ func Command() *cobra.Command {
 									}
 									reportName := "http-authz-report"
 									if podName := os.Getenv("POD_NAME"); podName != "" {
-										reportName = fmt.Sprintf("%s-%s", reportName, podName)
+										podNameHash := xxhash.Sum64String(podName)
+										reportName = fmt.Sprintf("%s-%x", reportName, podNameHash)
 									} else {
 										logger.Info("POD_NAME environment variable not set, using default report name. there may be a clash")
 									}
