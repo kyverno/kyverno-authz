@@ -124,7 +124,7 @@ func Command() *cobra.Command {
 						if eventsEnabled {
 							envoyEventHandlers = append(envoyEventHandlers,
 								events.NewK8sEventSubscriber[*authv3.CheckRequest](
-									kubeclient, namespace,
+									ctx, kubeclient, namespace,
 									logger, msgFormat))
 						}
 
@@ -146,7 +146,7 @@ func Command() *cobra.Command {
 									}
 									// todo: customize the report name based on pod name
 									envoyEventHandlers = append(envoyEventHandlers, events.NewOpenreportsSubscriber[*authv3.CheckRequest](
-										resultBufSize,
+										ctx, resultBufSize,
 										orClient, intervalPtr, logger,
 										"envoy-authz-report", namespace, msgFormat))
 								}

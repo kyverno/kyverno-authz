@@ -129,6 +129,7 @@ func Command() *cobra.Command {
 
 						if eventsEnabled {
 							httpEventHandlers = append(httpEventHandlers, events.NewK8sEventSubscriber[httplib.CheckRequest](
+								ctx,
 								kubeclient,
 								namespace,
 								logger,
@@ -153,7 +154,7 @@ func Command() *cobra.Command {
 									}
 
 									httpEventHandlers = append(httpEventHandlers, events.NewOpenreportsSubscriber[httplib.CheckRequest](
-										resultBufSize,
+										ctx, resultBufSize,
 										orClient, intervalPtr, logger,
 										"http-authz-report", namespace, msgFormat))
 								}
@@ -210,7 +211,6 @@ func Command() *cobra.Command {
 						}
 					} else {
 						compiler := vpolcompiler.NewCompiler[dynamic.Interface, *httplib.CheckRequest, *httplib.CheckResponse](nil)
-
 						rOpts, nOpts, err := ocifs.RegistryOpts(nil, allowInsecureRegistry)
 						if err != nil {
 							return fmt.Errorf("failed to initialize registry opts: %w", err)
