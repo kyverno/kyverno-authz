@@ -91,7 +91,7 @@ func (o *openreportsEventSubscriber[Req]) Push(ctx context.Context, t time.Time,
 	select {
 	case o.eventChan <- event:
 	default:
-		o.logger.Error(nil, "event channel full, dropping event")
+		o.logger.Error(nil, "openreports event handler: event channel full, dropping event")
 	}
 }
 

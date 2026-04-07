@@ -109,6 +109,6 @@ func (k *k8sEventSubscriber[Req]) Push(ctx context.Context, t time.Time, req Req
 	select {
 	case k.eventChan <- event:
 	default:
-		k.logger.Error(nil, "event channel full, dropping event")
+		k.logger.Error(nil, "k8s events event handler: event channel full, dropping event")
 	}
 }
