@@ -21,21 +21,18 @@ import (
 	"github.com/kyverno/kyverno-authz/pkg/events"
 	"github.com/kyverno/kyverno-authz/pkg/probes"
 	"github.com/kyverno/kyverno-authz/pkg/signals"
+	"github.com/kyverno/kyverno-authz/pkg/utils"
 	"github.com/kyverno/kyverno-authz/pkg/utils/ocifs"
 	"github.com/kyverno/sdk/core"
 	sdksources "github.com/kyverno/sdk/core/sources"
 	openreportsclient "github.com/openreports/reports-api/pkg/client/clientset/versioned/typed/openreports.io/v1alpha1"
 	"github.com/spf13/cobra"
 	"go.uber.org/multierr"
-	apixv1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -140,7 +137,7 @@ func Command() *cobra.Command {
 						}
 
 						if openreportsEnabled {
-							if exists, err := crdExists(config, "reports.openreports.io"); err == nil && exists {
+							if exists, err := utils.CrdExists(config, "reports.openreports.io"); err == nil && exists {
 								orClient, err := openreportsclient.NewForConfig(config)
 								if err != nil {
 									logger.Error(err, "failed to instantiate openreports client")
@@ -298,25 +295,4 @@ func getExternalSources[POLICY any](vpolCompiler engine.Compiler[POLICY], nOpts 
 		)
 	}
 	return providers, nil
-}
-
-// ammar: move this to a generic utils file
-func crdExists(cfg *rest.Config, crdName string) (bool, error) {
-	client, err := apixv1.NewForConfig(cfg)
-	if err != nil {
-		return false, err
-	}
-
-	_, err = client.ApiextensionsV1().
-		CustomResourceDefinitions().
-		Get(context.Background(), crdName, metav1.GetOptions{})
-
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return false, nil
-		}
-		return false, err
-	}
-
-	return true, nil
 }
