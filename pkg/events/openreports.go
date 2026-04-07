@@ -38,6 +38,7 @@ func NewOpenreportsSubscriber[Req any](bufferSize int,
 		namespace:  ns,
 		reportName: reportName,
 		msgFormat:  msgFormat,
+		logger:     logger,
 	}
 	if flushInterval != nil {
 		o.flushInterval = flushInterval
