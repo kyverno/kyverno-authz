@@ -174,9 +174,9 @@ func (o *openreportsEventSubscriber[Req]) pushReport(ctx context.Context) {
 	rep.Results = o.results.Values()
 
 	// update the report summary
-	rep.Summary.Error = int(o.allowed.Load())
+	rep.Summary.Error = int(o.errored.Load())
 	rep.Summary.Pass = int(o.allowed.Load())
-	rep.Summary.Fail = int(o.allowed.Load())
+	rep.Summary.Fail = int(o.denied.Load())
 
 	_, err = o.client.Reports(o.namespace).Update(ctx, rep, metav1.UpdateOptions{})
 	if err != nil {
