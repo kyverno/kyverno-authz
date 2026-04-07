@@ -414,6 +414,19 @@ jobs:
           set -e
           export HELM=${{ steps.helm.outputs.helm-path }}
           make deploy-kyverno-envoy-server
+      - name: Wait for validation webhook readiness
+        run: |
+          set -e
+          kubectl rollout status deployment/kyverno-authz-server-validation -n kyverno --timeout=180s
+          for i in $(seq 1 36); do
+            if kubectl get endpoints kyverno-authz-server-validation -n kyverno -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null | grep -q .; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "validation webhook service has no ready endpoints" >&2
+          kubectl get pods,svc,endpoints -n kyverno >&2 || true
+          exit 1
       - name: Run Chainsaw Tests
         run:  |
           set -e
@@ -470,6 +483,19 @@ jobs:
           set -e
           export HELM=${{ steps.helm.outputs.helm-path }}
           make deploy-kyverno-http-server
+      - name: Wait for validation webhook readiness
+        run: |
+          set -e
+          kubectl rollout status deployment/kyverno-authz-server-validation -n kyverno --timeout=180s
+          for i in $(seq 1 36); do
+            if kubectl get endpoints kyverno-authz-server-validation -n kyverno -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null | grep -q .; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "validation webhook service has no ready endpoints" >&2
+          kubectl get pods,svc,endpoints -n kyverno >&2 || true
+          exit 1
       - name: Run Chainsaw Tests
         run:  |
           set -e
