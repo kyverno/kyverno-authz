@@ -66,7 +66,7 @@ func (o *openreportsEventSubscriber[Req]) eventLoop(ctx context.Context) {
 			reportResult, err := o.newReportResult(ev.t, ev.req, ev.res)
 			if err != nil {
 				o.logger.Error(err, "error building report result")
-				return
+				continue
 			}
 
 			o.results.Push(*reportResult)
