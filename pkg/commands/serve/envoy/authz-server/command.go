@@ -145,10 +145,17 @@ func Command() *cobra.Command {
 										logger.Info("error parsing the reports flush interval, will push results to the report immediately")
 									}
 									// todo: customize the report name based on pod name
+									reportName := "envoy-authz-report"
+									if podName := os.Getenv("POD_NAME"); podName != "" {
+										reportName = fmt.Sprintf("%s-%s", reportName, podName)
+									} else {
+										logger.Info("POD_NAME environment variable not set, using default report name. there may be a clash")
+									}
+
 									envoyEventHandlers = append(envoyEventHandlers, events.NewOpenreportsSubscriber[*authv3.CheckRequest](
 										ctx, resultBufSize,
 										orClient, intervalPtr, logger,
-										"envoy-authz-report", namespace, msgFormat))
+										reportName, namespace, msgFormat))
 								}
 							}
 						}

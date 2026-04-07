@@ -152,11 +152,17 @@ func Command() *cobra.Command {
 									} else {
 										logger.Info("error parsing the reports flush interval, will push results to the report immediately")
 									}
+									reportName := "http-authz-report"
+									if podName := os.Getenv("POD_NAME"); podName != "" {
+										reportName = fmt.Sprintf("%s-%s", reportName, podName)
+									} else {
+										logger.Info("POD_NAME environment variable not set, using default report name. there may be a clash")
+									}
 
 									httpEventHandlers = append(httpEventHandlers, events.NewOpenreportsSubscriber[httplib.CheckRequest](
 										ctx, resultBufSize,
 										orClient, intervalPtr, logger,
-										"http-authz-report", namespace, msgFormat))
+										reportName, namespace, msgFormat))
 								}
 							}
 						}
