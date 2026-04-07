@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -16,9 +17,9 @@ import (
 type openreportsEventSubscriber[Req any] struct {
 	results       *ringBuffer[openreportsv1alpha1.ReportResult]
 	client        openreportsclient.OpenreportsV1alpha1Interface
-	allowed       int
-	denied        int
-	errored       int
+	allowed       atomic.Int64
+	denied        atomic.Int64
+	errored       atomic.Int64
 	namespace     string
 	reportName    string
 	msgFormat     string
@@ -73,13 +74,13 @@ func (o *openreportsEventSubscriber[Req]) newReportResult(t time.Time, r Req, re
 	switch res {
 	case RequestAllowed:
 		reportResult.Result = openreportsv1alpha1.Result("pass")
-		o.allowed++
+		o.allowed.Add(1)
 	case RequestDenied:
 		reportResult.Result = openreportsv1alpha1.Result("fail")
-		o.denied++
+		o.denied.Add(1)
 	case RequestErrored:
 		reportResult.Result = openreportsv1alpha1.Result("error")
-		o.errored++
+		o.errored.Add(1)
 	}
 	reportResult.Timestamp = metav1.Timestamp{
 		Seconds: t.Unix(),
@@ -113,9 +114,9 @@ func (o *openreportsEventSubscriber[Req]) newReport() *openreportsv1alpha1.Repor
 			Namespace: o.namespace,
 		},
 		Summary: openreportsv1alpha1.ReportSummary{
-			Error: o.errored,
-			Pass:  o.allowed,
-			Fail:  o.denied,
+			Error: int(o.errored.Load()),
+			Pass:  int(o.allowed.Load()),
+			Fail:  int(o.denied.Load()),
 		},
 		Results: o.results.Values(),
 	}
@@ -144,9 +145,9 @@ func (o *openreportsEventSubscriber[Req]) pushReport(ctx context.Context) {
 	rep.Results = o.results.Values()
 
 	// update the report summary
-	rep.Summary.Error = o.errored
-	rep.Summary.Pass = o.allowed
-	rep.Summary.Fail = o.denied
+	rep.Summary.Error = int(o.allowed.Load())
+	rep.Summary.Pass = int(o.allowed.Load())
+	rep.Summary.Fail = int(o.allowed.Load())
 
 	_, err = o.client.Reports(o.namespace).Update(ctx, rep, metav1.UpdateOptions{})
 	if err != nil {

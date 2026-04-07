@@ -1,5 +1,7 @@
 package events
 
+import "fmt"
+
 type ringBuffer[T any] struct {
 	data  []T
 	size  int
@@ -8,6 +10,9 @@ type ringBuffer[T any] struct {
 }
 
 func NewRingBuffer[T any](size int) *ringBuffer[T] {
+	if size <= 0 {
+		panic(fmt.Sprintf("ring buffer size must be > 0, got %d", size))
+	}
 	return &ringBuffer[T]{
 		data: make([]T, size),
 		size: size,

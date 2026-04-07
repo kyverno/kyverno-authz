@@ -133,7 +133,7 @@ func Command() *cobra.Command {
 
 						// add the openreports event handler
 						if openreportsEnabled {
-							if exists, err := crdExists(config, "reports.openreports.io"); err != nil && exists {
+							if exists, err := crdExists(config, "reports.openreports.io"); err == nil && exists {
 								orClient, err := openreportsclient.NewForConfig(config)
 								if err != nil {
 									logger.Error(err, "failed to instantiate openreports client")
@@ -147,6 +147,7 @@ func Command() *cobra.Command {
 									} else {
 										logger.Info("error parsing the reports flush interval, will push results to the report immediately")
 									}
+									// todo: customize the report name based on pod name
 									envoyEventHandlers = append(envoyEventHandlers, events.NewOpenreportsSubscriber[*authv3.CheckRequest](
 										resultBufSize,
 										orClient, intervalPtr, logger,
@@ -247,7 +248,7 @@ func Command() *cobra.Command {
 	command.Flags().StringArrayVar(&imagePullSecrets, "image-pull-secret", nil, "Image pull secrets")
 	command.Flags().BoolVar(&allowInsecureRegistry, "allow-insecure-registry", false, "Allow insecure registry")
 	command.Flags().BoolVar(&kubePolicySource, "kube-policy-source", true, "Enable in-cluster kubernetes policy source")
-	command.Flags().BoolVar(&eventsEnabled, "events-enabled", false, "Enable kuberetnetes events on authz, if not running in k8s this flag wont take effect")
+	command.Flags().BoolVar(&eventsEnabled, "events-enabled", false, "Enable k8s events on authz, if not running in k8s this flag wont take effect")
 	command.Flags().BoolVar(&openreportsEnabled, "openreports-enabled", false, "Enable reporting in the openreports format, if not running in k8s or the openreports CRD is not installed this flag wont take effect")
 	command.Flags().StringVar(&reportFlushInterval, "report-flush-interval", "", "how often do results get flushed into the openreports report (if active)")
 	command.Flags().StringVar(&msgFormat, "log-msg-format", "[%s] http: request %s, response: %s\n", "The format in which request logs would be shown in stdout")
