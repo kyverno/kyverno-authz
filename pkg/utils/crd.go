@@ -2,6 +2,7 @@ package utils
 
 import (
 	"context"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/rest"
@@ -16,9 +17,12 @@ func CrdExists(cfg *rest.Config, crdName string) (bool, error) {
 		return false, err
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
 	_, err = client.ApiextensionsV1().
 		CustomResourceDefinitions().
-		Get(context.Background(), crdName, metav1.GetOptions{})
+		Get(ctx, crdName, metav1.GetOptions{})
 
 	if err != nil {
 		if errors.IsNotFound(err) {
