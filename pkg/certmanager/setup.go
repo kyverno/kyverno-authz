@@ -9,15 +9,10 @@ import (
 	tlsmgr "github.com/kyverno/pkg/tls"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
 
 // Setup starts Kyverno certmanager controller for a given service.
-func Setup(ctx context.Context, logger logr.Logger, config *rest.Config, namespace, serviceName string) error {
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return err
-	}
+func Setup(ctx context.Context, logger logr.Logger, clientset kubernetes.Interface, namespace, serviceName string) error {
 
 	tlsConfig := &tlsmgr.Config{
 		ServiceName: serviceName,

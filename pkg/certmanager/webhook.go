@@ -29,7 +29,7 @@ func BootstrapWebhookCerts(ctx context.Context, logger logr.Logger, config *rest
 		return "", nil, err
 	}
 
-	if err := Setup(ctx, logger, config, namespace, serviceName); err != nil {
+	if err := Setup(ctx, logger, clientset, namespace, serviceName); err != nil {
 		return "", nil, err
 	}
 
