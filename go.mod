@@ -12,7 +12,9 @@ require (
 	github.com/google/go-containerregistry/pkg/authn/kubernetes v0.0.0-20260224031529-85f2bf5f7303
 	github.com/hairyhenderson/go-fsimpl v0.3.3
 	github.com/kyverno/api v0.0.1-alpha.2.0.20260129144402-7b64bcf2b1f7
+	github.com/kyverno/pkg/certmanager v0.0.10
 	github.com/kyverno/pkg/ext v0.0.0-20250303002756-48769d003e55
+	github.com/kyverno/pkg/tls v0.0.9
 	github.com/kyverno/sdk v0.0.0-20260403020150-29a100fa834c
 	github.com/lestrrat-go/jwx/v3 v3.0.13
 	github.com/mark3labs/mcp-go v0.43.2
