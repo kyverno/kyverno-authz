@@ -91,6 +91,8 @@ spec:
         {{- end }}
       serviceAccountName: {{ template "sidecar-injector.service-account.name" $ }}
       volumes:
+        - name: tmp
+          emptyDir: {}
         {{- if .Values.mutatingWebhookConfiguration.certificates.static }}
         - name: certs
           secret:
@@ -144,6 +146,8 @@ spec:
             {{- end }}
             - --config-file=/opt/kubernetes-sidecar-injector/config/sidecar.yaml
           volumeMounts:
+            - name: tmp
+              mountPath: /tmp
             {{- if $useStaticCertificates }}
             - name: certs
               mountPath: /opt/kubernetes-sidecar-injector/certs

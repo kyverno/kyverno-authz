@@ -414,14 +414,12 @@ validatingWebhookConfiguration:
     # ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/
     # @default -- See [values.yaml](values.yaml)
     readinessProbe:
-      httpGet:
-        path: /readyz
-        port: 9080
-        scheme: HTTP
+      tcpSocket:
+        port: 9443
       initialDelaySeconds: 5
-      periodSeconds: 10
+      periodSeconds: 5
       timeoutSeconds: 5
-      failureThreshold: 6
+      failureThreshold: 12
       successThreshold: 1
 
     # -- Container ports.
