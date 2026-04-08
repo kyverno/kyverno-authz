@@ -25,45 +25,74 @@ type openreportsEventSubscriber[Req any] struct {
 	msgFormat     string
 	logger        logr.Logger
 	flushInterval *time.Duration
+	eventChan     chan event[Req]
 }
 
-func NewOpenreportsSubscriber[Req any](bufferSize int,
+// pass a context to the constructor to make it the context used to cancel the event loop
+func NewOpenreportsSubscriber[Req any](ctx context.Context, bufferSize int,
 	orClient openreportsclient.OpenreportsV1alpha1Interface,
 	flushInterval *time.Duration,
 	logger logr.Logger,
 	reportName, ns, msgFormat string) EventIface[Req] {
 	o := &openreportsEventSubscriber[Req]{
-		client:     orClient,
+		client: orClient,
+		// we don't need the ring buffer to contain a mutex because in all cases we process events serially
 		results:    NewRingBuffer[openreportsv1alpha1.ReportResult](bufferSize),
 		namespace:  ns,
 		reportName: reportName,
 		msgFormat:  msgFormat,
 		logger:     logger,
+		eventChan:  make(chan event[Req], 50), // we can buffer up to 50 events
 	}
+
 	if flushInterval != nil {
 		o.flushInterval = flushInterval
-		go o.flushResultsToReport(context.Background())
+		go o.flushResultsToReport(ctx)
 	}
+
+	// if there is a flush interval we still want to run the event loop to append results to the report as they come.
+	// but we will patch/create the live report on interval elapsing
+	go o.eventLoop(ctx)
 	return o
+}
+
+func (o *openreportsEventSubscriber[Req]) eventLoop(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			o.logger.Info("openreports event handler exiting")
+			return
+		case ev := <-o.eventChan:
+			reportResult, err := o.newReportResult(ev.t, ev.req, ev.res)
+			if err != nil {
+				o.logger.Error(err, "error building report result")
+				continue
+			}
+
+			o.results.Push(*reportResult)
+			// no need to do anything further if we are gonna be pushing on an interval
+			if o.flushInterval != nil {
+				continue
+			}
+
+			o.pushReport(ctx)
+		}
+	}
 }
 
 // ammar: should we also convey the policy that caused the decision ?
 func (o *openreportsEventSubscriber[Req]) Push(ctx context.Context, t time.Time, req Req, res ResultAccessor) {
-	reportResult, err := o.newReportResult(t, req, res)
-	if err != nil {
-		o.logger.Error(err, "error building report result")
-		return
+	event := event[Req]{
+		t:   t,
+		req: req,
+		res: res,
 	}
-
-	o.results.Push(*reportResult)
-
-	// the new report result already did the aggregation and we will handle pushing the report
-	// when the interval is elapsed
-	if o.flushInterval != nil {
-		return
+	// try to push the event, drop it if the channel is full
+	select {
+	case o.eventChan <- event:
+	default:
+		o.logger.Error(nil, "openreports event handler: event channel full, dropping event")
 	}
-
-	o.pushReport(ctx)
 }
 
 func (o *openreportsEventSubscriber[Req]) newReportResult(t time.Time, r Req, resultAccessor ResultAccessor) (*openreportsv1alpha1.ReportResult, error) {
@@ -71,7 +100,6 @@ func (o *openreportsEventSubscriber[Req]) newReportResult(t time.Time, r Req, re
 	// ammar: is there a constant provided in the openreports package ?
 	// ammar: we should also have request skipped if it didn't match the conditions
 	res, resultErr := resultAccessor.MustGet()
-
 	switch res {
 	case RequestAllowed:
 		reportResult.Result = openreportsv1alpha1.Result("pass")
@@ -146,9 +174,9 @@ func (o *openreportsEventSubscriber[Req]) pushReport(ctx context.Context) {
 	rep.Results = o.results.Values()
 
 	// update the report summary
-	rep.Summary.Error = int(o.allowed.Load())
+	rep.Summary.Error = int(o.errored.Load())
 	rep.Summary.Pass = int(o.allowed.Load())
-	rep.Summary.Fail = int(o.allowed.Load())
+	rep.Summary.Fail = int(o.denied.Load())
 
 	_, err = o.client.Reports(o.namespace).Update(ctx, rep, metav1.UpdateOptions{})
 	if err != nil {
@@ -157,11 +185,11 @@ func (o *openreportsEventSubscriber[Req]) pushReport(ctx context.Context) {
 	}
 }
 
-// TODO: handle context cancellation
 func (o *openreportsEventSubscriber[Req]) flushResultsToReport(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			o.logger.Info("report interval flush worker exiting")
 			return
 		case <-time.After(*o.flushInterval):
 			o.pushReport(ctx)

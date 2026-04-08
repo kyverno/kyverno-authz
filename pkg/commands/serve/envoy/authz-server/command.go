@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/cespare/xxhash/v2"
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
@@ -21,21 +22,18 @@ import (
 	"github.com/kyverno/kyverno-authz/pkg/events"
 	"github.com/kyverno/kyverno-authz/pkg/probes"
 	"github.com/kyverno/kyverno-authz/pkg/signals"
+	"github.com/kyverno/kyverno-authz/pkg/utils"
 	"github.com/kyverno/kyverno-authz/pkg/utils/ocifs"
 	"github.com/kyverno/sdk/core"
 	sdksources "github.com/kyverno/sdk/core/sources"
 	openreportsclient "github.com/openreports/reports-api/pkg/client/clientset/versioned/typed/openreports.io/v1alpha1"
 	"github.com/spf13/cobra"
 	"go.uber.org/multierr"
-	apixv1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -127,13 +125,15 @@ func Command() *cobra.Command {
 						if eventsEnabled {
 							envoyEventHandlers = append(envoyEventHandlers,
 								events.NewK8sEventSubscriber[*authv3.CheckRequest](
-									kubeclient, namespace,
+									ctx, kubeclient, namespace,
 									logger, msgFormat))
 						}
 
 						// add the openreports event handler
 						if openreportsEnabled {
-							if exists, err := crdExists(config, "reports.openreports.io"); err == nil && exists {
+							if exists, err := utils.CrdExists(config, "reports.openreports.io"); err != nil {
+								logger.Error(err, "failed to check if openreports CRD exists")
+							} else if exists {
 								orClient, err := openreportsclient.NewForConfig(config)
 								if err != nil {
 									logger.Error(err, "failed to instantiate openreports client")
@@ -147,11 +147,18 @@ func Command() *cobra.Command {
 									} else {
 										logger.Info("error parsing the reports flush interval, will push results to the report immediately")
 									}
-									// todo: customize the report name based on pod name
+									reportName := "envoy-authz-report"
+									if podName := os.Getenv("POD_NAME"); podName != "" {
+										podNameHash := xxhash.Sum64String(podName)
+										reportName = fmt.Sprintf("%s-%x", reportName, podNameHash)
+									} else {
+										logger.Info("POD_NAME environment variable not set, using default report name. there may be a clash")
+									}
+
 									envoyEventHandlers = append(envoyEventHandlers, events.NewOpenreportsSubscriber[*authv3.CheckRequest](
-										resultBufSize,
+										ctx, resultBufSize,
 										orClient, intervalPtr, logger,
-										"envoy-authz-report", namespace, msgFormat))
+										reportName, namespace, msgFormat))
 								}
 							}
 						}
@@ -251,7 +258,7 @@ func Command() *cobra.Command {
 	command.Flags().BoolVar(&eventsEnabled, "events-enabled", false, "Enable k8s events on authz, if not running in k8s this flag won't take effect")
 	command.Flags().BoolVar(&openreportsEnabled, "openreports-enabled", false, "Enable reporting in the openreports format, if not running in k8s or the openreports CRD is not installed this flag won't take effect")
 	command.Flags().StringVar(&reportFlushInterval, "report-flush-interval", "", "how often do results get flushed into the openreports report (if active)")
-	command.Flags().StringVar(&msgFormat, "log-msg-format", "[%s] http: request %s, response: %s\n", "The format in which request logs would be shown in stdout")
+	command.Flags().StringVar(&msgFormat, "log-msg-format", "[%s] envoy: request %s, response: %s\n", "The format in which request logs would be shown in stdout")
 	command.Flags().IntVar(&resultBufSize, "result-buffer-size", 500, "Event buffer size for openreports, note that if the total exceeded the 1MB etcd limit, report flushing will error")
 	clientcmd.BindOverrideFlags(&kubeConfigOverrides, command.Flags(), clientcmd.RecommendedConfigOverrideFlags("kube-"))
 	return command
@@ -280,25 +287,4 @@ func getExternalSources[POLICY any](vpolCompiler engine.Compiler[POLICY], nOpts 
 		)
 	}
 	return providers, nil
-}
-
-// ammar: move this to a generic utils file
-func crdExists(cfg *rest.Config, crdName string) (bool, error) {
-	client, err := apixv1.NewForConfig(cfg)
-	if err != nil {
-		return false, err
-	}
-
-	_, err = client.ApiextensionsV1().
-		CustomResourceDefinitions().
-		Get(context.Background(), crdName, metav1.GetOptions{})
-
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return false, nil
-		}
-		return false, err
-	}
-
-	return true, nil
 }
