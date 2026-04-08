@@ -42,7 +42,7 @@ kyverno-authz serve envoy authz-server [flags]
       --kube-token string                    Bearer token for authentication to the API server
       --kube-user string                     The name of the kubeconfig user to use
       --kube-username string                 Username for basic authentication to the API server
-      --log-msg-format string                The format in which request logs would be shown in stdout (default "[%s] http: request %s, response: %s\n")
+      --log-msg-format string                The format in which request logs would be shown in stdout (default "[%s] envoy: request %s, response: %s\n")
       --metrics-address string               Address to listen on for metrics (default ":9082")
       --openreports-enabled                  Enable reporting in the openreports format, if not running in k8s or the openreports CRD is not installed this flag won't take effect
       --probes-address string                Address to listen on for health checks

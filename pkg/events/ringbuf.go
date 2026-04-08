@@ -1,6 +1,8 @@
 package events
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type ringBuffer[T any] struct {
 	data  []T

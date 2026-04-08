@@ -62,6 +62,12 @@ func (r *resultAccessorImpl) MustGet() (string, error) {
 	}
 }
 
+type event[Req any] struct {
+	t   time.Time
+	req Req
+	res ResultAccessor
+}
+
 func NewComposite[Req any](subsribers ...EventIface[Req]) EventIface[Req] {
 	return &CompositeEventSubscriber[Req]{
 		inner: subsribers,
@@ -70,7 +76,6 @@ func NewComposite[Req any](subsribers ...EventIface[Req]) EventIface[Req] {
 
 func (c *CompositeEventSubscriber[Req]) Push(ctx context.Context, t time.Time, req Req, res ResultAccessor) {
 	for _, sub := range c.inner {
-		// TODO: sync wait group and error returns if we want the process to be synchronous
-		go sub.Push(ctx, t, req, res)
+		sub.Push(ctx, t, req, res)
 	}
 }
