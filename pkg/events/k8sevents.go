@@ -73,6 +73,12 @@ func (k *k8sEventSubscriber[Req]) eventLoop(ctx context.Context) {
 					Name:      eventName,
 					Namespace: k.namespace,
 				},
+				// we need the namespace of the involved object to equal the namespace of the event.
+				// there's no involved object anyways since this is an authz request. we need this for
+				// error handling.
+				InvolvedObject: corev1.ObjectReference{
+					Namespace: k.namespace,
+				},
 				Reason:              result,
 				Message:             eventMsg,
 				Type:                corev1.EventTypeNormal,
