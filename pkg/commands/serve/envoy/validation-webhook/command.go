@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
-	vpolv1beta1 "github.com/kyverno/api/api/policies.kyverno.io/v1beta1"
+	vpolv1 "github.com/kyverno/api/api/policies.kyverno.io/v1"
 	"github.com/kyverno/kyverno-authz/apis"
 	"github.com/kyverno/kyverno-authz/pkg/certmanager"
 	vpolcompiler "github.com/kyverno/kyverno-authz/pkg/engine/compiler"
@@ -78,7 +78,7 @@ func Command() *cobra.Command {
 					defer group.Wait()
 					// create a controller manager
 					scheme := runtime.NewScheme()
-					if err := vpolv1beta1.Install(scheme); err != nil {
+					if err := vpolv1.Install(scheme); err != nil {
 						return err
 					}
 					mgr, err := ctrl.NewManager(config, ctrl.Options{
@@ -93,16 +93,17 @@ func Command() *cobra.Command {
 						return fmt.Errorf("failed to construct manager: %w", err)
 					}
 					envoyCompiler := vpolcompiler.NewCompiler[dynamic.Interface, *authv3.CheckRequest, *authv3.CheckResponse](dynclient)
-					vpolCompileFunc := func(policy *vpolv1beta1.ValidatingPolicy) field.ErrorList {
+					vpolCompileFunc := func(policy *vpolv1.ValidatingPolicy) field.ErrorList {
 						if policy.Spec.EvaluationMode() == apis.EvaluationModeEnvoy {
-							_, err := envoyCompiler.Compile(policy)
+							// in the validation webhook we don't care about exceptions
+							_, err := envoyCompiler.Compile(policy, nil)
 							ctrl.LoggerFrom(ctx).Error(err.ToAggregate(), "Validating policy compilation error")
 							return err
 						}
 						return nil
 					}
 					v := validation.NewValidator(vpolCompileFunc)
-					if err := ctrl.NewWebhookManagedBy(mgr, &vpolv1beta1.ValidatingPolicy{}).WithValidator(v).Complete(); err != nil {
+					if err := ctrl.NewWebhookManagedBy(mgr, &vpolv1.ValidatingPolicy{}).WithValidator(v).Complete(); err != nil {
 						return fmt.Errorf("failed to create webhook: %w", err)
 					}
 					// create a cancellable context

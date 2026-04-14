@@ -20,6 +20,11 @@ type compiledPolicy[DATA dynamic.Interface, IN, OUT any] struct {
 	matchConditions []cel.Program
 	variables       map[string]cel.Program
 	rules           []cel.Program
+	exceptions      []compiledException
+}
+
+type compiledException struct {
+	matchConditions []cel.Program
 }
 
 func (p compiledPolicy[DATA, IN, OUT]) Evaluate(ctx context.Context, _ DATA, r IN) (OUT, error) {
@@ -80,6 +85,7 @@ func (p compiledPolicy[DATA, IN, OUT]) setupVariables(r IN) (map[string]any, err
 	return data, nil
 }
 
+// in order to make the evaluator return a policy accessor we must not return OUT. we must return a result accessor generic over out
 func (p compiledPolicy[DATA, IN, OUT]) evaluateRules(r IN) (OUT, error) {
 	var zero OUT // create a zero variable of the output type
 	if match, err := p.match(r); err != nil {
@@ -87,6 +93,7 @@ func (p compiledPolicy[DATA, IN, OUT]) evaluateRules(r IN) (OUT, error) {
 	} else if !match {
 		return zero, nil
 	}
+
 	data, err := p.setupVariables(r)
 	if err != nil {
 		return zero, err
