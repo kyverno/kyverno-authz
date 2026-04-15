@@ -17,32 +17,40 @@ import (
 )
 
 type staticSource[POLICY any] struct {
-	compiler         engine.Compiler[POLICY]
-	policies         []*vpolv1.ValidatingPolicy
-	policyExceptions []*vpolv1.PolicyException
+	compiler  engine.Compiler[POLICY]
+	policyMap map[*vpolv1.ValidatingPolicy][]*vpolv1.PolicyException
 }
 
-func (s *staticSource[POLICY]) Load(_ context.Context) ([]POLICY, error) {
-	policies := []POLICY{}
-	for _, p := range s.policies {
+// we do exception matching during initialization to avoid latency in the http evaluation path
+func newStatic[POLICY any](compiler engine.Compiler[POLICY], policies []*vpolv1.ValidatingPolicy, policyExceptions []*vpolv1.PolicyException) *staticSource[POLICY] {
+	policyMap := make(map[*vpolv1.ValidatingPolicy][]*vpolv1.PolicyException, len(policies))
+	for _, p := range policies {
 		matchedExceptions := []*vpolv1.PolicyException{}
-		for _, ex := range s.policyExceptions {
+		for _, ex := range policyExceptions {
 			if ex.Spec.EvaluationMode != p.Spec.EvaluationMode() {
 				continue
 			}
 			for _, pol := range ex.Spec.PolicyRefs {
-				// any api other than validating policy
-				if pol.Kind != "ValidatingPolicy" {
-					continue
-				}
+				// no need to check for kind here because its already been checked in the filesystem load
 				if pol.Name != p.Name {
 					continue
 				}
 			}
 			matchedExceptions = append(matchedExceptions, ex)
 		}
+		policyMap[p] = matchedExceptions
+	}
 
-		policy, err := s.compiler.Compile(p, matchedExceptions)
+	return &staticSource[POLICY]{
+		compiler:  compiler,
+		policyMap: policyMap,
+	}
+}
+
+func (s *staticSource[POLICY]) Load(_ context.Context) ([]POLICY, error) {
+	policies := []POLICY{}
+	for p, polexs := range s.policyMap {
+		policy, err := s.compiler.Compile(p, polexs)
 		if err != nil {
 			return nil, err.ToAggregate()
 		}
@@ -77,10 +85,7 @@ func GetExternalSources[POLICY any](vpolCompiler engine.Compiler[POLICY], nOpts 
 
 		providers = append(
 			providers,
-			sdksources.NewOnce(&staticSource[POLICY]{
-				policies:         policies,
-				policyExceptions: policyExceptions,
-			}),
+			sdksources.NewOnce(newStatic(vpolCompiler, policies, policyExceptions)),
 		)
 	}
 	return providers, nil

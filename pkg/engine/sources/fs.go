@@ -44,6 +44,8 @@ var DefaultLoader = sync.OnceValues(func() (loader.Loader, error) { return defau
 
 // this new fs should not return the compile function. just until returning the policy files
 // we should make two of it and the second is for exceptions and during compilation of the policies we pass the exceptions
+// maybe we can combine the static source with this fs source. or maybe the separation is good because we are not doing
+// the path traversal and the compilation at eval time
 func LoadPolicies(f fs.FS) ([]*vpolv1.ValidatingPolicy, []*vpolv1.PolicyException, error) {
 	policies := []*vpolv1.ValidatingPolicy{}
 	policyExceptions := []*vpolv1.PolicyException{}
