@@ -20,7 +20,6 @@ func NewKube[POLICY any](name string, mgr ctrl.Manager, compiler engine.Compiler
 	apis, err := controllerruntime.NewApiSource[v1beta1.ValidatingPolicy](name, mgr, options)
 	if err != nil {
 		return nil, err
-
 	}
 	cache := sources.NewCache(
 		apis,

@@ -71,7 +71,7 @@ helm install kyverno-sidecar-injector --namespace kyverno --create-namespace kyv
 | service.nodePort | string | `nil` | Service node port. Only used if `type` is `NodePort`. |
 | mutatingWebhookConfiguration.annotations | object | `{}` | Webhook annotations |
 | mutatingWebhookConfiguration.certificates.static | object | `{}` | Static data to set in certificate secret |
-| mutatingWebhookConfiguration.certificates.certManager | object | `{}` | Infos for creating certificate with cert manager |
+| mutatingWebhookConfiguration.certificates.internal | object | `{"enabled":true}` | Use internal certificate controller (kyverno/pkg) |
 | mutatingWebhookConfiguration.failurePolicy | string | `"Fail"` | Webhook failure policy |
 | mutatingWebhookConfiguration.objectSelector | string | `nil` | Webhook object selector |
 | mutatingWebhookConfiguration.namespaceSelector | object | `{"matchExpressions":[{"key":"kyverno-injection","operator":"In","values":["enabled"]}]}` | Webhook namespace selector |

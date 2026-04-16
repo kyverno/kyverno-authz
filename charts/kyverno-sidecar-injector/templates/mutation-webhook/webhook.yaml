@@ -12,13 +12,10 @@ metadata:
       (include "kyverno.lib.labels.common.selector" $)
       (include "kyverno.lib.labels.component" $component)
     ) | nindent 4 }}
-  {{- if (or $value.certificates.certManager $value.annotations) }}
+  {{- if $value.annotations }}
   annotations:
     {{- with $value.annotations }}
     {{- tpl (toYaml .) $ | nindent 4 }}
-    {{- end }}
-    {{- if $value.certificates.certManager }}
-    cert-manager.io/inject-ca-from: {{ printf "%s/%s" $namespace $name }}
     {{- end }}
   {{- end }}
 webhooks:
