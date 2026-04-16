@@ -11,6 +11,7 @@ import (
 	httpcel "github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/http"
 	httpserver "github.com/kyverno/kyverno-authz/pkg/cel/libs/httpserver"
 	"github.com/kyverno/kyverno-authz/pkg/engine"
+	"github.com/kyverno/kyverno-authz/pkg/events"
 	"github.com/kyverno/kyverno-authz/pkg/server"
 	"github.com/kyverno/sdk/core"
 	"github.com/kyverno/sdk/core/dispatchers"
@@ -20,7 +21,8 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
-func NewServer(config Config, source engine.HTTPSource, dyn dynamic.Interface) server.ServerFunc {
+func NewServer(config Config, source engine.HTTPSource,
+	dyn dynamic.Interface, eventIface events.EventIface[httpcel.CheckRequest]) server.ServerFunc {
 	return func(ctx context.Context) error {
 		base, err := kcel.NewEnv(apis.EvaluationModeHTTP, dyn)
 		if err != nil {
@@ -100,13 +102,7 @@ has(object.ok)
 			),
 		)
 		// register service
-		a := &authorizer{
-			engine:        engine,
-			dyn:           dyn,
-			inputProgram:  inputProgram,
-			outputProgram: outputProgram,
-			nestedRequest: config.NestedRequest,
-		}
+		a := NewAuthorizer(engine, dyn, inputProgram, outputProgram, config.NestedRequest, eventIface)
 		mux.Handle("POST /{$}", a)
 		// create server
 		s := &http.Server{

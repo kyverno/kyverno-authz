@@ -79,7 +79,7 @@ helm install kyverno-authz-server --namespace kyverno --create-namespace kyverno
 | authzServer.service.nodePort | string | `nil` | Service node port. Only used if `type` is `NodePort`. |
 | validatingWebhookConfiguration.annotations | object | `{}` | Webhook annotations |
 | validatingWebhookConfiguration.certificates.static | object | `{}` | Static data to set in certificate secret |
-| validatingWebhookConfiguration.certificates.certManager | object | `{}` | Infos for creating certificate with cert manager |
+| validatingWebhookConfiguration.certificates.internal | object | `{"enabled":true}` | Use internal certificate controller (kyverno/pkg) |
 | validatingWebhookConfiguration.failurePolicy | string | `"Fail"` | Webhook failure policy |
 | validatingWebhookConfiguration.deployment.replicas | int | `nil` | Desired number of pods |
 | validatingWebhookConfiguration.deployment.revisionHistoryLimit | int | `10` | The number of revisions to keep |

@@ -2,29 +2,15 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ template "kyverno-authz-server.name" . }}
+  name: {{ template "sidecar-injector.name" . }}
   namespace: {{ template "kyverno.lib.namespace" . }}
   labels:
     {{- include "kyverno.lib.labels.merge" (list
       (include "kyverno.lib.labels.common" $)
       (include "kyverno.lib.labels.common.selector" $)
-      (include "kyverno.lib.labels.component" "authz-server")
+      (include "kyverno.lib.labels.component" "sidecar-injector")
     ) | nindent 4 }}
 rules:
-- apiGroups:
-  - coordination.k8s.io
-  resources:
-  - leases
-  verbs:
-  - create
-  - get
-  - update
-- apiGroups:
-  - ''
-  resources:
-  - events
-  verbs:
-  - create
 - apiGroups:
   - ''
   resources:

@@ -6,6 +6,7 @@ import (
 
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"github.com/kyverno/kyverno-authz/pkg/engine"
+	"github.com/kyverno/kyverno-authz/pkg/events"
 	"github.com/kyverno/kyverno-authz/pkg/server"
 	"github.com/kyverno/sdk/core"
 	"github.com/kyverno/sdk/core/dispatchers"
@@ -17,7 +18,7 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
-func NewServer(network, addr string, source engine.EnvoySource, dynclient dynamic.Interface) server.ServerFunc {
+func NewServer(network, addr string, source engine.EnvoySource, dynclient dynamic.Interface, eventHandler events.EventIface[*authv3.CheckRequest]) server.ServerFunc {
 	return func(ctx context.Context) error {
 		// create a server
 		s := grpc.NewServer()
@@ -42,8 +43,9 @@ func NewServer(network, addr string, source engine.EnvoySource, dynclient dynami
 		)
 		// setup our authorization service
 		svc := &service{
-			engine:    engine,
-			dynclient: dynclient,
+			engine:       engine,
+			dynclient:    dynclient,
+			eventHandler: eventHandler,
 		}
 		// register our authorization service
 		authv3.RegisterAuthorizationServer(s, svc)

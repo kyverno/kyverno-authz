@@ -46,7 +46,7 @@ spec:
               serviceAccountName: curl
               containers:
               - name: curl
-                image: curlimages/curl
+                image: curlimages/curl:8.12.1
                 command: ["/bin/sleep", "infinity"]
                 imagePullPolicy: IfNotPresent
                 volumeMounts:

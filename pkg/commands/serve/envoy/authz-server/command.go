@@ -3,7 +3,10 @@ package authzserver
 import (
 	"context"
 	"fmt"
+	"os"
+	"time"
 
+	"github.com/cespare/xxhash/v2"
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
@@ -16,11 +19,14 @@ import (
 	"github.com/kyverno/kyverno-authz/pkg/engine"
 	vpolcompiler "github.com/kyverno/kyverno-authz/pkg/engine/compiler"
 	"github.com/kyverno/kyverno-authz/pkg/engine/sources"
+	"github.com/kyverno/kyverno-authz/pkg/events"
 	"github.com/kyverno/kyverno-authz/pkg/probes"
 	"github.com/kyverno/kyverno-authz/pkg/signals"
+	"github.com/kyverno/kyverno-authz/pkg/utils"
 	"github.com/kyverno/kyverno-authz/pkg/utils/ocifs"
 	"github.com/kyverno/sdk/core"
 	sdksources "github.com/kyverno/sdk/core/sources"
+	openreportsclient "github.com/openreports/reports-api/pkg/client/clientset/versioned/typed/openreports.io/v1alpha1"
 	"github.com/spf13/cobra"
 	"go.uber.org/multierr"
 	"k8s.io/apimachinery/pkg/fields"
@@ -36,15 +42,22 @@ import (
 )
 
 func Command() *cobra.Command {
-	var probesAddress string
-	var metricsAddress string
-	var grpcAddress string
-	var grpcNetwork string
-	var kubeConfigOverrides clientcmd.ConfigOverrides
-	var externalPolicySources []string
-	var kubePolicySource bool
-	var imagePullSecrets []string
-	var allowInsecureRegistry bool
+	var (
+		probesAddress         string
+		metricsAddress        string
+		grpcAddress           string
+		grpcNetwork           string
+		kubeConfigOverrides   clientcmd.ConfigOverrides
+		externalPolicySources []string
+		kubePolicySource      bool
+		imagePullSecrets      []string
+		allowInsecureRegistry bool
+		msgFormat             string
+		eventsEnabled         bool
+		openreportsEnabled    bool
+		reportFlushInterval   string
+		resultBufSize         int
+	)
 	command := &cobra.Command{
 		Use:   "authz-server",
 		Short: "Start the Kyverno Authz Server",
@@ -77,6 +90,15 @@ func Command() *cobra.Command {
 					// load sources
 					var source engine.EnvoySource
 					var dyn dynamic.Interface
+
+					// envoy type generics need to be pointers due to the fact that they are protos and contain mutexes
+					envoyEventHandlers := []events.EventIface[*authv3.CheckRequest]{}
+					envoyEventHandlers = append(envoyEventHandlers, events.NewWriterEventSubscriber[*authv3.CheckRequest](
+						os.Stdout,
+						logger,
+						msgFormat,
+					))
+
 					if kubeOk {
 						// Create kubernetes client
 						kubeclient, err := kubernetes.NewForConfig(config)
@@ -98,6 +120,49 @@ func Command() *cobra.Command {
 						if namespace == "" || namespace == "default" {
 							logger.Info(fmt.Sprintf("Using namespace '%s' - consider setting explicit namespace", namespace))
 						}
+
+						// add the k8s events event handler
+						if eventsEnabled {
+							envoyEventHandlers = append(envoyEventHandlers,
+								events.NewK8sEventSubscriber[*authv3.CheckRequest](
+									ctx, kubeclient, namespace,
+									logger, msgFormat))
+						}
+
+						// add the openreports event handler
+						if openreportsEnabled {
+							if exists, err := utils.CrdExists(config, "reports.openreports.io"); err != nil {
+								logger.Error(err, "failed to check if openreports CRD exists")
+							} else if exists {
+								orClient, err := openreportsclient.NewForConfig(config)
+								if err != nil {
+									logger.Error(err, "failed to instantiate openreports client")
+								} else {
+									// the parse duration function returns a zero duration on error
+									// hence why we need to create a pointer variable to easily differentiate the absence of this value
+									var intervalPtr *time.Duration
+									flushInterval, err := time.ParseDuration(reportFlushInterval)
+									if err == nil {
+										intervalPtr = &flushInterval
+									} else {
+										logger.Info("error parsing the reports flush interval, will push results to the report immediately")
+									}
+									reportName := "envoy-authz-report"
+									if podName := os.Getenv("POD_NAME"); podName != "" {
+										podNameHash := xxhash.Sum64String(podName)
+										reportName = fmt.Sprintf("%s-%x", reportName, podNameHash)
+									} else {
+										logger.Info("POD_NAME environment variable not set, using default report name. there may be a clash")
+									}
+
+									envoyEventHandlers = append(envoyEventHandlers, events.NewOpenreportsSubscriber[*authv3.CheckRequest](
+										ctx, resultBufSize,
+										orClient, intervalPtr, logger,
+										reportName, namespace, msgFormat))
+								}
+							}
+						}
+
 						rOpts, nOpts, err := ocifs.RegistryOpts(kubeclient.CoreV1().Secrets(namespace), allowInsecureRegistry, imagePullSecrets...)
 						if err != nil {
 							return fmt.Errorf("failed to initialize registry opts: %w", err)
@@ -167,8 +232,10 @@ func Command() *cobra.Command {
 							probesErr = probesServer.Run(ctx)
 						})
 					}
+
+					ev := events.NewComposite(envoyEventHandlers...)
 					// auth server
-					authServer := envoy.NewServer(grpcNetwork, grpcAddress, source, dyn)
+					authServer := envoy.NewServer(grpcNetwork, grpcAddress, source, dyn, ev)
 					group.StartWithContext(ctx, func(ctx context.Context) {
 						// grpc auth server
 						defer cancel()
@@ -188,6 +255,11 @@ func Command() *cobra.Command {
 	command.Flags().StringArrayVar(&imagePullSecrets, "image-pull-secret", nil, "Image pull secrets")
 	command.Flags().BoolVar(&allowInsecureRegistry, "allow-insecure-registry", false, "Allow insecure registry")
 	command.Flags().BoolVar(&kubePolicySource, "kube-policy-source", true, "Enable in-cluster kubernetes policy source")
+	command.Flags().BoolVar(&eventsEnabled, "events-enabled", false, "Enable k8s events on authz, if not running in k8s this flag won't take effect")
+	command.Flags().BoolVar(&openreportsEnabled, "openreports-enabled", false, "Enable reporting in the openreports format, if not running in k8s or the openreports CRD is not installed this flag won't take effect")
+	command.Flags().StringVar(&reportFlushInterval, "report-flush-interval", "", "how often do results get flushed into the openreports report (if active)")
+	command.Flags().StringVar(&msgFormat, "log-msg-format", "[%s] envoy: request %s, response: %s\n", "The format in which request logs would be shown in stdout")
+	command.Flags().IntVar(&resultBufSize, "result-buffer-size", 500, "Event buffer size for openreports, note that if the total exceeded the 1MB etcd limit, report flushing will error")
 	clientcmd.BindOverrideFlags(&kubeConfigOverrides, command.Flags(), clientcmd.RecommendedConfigOverrideFlags("kube-"))
 	return command
 }
