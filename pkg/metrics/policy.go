@@ -42,7 +42,10 @@ func init() {
 // falling back to "unknown".
 func policyName[POLICY any](p POLICY) string {
 	if named, ok := any(p).(kyengine.Named); ok {
-		return named.Name()
+		name := named.Name()
+		if name != "" {
+			return name
+		}
 	}
 	return "unknown"
 }
