@@ -64,7 +64,7 @@ jobs:
         env:
           TRIVY_DB_REPOSITORY: "public.ecr.aws/aquasecurity/trivy-db:2"
       - name: Upload trivy scan results
-        uses: github/codeql-action/upload-sarif@45cbd0c69e560cd9e7cd7f8c32362050c9b7ded2 # v4.32.2
+        uses: github/codeql-action/upload-sarif@c793b717bc78562f491db7b0e93a3a178b099162 # v4.32.5
         with:
           sarif_file: trivy-results.sarif
           category: code
@@ -194,7 +194,7 @@ jobs:
         with:
           verify: true
       - name: Download image archive
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
         with:
           name: image.tar
       - name: Create kind cluster
@@ -261,7 +261,7 @@ jobs:
         with:
           verify: true
       - name: Download image archive
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
         with:
           name: image.tar
       - name: Create kind cluster
@@ -322,7 +322,7 @@ jobs:
         with:
           verify: true
       - name: Download image archive
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
         with:
           name: image.tar
       - name: Create kind cluster
@@ -383,7 +383,7 @@ jobs:
         with:
           verify: true
       - name: Download image archive
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
         with:
           name: image.tar
       - name: Create kind cluster
@@ -452,7 +452,7 @@ jobs:
         with:
           verify: true
       - name: Download image archive
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
         with:
           name: image.tar
       - name: Create kind cluster
