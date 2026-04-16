@@ -3,7 +3,10 @@ package authzserver
 import (
 	"context"
 	"fmt"
+	"os"
+	"time"
 
+	"github.com/cespare/xxhash/v2"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/hairyhenderson/go-fsimpl"
@@ -16,11 +19,14 @@ import (
 	"github.com/kyverno/kyverno-authz/pkg/engine"
 	vpolcompiler "github.com/kyverno/kyverno-authz/pkg/engine/compiler"
 	"github.com/kyverno/kyverno-authz/pkg/engine/sources"
+	"github.com/kyverno/kyverno-authz/pkg/events"
 	"github.com/kyverno/kyverno-authz/pkg/probes"
 	"github.com/kyverno/kyverno-authz/pkg/signals"
+	"github.com/kyverno/kyverno-authz/pkg/utils"
 	"github.com/kyverno/kyverno-authz/pkg/utils/ocifs"
 	"github.com/kyverno/sdk/core"
 	sdksources "github.com/kyverno/sdk/core/sources"
+	openreportsclient "github.com/openreports/reports-api/pkg/client/clientset/versioned/typed/openreports.io/v1alpha1"
 	"github.com/spf13/cobra"
 	"go.uber.org/multierr"
 	"k8s.io/apimachinery/pkg/fields"
@@ -36,19 +42,28 @@ import (
 )
 
 func Command() *cobra.Command {
-	var probesAddress string
-	var metricsAddress string
-	var serverAddress string
-	var kubeConfigOverrides clientcmd.ConfigOverrides
-	var externalPolicySources []string
-	var kubePolicySource bool
-	var imagePullSecrets []string
-	var allowInsecureRegistry bool
-	var nestedRequest bool
-	var certFile string
-	var keyFile string
-	var inputExpression string
-	var outputExpression string
+	// TODO: have a more sane way to store flag values
+	var (
+		probesAddress         string
+		metricsAddress        string
+		serverAddress         string
+		kubeConfigOverrides   clientcmd.ConfigOverrides
+		externalPolicySources []string
+		kubePolicySource      bool
+		imagePullSecrets      []string
+		allowInsecureRegistry bool
+		nestedRequest         bool
+		certFile              string
+		keyFile               string
+		inputExpression       string
+		outputExpression      string
+		msgFormat             string
+		eventsEnabled         bool
+		openreportsEnabled    bool
+		reportFlushInterval   string
+		resultBufSize         int
+	)
+
 	command := &cobra.Command{
 		Use:   "authz-server",
 		Short: "Start the Kyverno Authz Server",
@@ -78,6 +93,14 @@ func Command() *cobra.Command {
 					var group wait.Group
 					// wait all tasks in the group are over
 					defer group.Wait()
+
+					httpEventHandlers := []events.EventIface[httplib.CheckRequest]{}
+					httpEventHandlers = append(httpEventHandlers, events.NewWriterEventSubscriber[httplib.CheckRequest](
+						os.Stdout,
+						logger,
+						msgFormat,
+					))
+
 					// load sources
 					var source engine.HTTPSource
 					var dyn dynamic.Interface
@@ -93,6 +116,7 @@ func Command() *cobra.Command {
 							return err
 						}
 						dyn = dynclient
+
 						// initialize compiler
 						compiler := vpolcompiler.NewCompiler[dynamic.Interface, *httplib.CheckRequest, *httplib.CheckResponse](dynclient)
 
@@ -103,6 +127,50 @@ func Command() *cobra.Command {
 						if namespace == "" || namespace == "default" {
 							logger.Info(fmt.Sprintf("Using namespace '%s' - consider setting explicit namespace", namespace))
 						}
+
+						if eventsEnabled {
+							httpEventHandlers = append(httpEventHandlers, events.NewK8sEventSubscriber[httplib.CheckRequest](
+								ctx,
+								kubeclient,
+								namespace,
+								logger,
+								msgFormat,
+							))
+						}
+
+						if openreportsEnabled {
+							if exists, err := utils.CrdExists(config, "reports.openreports.io"); err != nil {
+								logger.Error(err, "failed to check if openreports CRD exists")
+							} else if exists {
+								orClient, err := openreportsclient.NewForConfig(config)
+								if err != nil {
+									logger.Error(err, "failed to instantiate openreports client")
+								} else {
+									// the parse duration function returns a zero duration on error
+									// hence why we need to create a pointer variable to easily differentiate the absence of this value
+									var intervalPtr *time.Duration
+									flushInterval, err := time.ParseDuration(reportFlushInterval)
+									if err == nil {
+										intervalPtr = &flushInterval
+									} else {
+										logger.Info("error parsing the reports flush interval, will push results to the report immediately")
+									}
+									reportName := "http-authz-report"
+									if podName := os.Getenv("POD_NAME"); podName != "" {
+										podNameHash := xxhash.Sum64String(podName)
+										reportName = fmt.Sprintf("%s-%x", reportName, podNameHash)
+									} else {
+										logger.Info("POD_NAME environment variable not set, using default report name. there may be a clash")
+									}
+
+									httpEventHandlers = append(httpEventHandlers, events.NewOpenreportsSubscriber[httplib.CheckRequest](
+										ctx, resultBufSize,
+										orClient, intervalPtr, logger,
+										reportName, namespace, msgFormat))
+								}
+							}
+						}
+
 						rOpts, nOpts, err := ocifs.RegistryOpts(kubeclient.CoreV1().Secrets(namespace), allowInsecureRegistry, imagePullSecrets...)
 						if err != nil {
 							return fmt.Errorf("failed to initialize registry opts: %w", err)
@@ -153,7 +221,6 @@ func Command() *cobra.Command {
 						}
 					} else {
 						compiler := vpolcompiler.NewCompiler[dynamic.Interface, *httplib.CheckRequest, *httplib.CheckResponse](nil)
-
 						rOpts, nOpts, err := ocifs.RegistryOpts(nil, allowInsecureRegistry)
 						if err != nil {
 							return fmt.Errorf("failed to initialize registry opts: %w", err)
@@ -181,7 +248,9 @@ func Command() *cobra.Command {
 						InputExpression:  inputExpression,
 						OutputExpression: outputExpression,
 					}
-					authServer := http.NewServer(httpConfig, source, dyn)
+
+					ev := events.NewComposite(httpEventHandlers...)
+					authServer := http.NewServer(httpConfig, source, dyn, ev)
 					group.StartWithContext(ctx, func(ctx context.Context) {
 						defer cancel()
 						serverErr = authServer.Run(ctx)
@@ -204,6 +273,11 @@ func Command() *cobra.Command {
 	command.Flags().StringVar(&outputExpression, "output-expression", "", "CEL expression for transforming responses before being sent to clients")
 	command.Flags().StringVar(&certFile, "cert-file", "", "File containing tls certificate")
 	command.Flags().StringVar(&keyFile, "key-file", "", "File containing tls private key")
+	command.Flags().StringVar(&msgFormat, "log-msg-format", "[%s] http: request %s, response: %s\n", "The format in which request logs would be shown in stdout")
+	command.Flags().BoolVar(&eventsEnabled, "events-enabled", false, "Enable k8s events on authz, if not running in k8s this flag won't take effect")
+	command.Flags().BoolVar(&openreportsEnabled, "openreports-enabled", false, "Enable reporting in the openreports format, if not running in k8s or the openreports CRD is not installed this flag won't take effect")
+	command.Flags().StringVar(&reportFlushInterval, "report-flush-interval", "", "how often do results get flushed into the openreports report (if active)")
+	command.Flags().IntVar(&resultBufSize, "result-buffer-size", 500, "Event buffer size for openreports, note that if the total exceeded the 1MB etcd limit, report flushing will error")
 	clientcmd.BindOverrideFlags(&kubeConfigOverrides, command.Flags(), clientcmd.RecommendedConfigOverrideFlags("kube-"))
 	return command
 }
