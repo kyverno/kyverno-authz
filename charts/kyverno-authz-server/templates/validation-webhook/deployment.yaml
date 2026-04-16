@@ -91,9 +91,14 @@ spec:
         {{- end }}
       serviceAccountName: {{ template "kyverno-authz-server.service-account.name" $ }}
       volumes:
+        {{- if $value.certificates.static }}
         - name: certs
           secret:
             secretName: {{ template "validation-webhook.name" $ }}
+        {{- else }}
+        - name: webhook-certs
+          emptyDir: {}
+        {{- end }}
       containers:
         {{- with $value.container }}
         - name: server
@@ -129,8 +134,21 @@ spec:
           - validation-webhook
           - --probes-address=:9080
           - --metrics-address=:9082
+          - --webhook-namespace={{ $namespace }}
+          - --webhook-service-name={{ $name }}
+          - --webhook-configuration-name={{ $name }}
+          {{- if $value.certificates.static }}
+          - --internal-cert-management=false
+          {{- else }}
+          - --internal-cert-management={{ default true $value.certificates.internal.enabled }}
+          {{- end }}
           volumeMounts:
+            {{- if $value.certificates.static }}
             - name: certs
               mountPath: /tmp/k8s-webhook-server/serving-certs
               readOnly: true
+            {{- else }}
+            - name: webhook-certs
+              mountPath: /tmp
+            {{- end }}
         {{- end }}

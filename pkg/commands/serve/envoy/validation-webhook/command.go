@@ -7,6 +7,7 @@ import (
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	vpolv1beta1 "github.com/kyverno/api/api/policies.kyverno.io/v1beta1"
 	"github.com/kyverno/kyverno-authz/apis"
+	"github.com/kyverno/kyverno-authz/pkg/certmanager"
 	vpolcompiler "github.com/kyverno/kyverno-authz/pkg/engine/compiler"
 	"github.com/kyverno/kyverno-authz/pkg/probes"
 	"github.com/kyverno/kyverno-authz/pkg/signals"
@@ -17,14 +18,20 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	ctrl "sigs.k8s.io/controller-runtime"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	ctrlwebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 func Command() *cobra.Command {
 	var probesAddress string
 	var metricsAddress string
+	var internalCertManagement bool
+	var webhookNamespace string
+	var webhookServiceName string
+	var webhookConfigurationName string
 	var kubeConfigOverrides clientcmd.ConfigOverrides
 	command := &cobra.Command{
 		Use:   "validation-webhook",
@@ -43,6 +50,22 @@ func Command() *cobra.Command {
 					config, err := kubeConfig.ClientConfig()
 					if err != nil {
 						return err
+					}
+					certDir := "/tmp/k8s-webhook-server/serving-certs"
+					if internalCertManagement {
+						logger := ctrl.LoggerFrom(ctx).WithName("certmanager")
+						var caBundle []byte
+						certDir, caBundle, err = certmanager.BootstrapWebhookCerts(ctx, logger, config, webhookNamespace, webhookServiceName)
+						if err != nil {
+							return fmt.Errorf("failed to bootstrap webhook certs: %w", err)
+						}
+						clientset, err := kubernetes.NewForConfig(config)
+						if err != nil {
+							return err
+						}
+						if err := certmanager.PatchValidatingWebhookConfigCA(ctx, clientset, webhookConfigurationName, caBundle); err != nil {
+							ctrl.LoggerFrom(ctx).Info("unable to patch ValidatingWebhookConfiguration", "name", webhookConfigurationName, "error", err)
+						}
 					}
 					// create dynamic client
 					dynclient, err := dynamic.NewForConfig(config)
@@ -63,6 +86,7 @@ func Command() *cobra.Command {
 						Metrics: metricsserver.Options{
 							BindAddress: metricsAddress,
 						},
+						WebhookServer:  ctrlwebhook.NewServer(ctrlwebhook.Options{CertDir: certDir}),
 						LeaderElection: false,
 					})
 					if err != nil {
@@ -105,6 +129,10 @@ func Command() *cobra.Command {
 	}
 	command.Flags().StringVar(&probesAddress, "probes-address", ":9080", "Address to listen on for health checks")
 	command.Flags().StringVar(&metricsAddress, "metrics-address", ":9082", "Address to listen on for metrics")
+	command.Flags().BoolVar(&internalCertManagement, "internal-cert-management", true, "Enable Kyverno internal certificate management")
+	command.Flags().StringVar(&webhookNamespace, "webhook-namespace", "kyverno", "Namespace where webhook service and secrets are created")
+	command.Flags().StringVar(&webhookServiceName, "webhook-service-name", "kyverno-authz-server-validation", "Webhook service name used for TLS certificate generation")
+	command.Flags().StringVar(&webhookConfigurationName, "webhook-configuration-name", "", "ValidatingWebhookConfiguration name to patch with generated CA bundle")
 	clientcmd.BindOverrideFlags(&kubeConfigOverrides, command.Flags(), clientcmd.RecommendedConfigOverrideFlags("kube-"))
 	return command
 }

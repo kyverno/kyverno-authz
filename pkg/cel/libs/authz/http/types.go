@@ -21,25 +21,25 @@ type (
 )
 
 type CheckRequest struct {
-	Attributes CheckRequestAttributes `cel:"attributes"`
+	Attributes CheckRequestAttributes `json:"attributes" cel:"attributes"`
 }
 
 type CheckRequestAttributes struct {
-	Method        string `cel:"method"`
-	Header        header `cel:"header"`
-	Host          string `cel:"host"`
-	Protocol      string `cel:"protocol"`
-	ContentLength int64  `cel:"contentLength"`
-	Body          []byte `cel:"body"`
-	Scheme        string `cel:"scheme"`
-	Path          string `cel:"path"`
-	Query         query  `cel:"query"`
-	Fragment      string `cel:"fragment"`
+	Method        string `json:"method"        cel:"method"`
+	Header        header `json:"header"        cel:"header"`
+	Host          string `json:"host"          cel:"host"`
+	Protocol      string `json:"protocol"      cel:"protocol"`
+	ContentLength int64  `json:"contentLength" cel:"contentLength"`
+	Body          []byte `json:"body"          cel:"body"`
+	Scheme        string `json:"scheme"        cel:"scheme"`
+	Path          string `json:"path"          cel:"path"`
+	Query         query  `json:"query"         cel:"query"`
+	Fragment      string `json:"fragment"      cel:"fragment"`
 }
 
 type CheckResponse struct {
-	Ok     *CheckResponseOk     `cel:"ok"`
-	Denied *CheckResponseDenied `cel:"denied"`
+	Ok     *CheckResponseOk     `json:"ok,omitempty"     cel:"ok"`
+	Denied *CheckResponseDenied `json:"denied,omitempty" cel:"denied"`
 }
 
 type CheckResponseOk struct{}

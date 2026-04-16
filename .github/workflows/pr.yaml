@@ -194,11 +194,11 @@ jobs:
         with:
           verify: true
       - name: Download image archive
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
         with:
           name: image.tar
       - name: Create kind cluster
-        uses: helm/kind-action@92086f6be054225fa813e0a4b13787fc9088faab # v1.13.0
+        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
         with:
           node_image: kindest/node:${{ matrix.k8s-version }}
           cluster_name: kind
@@ -261,11 +261,11 @@ jobs:
         with:
           verify: true
       - name: Download image archive
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
         with:
           name: image.tar
       - name: Create kind cluster
-        uses: helm/kind-action@92086f6be054225fa813e0a4b13787fc9088faab # v1.13.0
+        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
         with:
           node_image: kindest/node:${{ matrix.k8s-version }}
           cluster_name: kind
@@ -322,11 +322,11 @@ jobs:
         with:
           verify: true
       - name: Download image archive
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
         with:
           name: image.tar
       - name: Create kind cluster
-        uses: helm/kind-action@92086f6be054225fa813e0a4b13787fc9088faab # v1.13.0
+        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
         with:
           node_image: kindest/node:${{ matrix.k8s-version }}
           cluster_name: kind
@@ -339,11 +339,6 @@ jobs:
           set -e
           export HELM=${{ steps.helm.outputs.helm-path }}
           KYVERNO_AUTHZ_SERVICE=kyverno-authz-server.local make install-istio install-service-entry
-      - name: Setup cert-manager
-        run: |
-          set -e
-          export HELM=${{ steps.helm.outputs.helm-path }}
-          make install-cert-manager install-cluster-issuer
       - name: Install VPOL
         run: |
           set -e
@@ -388,11 +383,11 @@ jobs:
         with:
           verify: true
       - name: Download image archive
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
         with:
           name: image.tar
       - name: Create kind cluster
-        uses: helm/kind-action@92086f6be054225fa813e0a4b13787fc9088faab # v1.13.0
+        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
         with:
           node_image: kindest/node:${{ matrix.k8s-version }}
           cluster_name: kind
@@ -414,6 +409,19 @@ jobs:
           set -e
           export HELM=${{ steps.helm.outputs.helm-path }}
           make deploy-kyverno-envoy-server
+      - name: Wait for validation webhook readiness
+        run: |
+          set -e
+          kubectl rollout status deployment/kyverno-authz-server-validation -n kyverno --timeout=180s
+          for i in $(seq 1 36); do
+            if kubectl get endpoints kyverno-authz-server-validation -n kyverno -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null | grep -q .; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "validation webhook service has no ready endpoints" >&2
+          kubectl get pods,svc,endpoints -n kyverno >&2 || true
+          exit 1
       - name: Run Chainsaw Tests
         run:  |
           set -e
@@ -444,11 +452,11 @@ jobs:
         with:
           verify: true
       - name: Download image archive
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
         with:
           name: image.tar
       - name: Create kind cluster
-        uses: helm/kind-action@92086f6be054225fa813e0a4b13787fc9088faab # v1.13.0
+        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
         with:
           node_image: kindest/node:${{ matrix.k8s-version }}
           cluster_name: kind
@@ -470,6 +478,19 @@ jobs:
           set -e
           export HELM=${{ steps.helm.outputs.helm-path }}
           make deploy-kyverno-http-server
+      - name: Wait for validation webhook readiness
+        run: |
+          set -e
+          kubectl rollout status deployment/kyverno-authz-server-validation -n kyverno --timeout=180s
+          for i in $(seq 1 36); do
+            if kubectl get endpoints kyverno-authz-server-validation -n kyverno -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null | grep -q .; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "validation webhook service has no ready endpoints" >&2
+          kubectl get pods,svc,endpoints -n kyverno >&2 || true
+          exit 1
       - name: Run Chainsaw Tests
         run:  |
           set -e

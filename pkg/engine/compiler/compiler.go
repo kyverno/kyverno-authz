@@ -17,6 +17,7 @@ import (
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -40,6 +41,11 @@ type compiler[DATA dynamic.Interface, IN, OUT any] struct {
 func (c *compiler[DATA, IN, OUT]) Compile(policy *vpol.ValidatingPolicy) (policy.Policy[DATA, IN, OUT], field.ErrorList) {
 	matchConditions, variables, rules, err := c.compiledEnvironment(policy)
 	if err != nil {
+		// the behavior of the sdk is to ignore compile errors and continue
+		// trying to evaluate the payload against any of the valid policies
+		// which makes compile errors not appear in any meaningful way unless
+		// they get caught by the webhook
+		klog.Error("error compiling policy:", err.ToAggregate().Error())
 		return compiledPolicy[DATA, IN, OUT]{}, err
 	}
 	return compiledPolicy[DATA, IN, OUT]{
