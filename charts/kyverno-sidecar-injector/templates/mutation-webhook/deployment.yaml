@@ -1,6 +1,7 @@
 {{- $name := (include "sidecar-injector.name" $) }}
 {{- $namespace := (include "kyverno.lib.namespace" $) }}
 {{- $component := "sidecar-injector" }}
+{{- $useStaticCertificates := .Values.mutatingWebhookConfiguration.certificates.static }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -90,9 +91,13 @@ spec:
         {{- end }}
       serviceAccountName: {{ template "sidecar-injector.service-account.name" $ }}
       volumes:
+        - name: tmp
+          emptyDir: {}
+        {{- if .Values.mutatingWebhookConfiguration.certificates.static }}
         - name: certs
           secret:
             secretName: {{ $name }}
+        {{- end }}
         - name: config
           configMap:
             name: {{ $name }}
@@ -129,13 +134,25 @@ spec:
             - serve
             - sidecar-injector
             - --address=:9443
+            {{- if $useStaticCertificates }}
+            - --internal-cert-management=false
             - --cert-file=/opt/kubernetes-sidecar-injector/certs/tls.crt
             - --key-file=/opt/kubernetes-sidecar-injector/certs/tls.key
+            {{- else }}
+            - --internal-cert-management=true
+            - --webhook-namespace={{ $namespace }}
+            - --webhook-service-name={{ $name }}
+            - --webhook-configuration-name={{ $name }}
+            {{- end }}
             - --config-file=/opt/kubernetes-sidecar-injector/config/sidecar.yaml
           volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            {{- if $useStaticCertificates }}
             - name: certs
               mountPath: /opt/kubernetes-sidecar-injector/certs
               readOnly: true
+            {{- end }}
             - name: config
               mountPath: /opt/kubernetes-sidecar-injector/config
               readOnly: true
