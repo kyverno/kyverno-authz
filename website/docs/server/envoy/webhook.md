@@ -9,6 +9,7 @@ kyverno-authz serve envoy validation-webhook [flags]
 
 ```
   -h, --help                                help for validation-webhook
+      --internal-cert-management            Enable Kyverno internal certificate management (default true)
       --kube-as string                      Username to impersonate for the operation
       --kube-as-group stringArray           Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
       --kube-as-uid string                  UID to impersonate for the operation
@@ -30,5 +31,8 @@ kyverno-authz serve envoy validation-webhook [flags]
       --kube-username string                Username for basic authentication to the API server
       --metrics-address string              Address to listen on for metrics (default ":9082")
       --probes-address string               Address to listen on for health checks (default ":9080")
+      --webhook-configuration-name string   ValidatingWebhookConfiguration name to patch with generated CA bundle
+      --webhook-namespace string            Namespace where webhook service and secrets are created (default "kyverno")
+      --webhook-service-name string         Webhook service name used for TLS certificate generation (default "kyverno-authz-server-validation")
 ```
 

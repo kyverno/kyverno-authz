@@ -367,16 +367,12 @@ deploy-kyverno-sidecar-injector: $(HELM)
 		--set container.image.registry=$(KO_REGISTRY) \
 		--set container.image.repository=$(PACKAGE) \
 		--set container.image.tag=$(GIT_SHA) \
-		--set mutatingWebhookConfiguration.certificates.certManager.issuerRef.group=cert-manager.io \
-		--set mutatingWebhookConfiguration.certificates.certManager.issuerRef.kind=ClusterIssuer \
-		--set mutatingWebhookConfiguration.certificates.certManager.issuerRef.name=selfsigned-issuer \
 		--values .manifests/sidecar-injector/envoy-values.yaml \
 		--set sidecar.containers[0].image=$(KO_REGISTRY)/$(PACKAGE):$(GIT_SHA)
 
 .PHONY: install-kyverno-sidecar-injector
 install-kyverno-sidecar-injector: ## Install kyverno-sidecar-injector chart
 install-kyverno-sidecar-injector: kind-load-image
-install-kyverno-sidecar-injector: install-cluster-issuer
 install-kyverno-sidecar-injector: install-vpol
 install-kyverno-sidecar-injector: $(HELM)
 	@$(MAKE) deploy-kyverno-sidecar-injector
@@ -392,9 +388,6 @@ deploy-kyverno-envoy-server: $(HELM)
 		--set authzServer.container.image.registry=$(KO_REGISTRY) \
 		--set authzServer.container.image.repository=$(PACKAGE) \
 		--set authzServer.container.image.tag=$(GIT_SHA) \
-		--set validatingWebhookConfiguration.certificates.certManager.issuerRef.group=cert-manager.io \
-		--set validatingWebhookConfiguration.certificates.certManager.issuerRef.kind=ClusterIssuer \
-		--set validatingWebhookConfiguration.certificates.certManager.issuerRef.name=selfsigned-issuer \
 		--set validatingWebhookConfiguration.container.image.registry=$(KO_REGISTRY) \
 		--set validatingWebhookConfiguration.container.image.repository=$(PACKAGE) \
 		--set validatingWebhookConfiguration.container.image.tag=$(GIT_SHA)
@@ -402,7 +395,6 @@ deploy-kyverno-envoy-server: $(HELM)
 .PHONY: install-kyverno-envoy-server
 install-kyverno-envoy-server: ## Install kyverno-authz-server chart (envoy)
 install-kyverno-envoy-server: kind-load-image
-install-kyverno-envoy-server: install-cluster-issuer
 install-kyverno-envoy-server: install-vpol
 install-kyverno-envoy-server: $(HELM)
 	@$(MAKE) deploy-kyverno-envoy-server
@@ -418,9 +410,6 @@ deploy-kyverno-http-server: $(HELM)
 		--set authzServer.container.image.registry=$(KO_REGISTRY) \
 		--set authzServer.container.image.repository=$(PACKAGE) \
 		--set authzServer.container.image.tag=$(GIT_SHA) \
-		--set validatingWebhookConfiguration.certificates.certManager.issuerRef.group=cert-manager.io \
-		--set validatingWebhookConfiguration.certificates.certManager.issuerRef.kind=ClusterIssuer \
-		--set validatingWebhookConfiguration.certificates.certManager.issuerRef.name=selfsigned-issuer \
 		--set validatingWebhookConfiguration.container.image.registry=$(KO_REGISTRY) \
 		--set validatingWebhookConfiguration.container.image.repository=$(PACKAGE) \
 		--set validatingWebhookConfiguration.container.image.tag=$(GIT_SHA)
@@ -428,7 +417,6 @@ deploy-kyverno-http-server: $(HELM)
 .PHONY: install-kyverno-http-server
 install-kyverno-http-server: ## Install kyverno-authz-server chart (http)
 install-kyverno-http-server: kind-load-image
-install-kyverno-http-server: install-cluster-issuer
 install-kyverno-http-server: install-vpol
 install-kyverno-http-server: $(HELM)
 	@$(MAKE) deploy-kyverno-http-server
