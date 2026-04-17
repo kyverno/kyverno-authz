@@ -96,7 +96,10 @@ func (s *compositeStore) handlePolex(excKey string, exc *v1.PolicyException, isD
 }
 
 func (c *compositeStore) keyFunc(_ context.Context, policy *v1.ValidatingPolicy) (string, error) {
-	polState, ok := c.policies[policy.Name]
+	// we need to pass the name and the namespace in the key lookup because the predicate
+	// gets called with the reconcile key which is namespace/name. this would also allow us
+	// to more easily integrate namespaced policies later
+	polState, ok := c.policies[policy.Namespace+"/"+policy.Name]
 	if !ok {
 		return "", fmt.Errorf("attempting to get the cache key for a non existing policy")
 	}
