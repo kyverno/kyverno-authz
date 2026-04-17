@@ -102,7 +102,7 @@ func (p compiledPolicy[DATA, IN, OUT]) evaluateRules(r IN) (OUT, error) {
 	// run the request against the policy exceptions
 	for _, polex := range p.exceptions {
 		for _, matchCond := range polex.matchConditions {
-			out, _, err := matchCond.Eval(r)
+			out, _, err := matchCond.Eval(data)
 			if err != nil {
 				return zero, err
 			}
