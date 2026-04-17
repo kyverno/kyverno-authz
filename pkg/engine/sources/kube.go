@@ -47,6 +47,9 @@ func NewKube[POLICY any](name string, mgr ctrl.Manager, compiler engine.Compiler
 				return zero, fmt.Errorf("attempting to fetch and compile a policy that doesn't exist")
 			}
 			for _, exc := range polState.exceptions {
+				if exc.exception.Spec.EvaluationMode != in.Spec.EvaluationMode() {
+					continue
+				}
 				exceptions = append(exceptions, &exc.exception)
 			}
 			policy, err := compiler.Compile(in, exceptions)
