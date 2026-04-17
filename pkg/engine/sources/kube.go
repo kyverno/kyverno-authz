@@ -24,12 +24,12 @@ func NewKube[POLICY any](name string, mgr ctrl.Manager, compiler engine.Compiler
 
 	// we don't the instances of the api source. we only want to register them with the manager so they
 	// would start reconciling and calling the predicate
-	_, err := controllerruntime.NewApiWithPredicate[v1.ValidatingPolicy](name, mgr, options, compositeStore.handlePolicy)
+	_, err := controllerruntime.NewApiWithPredicate[v1.ValidatingPolicy](name+"-vpol", mgr, options, compositeStore.handlePolicy)
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = controllerruntime.NewApiWithPredicate[v1.PolicyException](name, mgr, options, compositeStore.handlePolex)
+	_, err = controllerruntime.NewApiWithPredicate[v1.PolicyException](name+"-vpol", mgr, options, compositeStore.handlePolex)
 	if err != nil {
 		return nil, err
 	}
