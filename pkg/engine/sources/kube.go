@@ -29,7 +29,7 @@ func NewKube[POLICY any](name string, mgr ctrl.Manager, compiler engine.Compiler
 		return nil, err
 	}
 
-	_, err = controllerruntime.NewApiWithPredicate[v1.PolicyException](name+"-vpol", mgr, options, compositeStore.handlePolex)
+	_, err = controllerruntime.NewApiWithPredicate[v1.PolicyException](name+"-polex", mgr, options, compositeStore.handlePolex)
 	if err != nil {
 		return nil, err
 	}
