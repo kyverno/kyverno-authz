@@ -312,6 +312,8 @@ github.com/kyverno/pkg/tls v0.0.9 h1:qESRb4YsmBeiXcR6rq6DiKFmbAb5mjmmYmw6VfBreu0
 github.com/kyverno/pkg/tls v0.0.9/go.mod h1:t2pXB7A1BrS95f6XAvkau70kq/1i7nGjebAwci3L9Go=
 github.com/kyverno/sdk v0.0.0-20260403020150-29a100fa834c h1:xte6C9WfSFZAmpTLv/nQcZpn4O4SXEZ3ChsiAlqeaJk=
 github.com/kyverno/sdk v0.0.0-20260403020150-29a100fa834c/go.mod h1:duWj9TYUzHnKH15v013U33kElDDAnBfQcftK/a3dcHM=
+github.com/kyverno/sdk v0.0.0-20260417131151-22516a21229b h1:dFjjlNNJ07Zg0tVXQ1BVNDKpiSa6zfdTwQOnjiVJWHA=
+github.com/kyverno/sdk v0.0.0-20260417131151-22516a21229b/go.mod h1:duWj9TYUzHnKH15v013U33kElDDAnBfQcftK/a3dcHM=
 github.com/lestrrat-go/blackmagic v1.0.4 h1:IwQibdnf8l2KoO+qC3uT4OaTWsW7tuRQXy9TRN9QanA=
 github.com/lestrrat-go/blackmagic v1.0.4/go.mod h1:6AWFyKNNj0zEXQYfTMPfZrAXUWUfTIZ5ECEUEJaijtw=
 github.com/lestrrat-go/dsig v1.0.0 h1:OE09s2r9Z81kxzJYRn07TFM9XA4akrUdoMwr0L8xj38=

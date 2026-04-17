@@ -15,7 +15,7 @@ require (
 	github.com/kyverno/pkg/certmanager v0.0.10
 	github.com/kyverno/pkg/ext v0.0.0-20250303002756-48769d003e55
 	github.com/kyverno/pkg/tls v0.0.9
-	github.com/kyverno/sdk v0.0.0-20260403020150-29a100fa834c
+	github.com/kyverno/sdk v0.0.0-20260417131151-22516a21229b
 	github.com/lestrrat-go/jwx/v3 v3.0.13
 	github.com/mark3labs/mcp-go v0.43.2
 	github.com/nlepage/go-tarfs v1.2.1
