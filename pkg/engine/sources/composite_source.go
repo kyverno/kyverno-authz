@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	v1 "github.com/kyverno/api/api/policies.kyverno.io/v1"
 )
@@ -41,6 +42,10 @@ func (c *compositeStore) Load(_ context.Context) ([]*v1.ValidatingPolicy, error)
 }
 
 func (s *compositeStore) handlePolicy(policyKey string, policy *v1.ValidatingPolicy, isDelete bool) {
+	// this store is explicitly for cluster scoped policies for now. we would need to handle this
+	// differently if we wanna add support for them in authz. but for now the authz project as a
+	// whole works with cluster scoped policies anyway
+	policyKey = strings.TrimPrefix("/", policyKey)
 	if isDelete {
 		delete(s.policies, policyKey)
 		for _, exc := range s.exceptions {
@@ -96,10 +101,7 @@ func (s *compositeStore) handlePolex(excKey string, exc *v1.PolicyException, isD
 }
 
 func (c *compositeStore) keyFunc(_ context.Context, policy *v1.ValidatingPolicy) (string, error) {
-	// we need to pass the name and the namespace in the key lookup because the predicate
-	// gets called with the reconcile key which is namespace/name. this would also allow us
-	// to more easily integrate namespaced policies later
-	polState, ok := c.policies[policy.Namespace+"/"+policy.Name]
+	polState, ok := c.policies[policy.Name]
 	if !ok {
 		return "", fmt.Errorf("attempting to get the cache key for a non existing policy")
 	}

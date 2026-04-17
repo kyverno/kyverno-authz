@@ -44,7 +44,7 @@ func NewKube[POLICY any](name string, mgr ctrl.Manager, compiler engine.Compiler
 			// we need to pass the name and the namespace in the key lookup because the predicate
 			// gets called with the reconcile key which is namespace/name. this would also allow us
 			// to more easily integrate namespaced policies later
-			polState, ok := compositeStore.policies[in.Namespace+"/"+in.Name]
+			polState, ok := compositeStore.policies[in.Name]
 			if !ok {
 				return zero, fmt.Errorf("attempting to fetch and compile a policy that doesn't exist")
 			}
