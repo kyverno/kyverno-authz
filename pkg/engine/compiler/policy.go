@@ -93,6 +93,12 @@ func (p compiledPolicy[DATA, IN, OUT]) evaluateRules(r IN) (OUT, error) {
 	} else if !match {
 		return zero, nil
 	}
+
+	// ammar: is it ok to pass the variables of the policy to the exception too ? check how kyverno does this
+	data, err := p.setupVariables(r)
+	if err != nil {
+		return zero, err
+	}
 	// run the request against the policy exceptions
 	for _, polex := range p.exceptions {
 		for _, matchCond := range polex.matchConditions {
@@ -109,11 +115,6 @@ func (p compiledPolicy[DATA, IN, OUT]) evaluateRules(r IN) (OUT, error) {
 				return zero, nil
 			}
 		}
-	}
-
-	data, err := p.setupVariables(r)
-	if err != nil {
-		return zero, err
 	}
 	for _, rule := range p.rules {
 		// evaluate the rule
