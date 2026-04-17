@@ -10,9 +10,9 @@ import (
 )
 
 type policyState struct {
-	policy     v1.ValidatingPolicy
-	exceptions map[string]*exceptionState // keyed by polex namespace/name
-	maxRV      int64
+	policy                v1.ValidatingPolicy
+	exceptions            map[string]*exceptionState // keyed by polex namespace/name
+	exceptionEventCounter int                        // deletes don't trigger a change in rv. so we rely on our own counter to keep track of polex events
 }
 
 type exceptionState struct {
@@ -79,7 +79,9 @@ func (s *compositeStore) handlePolex(excKey string, exc *v1.PolicyException, isD
 	if isDelete {
 		delete(s.exceptions, excKey)
 		for _, polState := range s.policies {
-			// deletion should trigger an rv increment as well
+			// increment the polex event counter to that during recomputing the cache
+			// we get a different value and recompile the policy with its exceptions
+			polState.exceptionEventCounter++
 			delete(polState.exceptions, excKey)
 		}
 		return
@@ -88,14 +90,11 @@ func (s *compositeStore) handlePolex(excKey string, exc *v1.PolicyException, isD
 		exception:  *exc,
 		references: map[string]*policyState{},
 	}
-	rv, _ := strconv.ParseInt(exc.ResourceVersion, 10, 64)
 	for _, polRef := range exc.Spec.PolicyRefs {
 		if polState, ok := s.policies[polRef.Name]; ok {
 			polState.exceptions[excKey] = excState
+			polState.exceptionEventCounter++
 			excState.references[polRef.Name] = polState
-			if rv > polState.maxRV {
-				polState.maxRV = rv
-			}
 		}
 	}
 }
@@ -105,6 +104,5 @@ func (c *compositeStore) keyFunc(_ context.Context, policy *v1.ValidatingPolicy)
 	if !ok {
 		return "", fmt.Errorf("attempting to get the cache key for a non existing policy")
 	}
-	// if resource version is a string why can't we just store it as string not an int
-	return policy.Name + policy.ResourceVersion + strconv.Itoa(int(polState.maxRV)), nil
+	return policy.Name + policy.ResourceVersion + strconv.Itoa(polState.exceptionEventCounter), nil
 }
