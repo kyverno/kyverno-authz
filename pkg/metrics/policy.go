@@ -20,7 +20,7 @@ const (
 var (
 	authzDecisionsTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "authz_decisions_total",
+			Name: "authz_policy_evaluations_total",
 			Help: "Total number of authz policy evaluations by policy name and decision outcome.",
 		},
 		[]string{"policy", "decision"},
