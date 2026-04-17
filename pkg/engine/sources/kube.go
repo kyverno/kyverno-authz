@@ -38,11 +38,13 @@ func NewKube[POLICY any](name string, mgr ctrl.Manager, compiler engine.Compiler
 	cache := sources.NewCache(
 		compositeStore,
 		compositeStore.keyFunc,
-
 		func(ctx context.Context, _ string, in *v1.ValidatingPolicy) (POLICY, error) {
 			var zero POLICY
 			exceptions := []*v1.PolicyException{}
-			polState, ok := compositeStore.policies[in.Name]
+			// we need to pass the name and the namespace in the key lookup because the predicate
+			// gets called with the reconcile key which is namespace/name. this would also allow us
+			// to more easily integrate namespaced policies later
+			polState, ok := compositeStore.policies[in.Namespace+"/"+in.Name]
 			if !ok {
 				return zero, fmt.Errorf("attempting to fetch and compile a policy that doesn't exist")
 			}
