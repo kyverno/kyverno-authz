@@ -16,7 +16,7 @@ type policyState struct {
 
 type exceptionState struct {
 	exception v1.PolicyException
-	// what policies point does this exception point to ?
+	// what policies does this exception point to ?
 	references map[string]*policyState // keyed by policy namespace/name
 }
 
@@ -52,7 +52,6 @@ func (s *compositeStore) handlePolicy(policyKey string, policy *v1.ValidatingPol
 	// update: replace the policy in place
 	if policyState, ok := s.policies[policyKey]; ok {
 		policyState.policy = *policy
-
 		return
 	}
 
@@ -80,7 +79,6 @@ func (s *compositeStore) handlePolex(excKey string, exc *v1.PolicyException, isD
 		}
 		return
 	}
-
 	excState := &exceptionState{
 		exception:  *exc,
 		references: map[string]*policyState{},
