@@ -22,6 +22,7 @@ type exceptionState struct {
 }
 
 type compositeStore struct {
+	// we should have locks on this type
 	policies   map[string]*policyState    // keyed by policy namespace/name
 	exceptions map[string]*exceptionState // keyed by polex namespace/name
 }
@@ -45,7 +46,7 @@ func (s *compositeStore) handlePolicy(policyKey string, policy *v1.ValidatingPol
 	// this store is explicitly for cluster scoped policies for now. we would need to handle this
 	// differently if we wanna add support for them in authz. but for now the authz project as a
 	// whole works with cluster scoped policies anyway
-	policyKey = strings.TrimPrefix("/", policyKey)
+	policyKey = strings.TrimPrefix(policyKey, "/")
 	if isDelete {
 		delete(s.policies, policyKey)
 		for _, exc := range s.exceptions {
