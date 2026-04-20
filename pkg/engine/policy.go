@@ -9,3 +9,9 @@ import (
 
 type EnvoyPolicy = policy.Policy[dynamic.Interface, *authv3.CheckRequest, *authv3.CheckResponse]
 type HTTPPolicy = policy.Policy[dynamic.Interface, *http.CheckRequest, *http.CheckResponse]
+
+// Named is an optional interface that a Policy may implement to expose its name.
+// This is used for per-policy observability (metrics, logging).
+type Named interface {
+	Name() string
+}

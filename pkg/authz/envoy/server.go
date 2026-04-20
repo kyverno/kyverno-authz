@@ -7,6 +7,7 @@ import (
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"github.com/kyverno/kyverno-authz/pkg/engine"
 	"github.com/kyverno/kyverno-authz/pkg/events"
+	"github.com/kyverno/kyverno-authz/pkg/metrics"
 	"github.com/kyverno/kyverno-authz/pkg/server"
 	"github.com/kyverno/sdk/core"
 	"github.com/kyverno/sdk/core/dispatchers"
@@ -27,7 +28,21 @@ func NewServer(network, addr string, source engine.EnvoySource, dynclient dynami
 			source,
 			handlers.Handler(
 				dispatchers.Sequential(
-					policy.EvaluatorFactory[engine.EnvoyPolicy](),
+					metrics.MetricsEvaluatorFactory(
+						policy.EvaluatorFactory[engine.EnvoyPolicy](),
+						func(out policy.Evaluation[*authv3.CheckResponse]) string {
+							if out.Error != nil {
+								return metrics.DecisionError
+							}
+							if out.Result == nil {
+								return metrics.DecisionNoMatch
+							}
+							if out.Result.GetDeniedResponse() != nil {
+								return metrics.DecisionDeny
+							}
+							return metrics.DecisionAllow
+						},
+					),
 					func(ctx context.Context, fc core.FactoryContext[engine.EnvoyPolicy, dynamic.Interface, *authv3.CheckRequest]) core.Breaker[engine.EnvoyPolicy, *authv3.CheckRequest, policy.Evaluation[*authv3.CheckResponse]] {
 						return core.MakeBreakerFunc(func(_ context.Context, _ engine.EnvoyPolicy, _ *authv3.CheckRequest, out policy.Evaluation[*authv3.CheckResponse]) bool {
 							return out.Result != nil

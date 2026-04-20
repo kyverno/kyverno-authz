@@ -16,10 +16,15 @@ import (
 )
 
 type compiledPolicy[DATA dynamic.Interface, IN, OUT any] struct {
+	name            string
 	failurePolicy   admissionregistrationv1.FailurePolicyType
 	matchConditions []cel.Program
 	variables       map[string]cel.Program
 	rules           []cel.Program
+}
+
+func (p compiledPolicy[DATA, IN, OUT]) Name() string {
+	return p.name
 }
 
 func (p compiledPolicy[DATA, IN, OUT]) Evaluate(ctx context.Context, _ DATA, r IN) (OUT, error) {
