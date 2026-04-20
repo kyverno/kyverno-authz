@@ -261,7 +261,7 @@ auto_generated: true
 
 | Field | Type | Required | Inline | Description |
 |---|---|---|---|---|
-| `mode` | `string` |  |  | <p>Mode is the mode of policy evaluation. Allowed values are "Kubernetes" or "JSON". Optional. Default value is "Kubernetes".</p> |
+| `mode` | `string` |  |  | <p>Mode is the mode of policy evaluation. Allowed values are "Kubernetes", "HTTP" or "Envoy". Optional. Default value is "Kubernetes".</p> |
 | `admission` | [`AdmissionConfiguration`](#policies-kyverno-io-v1alpha1-AdmissionConfiguration) |  |  | <p>Admission controls policy evaluation during admission.</p> |
 | `background` | [`BackgroundConfiguration`](#policies-kyverno-io-v1alpha1-BackgroundConfiguration) |  |  | <p>Background  controls policy evaluation during background scan.</p> |
 
@@ -643,6 +643,7 @@ against which to verify.</p>
 | `images` | `[]string` |  |  | <p>Images specifies container images to be excluded from policy evaluation. These excluded images can be referenced in CEL expressions via `exceptions.allowedImages`.</p> |
 | `allowedValues` | `[]string` |  |  | <p>AllowedValues specifies values that can be used in CEL expressions to bypass policy checks. These values can be referenced in CEL expressions via `exceptions.allowedValues`.</p> |
 | `reportResult` | `string` |  |  | <p>ReportResult indicates whether the policy exception should be reported in the policy report as a skip result or pass result. Defaults to "skip".</p> |
+| `evaluationMode` | `string` |  |  | <p>Evaluation mode denotes which controller is in charge of compiling and handling this exception.</p> |
 
 ## PolicyRef     {#policies-kyverno-io-v1alpha1-PolicyRef}
 
