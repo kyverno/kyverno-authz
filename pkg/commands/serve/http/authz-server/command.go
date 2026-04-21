@@ -234,6 +234,7 @@ func Command() *cobra.Command {
 						})
 					}
 					// auth server
+					nestedRequest = true
 					httpConfig := http.Config{
 						Address:          serverAddress,
 						NestedRequest:    nestedRequest,
