@@ -30,13 +30,17 @@ func newStatic[POLICY any](compiler engine.Compiler[POLICY], policies []*vpolv1.
 			if ex.Spec.EvaluationMode != p.Spec.EvaluationMode() {
 				continue
 			}
+			exceptionMatched := false
 			for _, pol := range ex.Spec.PolicyRefs {
 				// no need to check for kind here because its already been checked in the filesystem load
-				if pol.Name != p.Name {
-					continue
+				if pol.Name == p.Name {
+					exceptionMatched = true
+					break
 				}
 			}
-			matchedExceptions = append(matchedExceptions, ex)
+			if exceptionMatched {
+				matchedExceptions = append(matchedExceptions, ex)
+			}
 		}
 		policyMap[p] = matchedExceptions
 	}
