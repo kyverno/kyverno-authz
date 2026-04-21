@@ -114,6 +114,7 @@ func (s *compositeStore) handlePolex(excKey string, exc *v1.PolicyException, isD
 			polState.exceptions[excKey] = excState
 			polState.exceptionEventCounter++
 			excState.references[polRef.Name] = polState
+			s.exceptions[excKey] = excState
 		}
 	}
 }
