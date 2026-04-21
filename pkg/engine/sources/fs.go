@@ -6,6 +6,8 @@ import (
 	"io/fs"
 	"sync"
 
+	"k8s.io/klog/v2"
+
 	v1 "github.com/kyverno/api/api/policies.kyverno.io/v1"
 	vpolv1 "github.com/kyverno/api/api/policies.kyverno.io/v1"
 	vpolv1alpha1 "github.com/kyverno/api/api/policies.kyverno.io/v1"
@@ -47,7 +49,8 @@ func LoadPolicies(f fs.FS) ([]*vpolv1.ValidatingPolicy, []*vpolv1.PolicyExceptio
 	policyExceptions := []*vpolv1.PolicyException{}
 
 	err := fs.WalkDir(f, ".", func(path string, entry fs.DirEntry, walkErr error) error {
-		if entry == nil {
+		if walkErr != nil || entry == nil {
+			klog.Errorf("skipping entry %s: walk error: %v", path, walkErr)
 			return nil
 		}
 		// process only files
@@ -59,35 +62,38 @@ func LoadPolicies(f fs.FS) ([]*vpolv1.ValidatingPolicy, []*vpolv1.PolicyExceptio
 		}
 		docs, err := getDocuments(context.Background(), f, entry)
 		if err != nil {
-			return err
+			klog.Errorf("skipping entry %s: failed to read documents: %v", entry.Name(), err)
+			return nil
 		}
 		for _, doc := range docs {
 			ldr, err := DefaultLoader()
 			if err != nil {
-				return fmt.Errorf("failed to load CRDs: %w", err)
+				klog.Errorf("skipping entry %s: failed to create loader: %v", entry.Name(), err)
+				return nil
 			}
 			gvk, untyped, err := ldr.Load(doc)
 			if err != nil {
-				return err
+				klog.Errorf("skipping document in %s: failed to load: %v", entry.Name(), err)
+				continue
 			}
-
 			switch gvk {
 			case vpolGVKv1alpha1, vpolGVKv1beta1, vpolGVKv1:
 				typed, err := convert.To[vpolv1.ValidatingPolicy](untyped)
 				if err != nil {
-					return fmt.Errorf("failed to convert to ValidatingPolicy: %w", err)
+					klog.Errorf("skipping document in %s: failed to convert to ValidatingPolicy: %v", entry.Name(), err)
+					continue
 				}
 				policies = append(policies, typed)
 			case polexGVKv1, polexGVKv1alpha1, polexGVKv1beta1:
 				typed, err := convert.To[v1.PolicyException](untyped)
 				if err != nil {
-					return fmt.Errorf("failed to convert to ValidatingPolicy: %w", err)
+					klog.Errorf("skipping document in %s: failed to convert to PolicyException: %v", entry.Name(), err)
+					continue
 				}
 				policyExceptions = append(policyExceptions, typed)
 			}
 		}
-		// Propagate traversal errors (e.g., permission denied, fs.SkipDir).
-		return walkErr
+		return nil
 	})
 	if err != nil {
 		return nil, nil, err
@@ -98,10 +104,6 @@ func LoadPolicies(f fs.FS) ([]*vpolv1.ValidatingPolicy, []*vpolv1.PolicyExceptio
 
 func getDocuments(_ context.Context, f fs.FS, entry fs.DirEntry) ([]document, error) {
 	if entry == nil {
-		return nil, nil
-	}
-	// process only files
-	if entry.IsDir() {
 		return nil, nil
 	}
 	// if it's a yaml file, it can contain multiple documents
