@@ -46,7 +46,6 @@ func LoadPolicies(f fs.FS) ([]*vpolv1.ValidatingPolicy, []*vpolv1.PolicyExceptio
 	policies := []*vpolv1.ValidatingPolicy{}
 	policyExceptions := []*vpolv1.PolicyException{}
 
-	// we pass the error here because it comes from before calling the predicate ?
 	err := fs.WalkDir(f, ".", func(path string, entry fs.DirEntry, walkErr error) error {
 		if entry == nil {
 			return nil
@@ -55,7 +54,7 @@ func LoadPolicies(f fs.FS) ([]*vpolv1.ValidatingPolicy, []*vpolv1.PolicyExceptio
 		if entry.IsDir() {
 			return nil
 		}
-		if !file.IsYaml(entry.Name()) || !file.IsJson(entry.Name()) {
+		if !file.IsYaml(entry.Name()) && !file.IsJson(entry.Name()) {
 			return nil
 		}
 		docs, err := getDocuments(context.Background(), f, entry)
