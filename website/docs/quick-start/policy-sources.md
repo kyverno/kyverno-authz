@@ -118,7 +118,7 @@ This is useful for distributing versioned policy bundles via registries such as 
 From each mounted source directory, the Authz Server loads all YAML and JSON files recusively.  
 It expects documents of the following kind:
 
-- `#!yaml apiVersion: policies.kyverno.io/v1alpha1` and `#!yaml kind: ValidatingPolicy`
+- `#!yaml apiVersion: policies.kyverno.io/v1` and `#!yaml kind: ValidatingPolicy`
 
 Invalid or non-policy documents are skipped.  
 

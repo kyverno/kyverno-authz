@@ -184,7 +184,7 @@ In summary the policy below does the following:
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: policies.kyverno.io/v1alpha1
+apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
   name: demo

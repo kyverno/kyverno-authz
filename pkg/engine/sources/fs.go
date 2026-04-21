@@ -8,7 +8,7 @@ import (
 
 	v1 "github.com/kyverno/api/api/policies.kyverno.io/v1"
 	vpolv1 "github.com/kyverno/api/api/policies.kyverno.io/v1"
-	vpolv1alpha1 "github.com/kyverno/api/api/policies.kyverno.io/v1alpha1"
+	vpolv1alpha1 "github.com/kyverno/api/api/policies.kyverno.io/v1"
 	vpolv1beta1 "github.com/kyverno/api/api/policies.kyverno.io/v1beta1"
 	"github.com/kyverno/kyverno-authz/pkg/data"
 	"github.com/kyverno/pkg/ext/file"

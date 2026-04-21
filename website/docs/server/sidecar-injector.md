@@ -165,7 +165,7 @@ metadata:
   namespace: demo
 data:
   policy.yaml: |
-    apiVersion: policies.kyverno.io/v1alpha1
+    apiVersion: policies.kyverno.io/v1
     kind: ValidatingPolicy
     metadata:
       name: demo

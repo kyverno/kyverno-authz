@@ -21,7 +21,7 @@ Start by creating a simple **ValidatingPolicy**.
 Save the following policy as `quick-start.yaml` in your working directory:
 
 ```yaml
-apiVersion: policies.kyverno.io/v1alpha1
+apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
   name: policy

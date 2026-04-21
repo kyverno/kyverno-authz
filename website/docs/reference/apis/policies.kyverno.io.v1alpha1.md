@@ -1,7 +1,7 @@
 ---
 title: policies.kyverno.io (v1alpha1)
 content_type: tool-reference
-package: policies.kyverno.io/v1alpha1
+package: policies.kyverno.io/v1
 auto_generated: true
 ---
 
@@ -20,7 +20,7 @@ auto_generated: true
 
 | Field | Type | Required | Inline | Description |
 |---|---|---|---|---|
-| `apiVersion` | `string` | :white_check_mark: | | `policies.kyverno.io/v1alpha1` |
+| `apiVersion` | `string` | :white_check_mark: | | `policies.kyverno.io/v1` |
 | `kind` | `string` | :white_check_mark: | | `DeletingPolicy` |
 | `metadata` | [`meta/v1.ObjectMeta`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta) | :white_check_mark: |  | *No description provided.* |
 | `spec` | [`DeletingPolicySpec`](#policies-kyverno-io-v1alpha1-DeletingPolicySpec) | :white_check_mark: |  | *No description provided.* |
@@ -30,7 +30,7 @@ auto_generated: true
 
 | Field | Type | Required | Inline | Description |
 |---|---|---|---|---|
-| `apiVersion` | `string` | :white_check_mark: | | `policies.kyverno.io/v1alpha1` |
+| `apiVersion` | `string` | :white_check_mark: | | `policies.kyverno.io/v1` |
 | `kind` | `string` | :white_check_mark: | | `GeneratingPolicy` |
 | `metadata` | [`meta/v1.ObjectMeta`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta) | :white_check_mark: |  | *No description provided.* |
 | `spec` | [`GeneratingPolicySpec`](#policies-kyverno-io-v1alpha1-GeneratingPolicySpec) | :white_check_mark: |  | *No description provided.* |
@@ -40,7 +40,7 @@ auto_generated: true
 
 | Field | Type | Required | Inline | Description |
 |---|---|---|---|---|
-| `apiVersion` | `string` | :white_check_mark: | | `policies.kyverno.io/v1alpha1` |
+| `apiVersion` | `string` | :white_check_mark: | | `policies.kyverno.io/v1` |
 | `kind` | `string` | :white_check_mark: | | `ImageValidatingPolicy` |
 | `metadata` | [`meta/v1.ObjectMeta`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta) | :white_check_mark: |  | *No description provided.* |
 | `spec` | [`ImageValidatingPolicySpec`](#policies-kyverno-io-v1alpha1-ImageValidatingPolicySpec) | :white_check_mark: |  | *No description provided.* |
@@ -50,7 +50,7 @@ auto_generated: true
 
 | Field | Type | Required | Inline | Description |
 |---|---|---|---|---|
-| `apiVersion` | `string` | :white_check_mark: | | `policies.kyverno.io/v1alpha1` |
+| `apiVersion` | `string` | :white_check_mark: | | `policies.kyverno.io/v1` |
 | `kind` | `string` | :white_check_mark: | | `MutatingPolicy` |
 | `metadata` | [`meta/v1.ObjectMeta`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta) | :white_check_mark: |  | *No description provided.* |
 | `spec` | [`MutatingPolicySpec`](#policies-kyverno-io-v1alpha1-MutatingPolicySpec) | :white_check_mark: |  | *No description provided.* |
@@ -63,7 +63,7 @@ auto_generated: true
 
 | Field | Type | Required | Inline | Description |
 |---|---|---|---|---|
-| `apiVersion` | `string` | :white_check_mark: | | `policies.kyverno.io/v1alpha1` |
+| `apiVersion` | `string` | :white_check_mark: | | `policies.kyverno.io/v1` |
 | `kind` | `string` | :white_check_mark: | | `PolicyException` |
 | `metadata` | [`meta/v1.ObjectMeta`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta) | :white_check_mark: |  | *No description provided.* |
 | `spec` | [`PolicyExceptionSpec`](#policies-kyverno-io-v1alpha1-PolicyExceptionSpec) | :white_check_mark: |  | <p>Spec declares policy exception behaviors.</p> |
@@ -72,7 +72,7 @@ auto_generated: true
 
 | Field | Type | Required | Inline | Description |
 |---|---|---|---|---|
-| `apiVersion` | `string` | :white_check_mark: | | `policies.kyverno.io/v1alpha1` |
+| `apiVersion` | `string` | :white_check_mark: | | `policies.kyverno.io/v1` |
 | `kind` | `string` | :white_check_mark: | | `ValidatingPolicy` |
 | `metadata` | [`meta/v1.ObjectMeta`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta) | :white_check_mark: |  | *No description provided.* |
 | `spec` | [`ValidatingPolicySpec`](#policies-kyverno-io-v1alpha1-ValidatingPolicySpec) | :white_check_mark: |  | *No description provided.* |
@@ -864,5 +864,3 @@ against which to verify.</p>
 | Field | Type | Required | Inline | Description |
 |---|---|---|---|---|
 | `timeoutSeconds` | `int32` | :white_check_mark: |  | <p>TimeoutSeconds specifies the maximum time in seconds allowed to apply this policy. After the configured time expires, the admission request may fail, or may simply ignore the policy results, based on the failure policy. The default timeout is 10s, the value must be between 1 and 30 seconds.</p> |
-
-  
