@@ -8,9 +8,8 @@ import (
 
 	"k8s.io/klog/v2"
 
-	v1 "github.com/kyverno/api/api/policies.kyverno.io/v1"
 	vpolv1 "github.com/kyverno/api/api/policies.kyverno.io/v1"
-	vpolv1alpha1 "github.com/kyverno/api/api/policies.kyverno.io/v1"
+	vpolv1alpha1 "github.com/kyverno/api/api/policies.kyverno.io/v1alpha1"
 	vpolv1beta1 "github.com/kyverno/api/api/policies.kyverno.io/v1beta1"
 	"github.com/kyverno/kyverno-authz/pkg/data"
 	"github.com/kyverno/pkg/ext/file"
@@ -85,7 +84,7 @@ func LoadPolicies(f fs.FS) ([]*vpolv1.ValidatingPolicy, []*vpolv1.PolicyExceptio
 				}
 				policies = append(policies, typed)
 			case polexGVKv1, polexGVKv1alpha1, polexGVKv1beta1:
-				typed, err := convert.To[v1.PolicyException](untyped)
+				typed, err := convert.To[vpolv1.PolicyException](untyped)
 				if err != nil {
 					klog.Errorf("skipping document in %s: failed to convert to PolicyException: %v", entry.Name(), err)
 					continue
