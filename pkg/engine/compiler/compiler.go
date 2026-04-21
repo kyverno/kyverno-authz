@@ -139,7 +139,7 @@ func (c *compiler[DATA, IN, OUT]) compile(policy *v1.ValidatingPolicy, exception
 	{
 		for _, ex := range exceptions {
 			cex, errs := c.compileException(*ex, env)
-			if errs != nil {
+			if err != nil {
 				return nil, append(allErrs, errs...)
 			}
 			compiledPolexs = append(compiledPolexs, *cex)
