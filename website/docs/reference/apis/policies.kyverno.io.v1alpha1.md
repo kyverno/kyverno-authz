@@ -1,5 +1,5 @@
 ---
-title: policies.kyverno.io (v1alpha1)
+title: policies.kyverno.io (v1)
 content_type: tool-reference
 package: policies.kyverno.io/v1
 auto_generated: true
