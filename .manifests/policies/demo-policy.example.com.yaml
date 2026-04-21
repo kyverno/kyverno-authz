@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/playground/refs/heads/main/schemas/json/v3/validatingpolicy-policies.kyverno.io-v1alpha1.json
-apiVersion: policies.kyverno.io/v1alpha1
+apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
   name: demo-policy.example.com
@@ -14,8 +14,8 @@ spec:
   - name: metadata
     expression: '{"my-new-metadata": "my-new-value"}'
   validations:
-  - expression: | 
-      variables.force_unauthenticated ? 
+  - expression: |
+      variables.force_unauthenticated ?
         envoy.Denied(401)
           .WithBody("Authentication Failed")
           .Response() :

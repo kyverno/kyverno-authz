@@ -23,7 +23,7 @@ A Kyverno `ValidatingPolicy` for Envoy consists of:
 For Envoy integration, the evaluation mode **must** be set to `Envoy`:
 
 ```yaml
-apiVersion: policies.kyverno.io/v1alpha1
+apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
   name: envoy-policy
@@ -46,7 +46,7 @@ Allowed values:
 ### Example: Fail Policy
 
 ```yaml
-apiVersion: policies.kyverno.io/v1alpha1
+apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
   name: demo
@@ -69,7 +69,7 @@ spec:
 ### Example: Ignore Policy
 
 ```yaml
-apiVersion: policies.kyverno.io/v1alpha1
+apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
   name: demo
@@ -99,7 +99,7 @@ Match conditions provide fine-grained request filtering using CEL expressions. A
 ### Example: Header-Based Matching
 
 ```yaml
-apiVersion: policies.kyverno.io/v1alpha1
+apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
   name: demo
@@ -140,7 +140,7 @@ Variables are named CEL expressions that can be reused throughout the policy. Th
 ### Example: Using Variables
 
 ```yaml
-apiVersion: policies.kyverno.io/v1alpha1
+apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
   name: demo
@@ -178,7 +178,7 @@ Validation rules contain the authorization logic. Each rule is a CEL expression 
 ### Basic Example
 
 ```yaml
-apiVersion: policies.kyverno.io/v1alpha1
+apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
   name: demo
@@ -203,7 +203,7 @@ spec:
 This example demonstrates multiple validation checks with custom headers and metadata:
 
 ```yaml
-apiVersion: policies.kyverno.io/v1alpha1
+apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
   name: demo
@@ -274,7 +274,7 @@ The CEL engine includes helper functions for creating Envoy responses:
 You can also create responses manually without helper functions:
 
 ```yaml
-apiVersion: policies.kyverno.io/v1alpha1
+apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
   name: demo
@@ -331,7 +331,7 @@ validations:
 Here's a complete policy that combines all concepts:
 
 ```yaml
-apiVersion: policies.kyverno.io/v1alpha1
+apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
   name: complete-envoy-policy

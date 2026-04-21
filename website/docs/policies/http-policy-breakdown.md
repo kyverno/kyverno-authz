@@ -21,7 +21,7 @@ A Kyverno `ValidatingPolicy` for HTTP consists of:
 For HTTP authorization, the evaluation mode **must** be set to `HTTP`:
 
 ```yaml
-apiVersion: policies.kyverno.io/v1alpha1
+apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
   name: http-policy
@@ -44,7 +44,7 @@ Allowed values:
 ### Example: Fail Policy
 
 ```yaml
-apiVersion: policies.kyverno.io/v1alpha1
+apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
   name: demo
@@ -65,7 +65,7 @@ spec:
 ### Example: Ignore Policy
 
 ```yaml
-apiVersion: policies.kyverno.io/v1alpha1
+apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
   name: demo
@@ -93,7 +93,7 @@ Match conditions provide fine-grained request filtering using CEL expressions. A
 ### Example: Path-Based Matching
 
 ```yaml
-apiVersion: policies.kyverno.io/v1alpha1
+apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
   name: api-protection
@@ -112,7 +112,7 @@ spec:
 ### Example: Header-Based Matching
 
 ```yaml
-apiVersion: policies.kyverno.io/v1alpha1
+apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
   name: admin-only
@@ -147,7 +147,7 @@ Variables are named CEL expressions that can be reused throughout the policy. Th
 ### Example: Using Variables
 
 ```yaml
-apiVersion: policies.kyverno.io/v1alpha1
+apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
   name: demo
@@ -187,7 +187,7 @@ Validation rules contain the authorization logic. Each rule is a CEL expression 
 ### Basic Example
 
 ```yaml
-apiVersion: policies.kyverno.io/v1alpha1
+apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
   name: demo
@@ -214,7 +214,7 @@ spec:
 This example demonstrates multiple validation checks with custom headers and status codes:
 
 ```yaml
-apiVersion: policies.kyverno.io/v1alpha1
+apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
   name: demo
@@ -281,7 +281,7 @@ You can fetch data from external sources to make authorization decisions:
 ### Example: External API Call
 
 ```yaml
-apiVersion: policies.kyverno.io/v1alpha1
+apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
   name: external-data-policy
@@ -302,7 +302,7 @@ spec:
 ### Example: Multiple External Calls
 
 ```yaml
-apiVersion: policies.kyverno.io/v1alpha1
+apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
   name: multi-source-policy
@@ -330,7 +330,7 @@ spec:
 Here's a complete policy that combines all concepts:
 
 ```yaml
-apiVersion: policies.kyverno.io/v1alpha1
+apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
   name: complete-http-policy
@@ -431,7 +431,7 @@ variables:
 ### Pattern 1: Token Validation
 
 ```yaml
-apiVersion: policies.kyverno.io/v1alpha1
+apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
   name: token-validation
@@ -455,7 +455,7 @@ spec:
 ### Pattern 2: Role-Based Access Control
 
 ```yaml
-apiVersion: policies.kyverno.io/v1alpha1
+apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
   name: rbac-policy
@@ -477,7 +477,7 @@ spec:
 ### Pattern 3: Rate Limiting Check
 
 ```yaml
-apiVersion: policies.kyverno.io/v1alpha1
+apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
   name: rate-limit-check
@@ -500,7 +500,7 @@ spec:
 ### Pattern 4: Path-Based Authorization
 
 ```yaml
-apiVersion: policies.kyverno.io/v1alpha1
+apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
   name: path-authorization

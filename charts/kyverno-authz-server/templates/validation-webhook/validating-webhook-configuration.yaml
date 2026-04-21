@@ -25,7 +25,7 @@ webhooks:
       name: {{ $name }}
       namespace: {{ $namespace }}
       port: 9443
-      path: /validate-policies-kyverno-io-v1beta1-validatingpolicy
+      path: /validate-policies-kyverno-io-v1-validatingpolicy
     {{- if $value.certificates.static }}
     caBundle: {{ index $value.certificates.static.crt | b64enc }}
     {{- end }}
@@ -35,6 +35,6 @@ webhooks:
   matchPolicy: Equivalent
   rules:
   - apiGroups: [policies.kyverno.io]
-    apiVersions: [v1beta1]
+    apiVersions: [v1]
     resources: [validatingpolicies]
     operations: [CREATE, UPDATE]

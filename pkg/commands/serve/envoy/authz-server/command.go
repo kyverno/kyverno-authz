@@ -8,7 +8,7 @@ import (
 
 	"github.com/cespare/xxhash/v2"
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
-	vpol "github.com/kyverno/api/api/policies.kyverno.io/v1beta1"
+	vpol "github.com/kyverno/api/api/policies.kyverno.io/v1"
 	"github.com/kyverno/kyverno-authz/apis"
 	"github.com/kyverno/kyverno-authz/pkg/authz/envoy"
 	"github.com/kyverno/kyverno-authz/pkg/engine"

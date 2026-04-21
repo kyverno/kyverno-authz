@@ -23,7 +23,7 @@ The policy below does the following:
 === "Envoy"
 
     ```yaml
-    apiVersion: policies.kyverno.io/v1alpha1
+    apiVersion: policies.kyverno.io/v1
     kind: ValidatingPolicy
     metadata:
       name: quick-start
@@ -63,7 +63,7 @@ The policy below does the following:
 === "HTTP"
 
     ```yaml
-    apiVersion: policies.kyverno.io/v1alpha1
+    apiVersion: policies.kyverno.io/v1
     kind: ValidatingPolicy
     metadata:
       name: quick-start

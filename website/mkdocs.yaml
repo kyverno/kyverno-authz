@@ -53,7 +53,7 @@ nav:
   - reference/index.md
   - reference/json-schemas.md
   - APIs:
-    - policies.kyverno.io/v1alpha1: reference/apis/policies.kyverno.io.v1alpha1.md
+    - policies.kyverno.io/v1: reference/apis/policies.kyverno.io.v1alpha1.md
   - Command Line:
     - reference/commands/kyverno-authz.md
     - reference/commands/kyverno-authz_completion.md
