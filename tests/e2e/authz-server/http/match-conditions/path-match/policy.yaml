@@ -2,14 +2,14 @@
 apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
-  name: policy
+  name: path-policy
 spec:
   evaluation:
     mode: HTTP
   matchConditions:
-  - name: match-host
-    expression: |
-      object.attributes.path.startsWith("/get")
+    - name: match-host
+      expression: |
+        object.attributes.path.startsWith("/get")
   validations:
-  - expression: >
-      http.Denied("not allowed").Response()
+    - expression: >
+        http.Denied("not allowed").Response()
