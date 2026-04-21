@@ -61,7 +61,6 @@ func (s *staticSource[POLICY]) Load(_ context.Context) ([]POLICY, error) {
 }
 
 func GetExternalSources[POLICY any](vpolCompiler engine.Compiler[POLICY], nOpts []name.Option, rOpts []remote.Option, urls ...string) ([]core.Source[POLICY], error) {
-	// how about we strip away all this sdk bullshit and make it just open the location it get policies and exceptions
 	mux := fsimpl.NewMux()
 	mux.Add(filefs.FS)
 	// mux.Add(httpfs.FS)
