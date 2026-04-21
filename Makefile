@@ -351,7 +351,7 @@ install-service-entry:
 
 .PHONY: install-vpol
 install-vpol: ## Install Validating policy CRD
-	@kubectl apply -f https://raw.githubusercontent.com/kyverno/api/refs/heads/main/config/crds/policies.kyverno.io_validatingpolicies.yaml
+	@kubectl apply -f https://raw.githubusercontent.com/kyverno/kyverno/refs/heads/main/config/crds/policies.kyverno.io/policies.kyverno.io_validatingpolicies.yaml
 
 #########
 # POLEX #
