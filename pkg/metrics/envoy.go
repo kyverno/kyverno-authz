@@ -39,37 +39,47 @@ func init() {
 }
 
 func RecordEnvoyRequest(ctx context.Context, startTime time.Time, req *authv3.CheckRequest, res *authv3.CheckResponse) {
+	method, host, path, scheme := envoyRequestAttributes(req)
 	var status string
-	if res.Status != nil {
+	if res != nil && res.Status != nil {
 		status = fmt.Sprint(res.Status.Code)
 	}
 
 	envoyRequestsMetric.WithLabelValues(
-		req.Attributes.Request.Http.Method,
-		req.Attributes.Request.Http.Host,
-		req.Attributes.Request.Http.Path,
-		req.Attributes.Request.Http.Scheme,
+		method,
+		host,
+		path,
+		scheme,
 		status,
 	).Inc()
 
 	defer func() {
-		latency := float64(time.Since(startTime))
+		latency := time.Since(startTime).Seconds()
 
 		envoyDurationMetric.WithLabelValues(
-			req.Attributes.Request.Http.Method,
-			req.Attributes.Request.Http.Host,
-			req.Attributes.Request.Http.Path,
-			req.Attributes.Request.Http.Scheme,
+			method,
+			host,
+			path,
+			scheme,
 			status,
 		).Observe(latency)
 	}()
 }
 
 func RecordEnvoyRequestError(ctx context.Context, req *authv3.CheckRequest, err error) {
+	method, host, path, scheme := envoyRequestAttributes(req)
 	envoyRequestsErrorMetric.WithLabelValues(
-		req.Attributes.Request.Http.Method,
-		req.Attributes.Request.Http.Host,
-		req.Attributes.Request.Http.Path,
-		req.Attributes.Request.Http.Scheme,
+		method,
+		host,
+		path,
+		scheme,
 	).Inc()
+}
+
+func envoyRequestAttributes(req *authv3.CheckRequest) (method, host, path, scheme string) {
+	if req == nil || req.Attributes == nil || req.Attributes.Request == nil || req.Attributes.Request.Http == nil {
+		return "", "", "", ""
+	}
+	http := req.Attributes.Request.Http
+	return http.Method, http.Host, http.Path, http.Scheme
 }

@@ -48,6 +48,11 @@ func NewAuthorizer(
 
 func (a *authorizer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
+	decision := metrics.DecisionError
+	source := metrics.SourceServer
+	defer func() {
+		metrics.RecordAuthzDecision(metrics.ModeHTTP, decision, source, start)
+	}()
 	logger := ctrl.LoggerFrom(r.Context()).WithValues("from", r.RemoteAddr)
 	logger.Info("received request")
 	if a.nestedRequest {
@@ -81,6 +86,7 @@ func (a *authorizer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	response := a.engine.Handle(r.Context(), a.dyn, &httpReq)
 	if response.Error != nil {
+		source = metrics.SourceEngine
 		metrics.RecordHTTPRequestError(r.Context(), httpReq, response.Error)
 		a.eventHandler.Push(context.Background(), time.Now(), httpReq, events.NewResultAccessor(nil, response.Error))
 		writeErrResp(logger, w, response.Error)
@@ -91,6 +97,14 @@ func (a *authorizer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		result = &httpcel.CheckResponse{
 			Ok: &httpcel.CheckResponseOk{},
 		}
+		decision = metrics.DecisionAllow
+		source = metrics.SourceDefault
+	} else if result.Denied != nil {
+		decision = metrics.DecisionDeny
+		source = metrics.SourcePolicy
+	} else {
+		decision = metrics.DecisionAllow
+		source = metrics.SourcePolicy
 	}
 
 	// result will never be nil here because we set it in the block above
@@ -100,10 +114,14 @@ func (a *authorizer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"object": result,
 	})
 	if err != nil {
+		decision = metrics.DecisionError
+		source = metrics.SourceServer
 		writeErrResp(logger, w, err)
 		return
 	}
 	if out, err := utils.ConvertToNative[httpserver.HttpResponse](out); err != nil {
+		decision = metrics.DecisionError
+		source = metrics.SourceServer
 		writeErrResp(logger, w, err)
 	} else {
 		writeResponse(logger, w, out)
