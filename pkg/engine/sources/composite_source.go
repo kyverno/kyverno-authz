@@ -3,9 +3,12 @@ package sources
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
+
+	"golang.org/x/exp/maps"
 
 	v1 "github.com/kyverno/api/api/policies.kyverno.io/v1"
 )
@@ -40,9 +43,13 @@ func (s *compositeStore) Load(_ context.Context) ([]*v1.ValidatingPolicy, error)
 	s.Lock()
 	defer s.Unlock()
 
+	// Collect and sort keys for deterministic iteration
+	keys := maps.Keys(s.policies)
+	slices.Sort(keys)
+
 	policies := []*v1.ValidatingPolicy{}
-	for _, polState := range s.policies {
-		policies = append(policies, &polState.policy)
+	for _, key := range keys {
+		policies = append(policies, &s.policies[key].policy)
 	}
 	return policies, nil
 }
