@@ -21,7 +21,7 @@ spec:
   - try:
     - script:
         content: >
-          kubectl exec -n $NAMESPACE deploy/curl -- curl -s -w "\nhttp_code=%{http_code}" http-srv.app/get
+          kubectl exec -n $NAMESPACE deploy/curl -- curl -s -w "\nhttp_code=%{http_code}" http-srv.app/get -H "X-Gateway: untrusted"
         check:
           (wildcard('*http_code=403', $stdout)): true
     - script:
