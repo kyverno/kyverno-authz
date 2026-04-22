@@ -235,6 +235,9 @@ jobs:
         run:  |
           set -e
           chainsaw test tests/e2e/authz-server/envoy
+      - name: Dump authz server logs
+        run: |
+          kubectl logs -n kyverno deployment/kyverno-authz-server --all-containers --tail=-1
 
   e2e-authz-server-http:
     runs-on: ubuntu-latest
@@ -298,7 +301,6 @@ jobs:
           set -e
           chainsaw test tests/e2e/authz-server/http
       - name: Dump authz server logs
-        if: failure()
         run: |
           kubectl logs -n kyverno deployment/kyverno-authz-server --all-containers --tail=-1
 
