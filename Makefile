@@ -304,7 +304,7 @@ generate-certs:
 	@openssl req -new -x509  \
         -subj "/CN=kyverno-sidecar-injector.kyverno.svc" \
         -addext "subjectAltName = DNS:kyverno-sidecar-injector.kyverno.svc" \
-        -nodes -newkey rsa:4096 -keyout .certs/tls.key -out .certs/tls.crt 
+        -nodes -newkey rsa:4096 -keyout .certs/tls.key -out .certs/tls.crt
 
 ################
 # CERT MANAGER #
@@ -353,6 +353,14 @@ install-service-entry:
 install-vpol: ## Install Validating policy CRD
 	@kubectl apply -f https://raw.githubusercontent.com/kyverno/kyverno/refs/heads/main/config/crds/policies.kyverno.io/policies.kyverno.io_validatingpolicies.yaml
 
+#########
+# POLEX #
+#########
+
+.PHONY: install-polex
+install-polex: ## Install policy exception CRD
+	@kubectl apply -f https://raw.githubusercontent.com/kyverno/api/refs/heads/main/config/crds/policies.kyverno.io_policyexceptions.yaml
+
 ########
 # HELM #
 ########
@@ -374,6 +382,7 @@ deploy-kyverno-sidecar-injector: $(HELM)
 install-kyverno-sidecar-injector: ## Install kyverno-sidecar-injector chart
 install-kyverno-sidecar-injector: kind-load-image
 install-kyverno-sidecar-injector: install-vpol
+install-kyverno-sidecar-injector: install-polex
 install-kyverno-sidecar-injector: $(HELM)
 	@$(MAKE) deploy-kyverno-sidecar-injector
 
@@ -396,6 +405,7 @@ deploy-kyverno-envoy-server: $(HELM)
 install-kyverno-envoy-server: ## Install kyverno-authz-server chart (envoy)
 install-kyverno-envoy-server: kind-load-image
 install-kyverno-envoy-server: install-vpol
+install-kyverno-envoy-server: install-polex
 install-kyverno-envoy-server: $(HELM)
 	@$(MAKE) deploy-kyverno-envoy-server
 
@@ -418,6 +428,7 @@ deploy-kyverno-http-server: $(HELM)
 install-kyverno-http-server: ## Install kyverno-authz-server chart (http)
 install-kyverno-http-server: kind-load-image
 install-kyverno-http-server: install-vpol
+install-kyverno-http-server: install-polex
 install-kyverno-http-server: $(HELM)
 	@$(MAKE) deploy-kyverno-http-server
 

@@ -282,6 +282,7 @@ jobs:
         run: |
           set -e
           make install-vpol
+          make install-polex
       - name: Install chart
         run: |
           set -e
