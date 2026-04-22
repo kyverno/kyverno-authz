@@ -59,8 +59,15 @@ func (c *compiler[DATA, IN, OUT]) Compile(policy *v1.ValidatingPolicy, exception
 }
 
 func (c *compiler[DATA, IN, OUT]) compile(policy *v1.ValidatingPolicy, exceptions []*v1.PolicyException) (
-	*compiledPolicy[DATA, IN, OUT], field.ErrorList) {
+	cp *compiledPolicy[DATA, IN, OUT], e field.ErrorList) {
 	var allErrs field.ErrorList
+	defer func() {
+		if rec := recover(); rec != nil {
+			err := fmt.Errorf("panic: %v", rec)
+			allErrs = append(allErrs, field.InternalError(nil, err))
+		}
+	}()
+
 	base, err := authzcel.NewEnv(policy.Spec.EvaluationMode(), c.client)
 	if err != nil {
 		return nil, append(allErrs, field.InternalError(nil, err))
