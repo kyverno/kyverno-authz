@@ -14,6 +14,7 @@ rules:
   - policies.kyverno.io
   resources:
   - validatingpolicies
+  - policyexceptions
   verbs:
   - get
   - list
