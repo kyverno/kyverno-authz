@@ -6,10 +6,6 @@ metadata:
 spec:
   evaluation:
     mode: HTTP
-  matchConditions:
-  - name: match-host
-    expression: |
-      object.attributes.path.startsWith("/get")
   validations:
   - expression: >
       "bar" in object.attributes.Header("foo")
