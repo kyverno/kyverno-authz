@@ -26,14 +26,14 @@ type exceptionState struct {
 }
 
 type compositeStore struct {
-	sync.Mutex
+	*sync.Mutex
 	policies   map[string]*policyState    // keyed by policy namespace/name
 	exceptions map[string]*exceptionState // keyed by polex namespace/name
 }
 
 func newCompositeStore() *compositeStore {
 	return &compositeStore{
-		Mutex:      sync.Mutex{},
+		Mutex:      &sync.Mutex{},
 		policies:   make(map[string]*policyState),
 		exceptions: make(map[string]*exceptionState),
 	}
