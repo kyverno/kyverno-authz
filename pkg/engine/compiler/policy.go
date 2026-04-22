@@ -32,15 +32,28 @@ func (p compiledPolicy[DATA, IN, OUT]) Name() string {
 	return p.name
 }
 
-func (p compiledPolicy[DATA, IN, OUT]) Evaluate(ctx context.Context, _ DATA, r IN) (OUT, error) {
-	var zero OUT // create a zero variable of the output type
-	response, err := p.evaluateRules(r)
+func (p compiledPolicy[DATA, IN, OUT]) Evaluate(
+	ctx context.Context,
+	_ DATA,
+	in IN,
+) (out OUT, e error) {
+	var zero OUT
+	defer func() {
+		if rec := recover(); rec != nil {
+			out = zero
+			e = fmt.Errorf("panic: %v", rec)
+		}
+	}()
+
+	response, err := p.evaluateRules(in)
 	if err != nil && p.failurePolicy == admissionregistrationv1.Fail {
 		return zero, err
 	}
+
 	return response, nil
 }
 
+// is how we pass the request changed in any way ?
 func (p compiledPolicy[DATA, IN, OUT]) match(r IN) (bool, error) {
 	data := map[string]any{
 		ObjectKey: r,
