@@ -41,10 +41,13 @@ func NewKube[POLICY any](name string, mgr ctrl.Manager, compiler engine.Compiler
 			var zero POLICY
 			exceptions := []*v1.PolicyException{}
 			// TODO: if we ever choose to support namespaced policy exceptions we would need to key on ns/name
+			compositeStore.Lock()
 			polState, ok := compositeStore.policies[in.Name]
 			if !ok {
 				return zero, fmt.Errorf("attempting to fetch and compile a policy that doesn't exist")
 			}
+			compositeStore.Unlock()
+
 			for _, exc := range polState.exceptions {
 				if exc.exception.Spec.EvaluationMode != in.Spec.EvaluationMode() {
 					continue

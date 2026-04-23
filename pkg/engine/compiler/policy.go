@@ -105,19 +105,25 @@ func (p compiledPolicy[DATA, IN, OUT]) evaluateRules(r IN) (OUT, error) {
 	}
 	// run the request against the policy exceptions
 	for _, polex := range p.exceptions {
+		exceptionMatches := true
 		for _, matchCond := range polex.matchConditions {
 			out, _, err := matchCond.Eval(data)
 			if err != nil {
 				return zero, err
 			}
+
 			match, ok := out.Value().(bool)
 			if !ok {
 				return zero, fmt.Errorf("got an output for the match condition that isn't bool")
 			}
-			// we got a match, we should exempt this request
-			if match {
-				return zero, nil
+			if !match {
+				exceptionMatches = false
 			}
+		}
+
+		// all match condtitions didn't flip the bool, we should exempt this request
+		if exceptionMatches {
+			return zero, nil
 		}
 	}
 	for _, rule := range p.rules {

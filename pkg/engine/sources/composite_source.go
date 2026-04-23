@@ -77,15 +77,17 @@ func (s *compositeStore) handlePolicy(policyKey string, policy *v1.ValidatingPol
 	}
 
 	// create: build the policy state and link any exceptions that already reference it
-	s.policies[policyKey] = &policyState{
+	polState := &policyState{
 		policy:     *policy,
 		exceptions: make(map[string]*exceptionState),
 	}
+
+	s.policies[policyKey] = polState
 	for excKey, exc := range s.exceptions {
 		for _, ref := range exc.exception.Spec.PolicyRefs {
 			if ref.Name == policyKey {
 				exc.references[policyKey] = s.policies[policyKey]
-				s.policies[policyKey].exceptions[excKey] = exc
+				polState.exceptions[excKey] = exc
 			}
 		}
 	}
@@ -110,10 +112,12 @@ func (s *compositeStore) handlePolex(excKey string, exc *v1.PolicyException, isD
 		references: map[string]*policyState{},
 	}
 	for _, polRef := range exc.Spec.PolicyRefs {
-		if polState, ok := s.policies[polRef.Name]; ok {
+		polState, ok := s.policies[polRef.Name]
+		if ok {
 			polState.exceptions[excKey] = excState
 			polState.exceptionEventCounter++
 			excState.references[polRef.Name] = polState
+			s.exceptions[excKey] = excState
 		}
 	}
 }
