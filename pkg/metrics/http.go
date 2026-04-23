@@ -39,7 +39,7 @@ func init() {
 
 func RecordHTTPRequest(ctx context.Context, startTime time.Time, req httpcel.CheckRequest, res *httpcel.CheckResponse) {
 	var status string
-	if res.Denied != nil {
+	if res != nil && res.Denied != nil {
 		status = "denied"
 	} else {
 		status = "ok"
@@ -55,7 +55,7 @@ func RecordHTTPRequest(ctx context.Context, startTime time.Time, req httpcel.Che
 
 	if httpDurationMetric != nil {
 		defer func() {
-			latency := float64(time.Since(startTime))
+			latency := time.Since(startTime).Seconds()
 			httpDurationMetric.WithLabelValues(
 				req.Attributes.Method,
 				req.Attributes.Host,

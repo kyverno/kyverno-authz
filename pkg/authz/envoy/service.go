@@ -21,14 +21,30 @@ type service struct {
 
 func (s *service) Check(ctx context.Context, r *authv3.CheckRequest) (*authv3.CheckResponse, error) {
 	start := time.Now()
+	decision := metrics.DecisionError
+	source := metrics.SourceServer
+	defer func() {
+		metrics.RecordAuthzDecision(metrics.ModeEnvoy, decision, source, start)
+	}()
 	// execute check
 	response, err := s.check(ctx, r)
 	// log error if any
 	if err != nil {
+		source = metrics.SourceEngine
 		metrics.RecordEnvoyRequestError(ctx, r, err)
 		s.eventHandler.Push(ctx, time.Now(), r, events.NewResultAccessor(nil, err))
 		ctrl.LoggerFrom(ctx).Error(err, "Check failed")
 	} else {
+		if response.GetDeniedResponse() != nil {
+			decision = metrics.DecisionDeny
+			source = metrics.SourcePolicy
+		} else if response.GetOkResponse() != nil {
+			decision = metrics.DecisionAllow
+			source = metrics.SourcePolicy
+		} else {
+			decision = metrics.DecisionAllow
+			source = metrics.SourceDefault
+		}
 		defer func() {
 			s.eventHandler.Push(ctx, time.Now(), r, events.NewResultAccessor(response, nil))
 			metrics.RecordEnvoyRequest(ctx, start, r, response)
