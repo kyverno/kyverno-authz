@@ -6,24 +6,26 @@ import (
 	"io/fs"
 	"sync"
 
+	"k8s.io/klog/v2"
+
 	vpolv1 "github.com/kyverno/api/api/policies.kyverno.io/v1"
 	vpolv1alpha1 "github.com/kyverno/api/api/policies.kyverno.io/v1alpha1"
 	vpolv1beta1 "github.com/kyverno/api/api/policies.kyverno.io/v1beta1"
 	"github.com/kyverno/kyverno-authz/pkg/data"
-	"github.com/kyverno/kyverno-authz/pkg/engine"
 	"github.com/kyverno/pkg/ext/file"
 	"github.com/kyverno/pkg/ext/resource/convert"
 	"github.com/kyverno/pkg/ext/resource/loader"
 	"github.com/kyverno/pkg/ext/yaml"
-	"github.com/kyverno/sdk/core"
-	"github.com/kyverno/sdk/core/sources"
 	"sigs.k8s.io/kubectl-validate/pkg/openapiclient"
 )
 
 var (
-	vpolGVKv1alpha1 = vpolv1alpha1.SchemeGroupVersion.WithKind("ValidatingPolicy")
-	vpolGVKv1beta1  = vpolv1beta1.SchemeGroupVersion.WithKind("ValidatingPolicy")
-	vpolGVKv1       = vpolv1.SchemeGroupVersion.WithKind("ValidatingPolicy")
+	vpolGVKv1alpha1  = vpolv1alpha1.SchemeGroupVersion.WithKind("ValidatingPolicy")
+	vpolGVKv1beta1   = vpolv1beta1.SchemeGroupVersion.WithKind("ValidatingPolicy")
+	vpolGVKv1        = vpolv1.SchemeGroupVersion.WithKind("ValidatingPolicy")
+	polexGVKv1alpha1 = vpolv1alpha1.SchemeGroupVersion.WithKind("PolicyException")
+	polexGVKv1beta1  = vpolv1beta1.SchemeGroupVersion.WithKind("PolicyException")
+	polexGVKv1       = vpolv1.SchemeGroupVersion.WithKind("PolicyException")
 )
 
 type document = []byte
@@ -41,71 +43,66 @@ func defaultLoader(_fs func() (fs.FS, error)) (loader.Loader, error) {
 
 var DefaultLoader = sync.OnceValues(func() (loader.Loader, error) { return defaultLoader(nil) })
 
-func NewFs[POLICY any](f fs.FS, compiler engine.Compiler[POLICY]) core.Source[POLICY] {
-	input := sources.NewFs(f, func(_ string, entry fs.DirEntry) bool {
-		if entry == nil {
-			return false
+func LoadPolicies(f fs.FS) ([]*vpolv1.ValidatingPolicy, []*vpolv1.PolicyException, error) {
+	policies := []*vpolv1.ValidatingPolicy{}
+	policyExceptions := []*vpolv1.PolicyException{}
+
+	err := fs.WalkDir(f, ".", func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil || entry == nil {
+			klog.Errorf("skipping entry %s: walk error: %v", path, walkErr)
+			return nil
 		}
 		// process only files
 		if entry.IsDir() {
-			return false
+			return nil
 		}
-		return file.IsYaml(entry.Name()) || file.IsJson(entry.Name())
-	})
-	transform := sources.NewTransformErr(
-		input,
-		func(entry sources.FsEntry) ([]document, error) {
-			return getDocuments(context.Background(), f, entry.DirEntry)
-		},
-	)
-	flatten := sources.NewFlatten(transform)
-	load := sources.NewTransformErr(
-		flatten,
-		func(document document) (*vpolv1beta1.ValidatingPolicy, error) {
+		if !file.IsYaml(entry.Name()) && !file.IsJson(entry.Name()) {
+			return nil
+		}
+		docs, err := getDocuments(context.Background(), f, entry)
+		if err != nil {
+			klog.Errorf("skipping entry %s: failed to read documents: %v", entry.Name(), err)
+			return nil
+		}
+		for _, doc := range docs {
 			ldr, err := DefaultLoader()
 			if err != nil {
-				return nil, fmt.Errorf("failed to load CRDs: %w", err)
+				klog.Errorf("skipping entry %s: failed to create loader: %v", entry.Name(), err)
+				return nil
 			}
-			gvk, untyped, err := ldr.Load(document)
+			gvk, untyped, err := ldr.Load(doc)
 			if err != nil {
-				return nil, err
+				klog.Errorf("skipping document in %s: failed to load: %v", entry.Name(), err)
+				continue
 			}
 			switch gvk {
 			case vpolGVKv1alpha1, vpolGVKv1beta1, vpolGVKv1:
-				typed, err := convert.To[vpolv1beta1.ValidatingPolicy](untyped)
+				typed, err := convert.To[vpolv1.ValidatingPolicy](untyped)
 				if err != nil {
-					return nil, fmt.Errorf("failed to convert to ValidatingPolicy: %w", err)
+					klog.Errorf("skipping document in %s: failed to convert to ValidatingPolicy: %v", entry.Name(), err)
+					continue
 				}
-				return typed, nil
+				policies = append(policies, typed)
+			case polexGVKv1, polexGVKv1alpha1, polexGVKv1beta1:
+				typed, err := convert.To[vpolv1.PolicyException](untyped)
+				if err != nil {
+					klog.Errorf("skipping document in %s: failed to convert to PolicyException: %v", entry.Name(), err)
+					continue
+				}
+				policyExceptions = append(policyExceptions, typed)
 			}
-			return nil, nil
-		})
-	filter := sources.NewFilter(
-		load,
-		func(p *vpolv1beta1.ValidatingPolicy) bool {
-			return p != nil
-		},
-	)
-	// TODO: sort by policy name
-	compile := sources.NewTransformErr(
-		filter,
-		func(p *vpolv1beta1.ValidatingPolicy) (POLICY, error) {
-			c, errs := compiler.Compile(p)
-			if len(errs) > 0 {
-				return c, fmt.Errorf("failed to compile ValidatingPolicy: %w", errs.ToAggregate())
-			}
-			return c, nil
-		},
-	)
-	return compile
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return policies, policyExceptions, nil
 }
 
 func getDocuments(_ context.Context, f fs.FS, entry fs.DirEntry) ([]document, error) {
 	if entry == nil {
-		return nil, nil
-	}
-	// process only files
-	if entry.IsDir() {
 		return nil, nil
 	}
 	// if it's a yaml file, it can contain multiple documents

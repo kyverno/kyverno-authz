@@ -216,10 +216,11 @@ jobs:
           set -e
           export HELM=${{ steps.helm.outputs.helm-path }}
           make install-cert-manager install-cluster-issuer
-      - name: Install VPOL
+      - name: Install VPOL and polex
         run: |
           set -e
           make install-vpol
+          make install-polex
       - name: Install chart
         run: |
           set -e
@@ -235,6 +236,10 @@ jobs:
         run:  |
           set -e
           chainsaw test tests/e2e/authz-server/envoy
+      - name: Dump authz server logs
+        if: failure()
+        run: |
+          kubectl logs -n kyverno deployment/kyverno-authz-server --all-containers --tail=-
 
   e2e-authz-server-http:
     runs-on: ubuntu-latest
@@ -278,10 +283,11 @@ jobs:
           set -e
           export HELM=${{ steps.helm.outputs.helm-path }}
           make install-cert-manager install-cluster-issuer
-      - name: Install VPOL
+      - name: Install VPOL and polex
         run: |
           set -e
           make install-vpol
+          make install-polex
       - name: Install chart
         run: |
           set -e
@@ -296,6 +302,10 @@ jobs:
         run:  |
           set -e
           chainsaw test tests/e2e/authz-server/http
+      - name: Dump authz server logs
+        if: failure()
+        run: |
+          kubectl logs -n kyverno deployment/kyverno-authz-server --all-containers --tail=-
 
   e2e-sidecar-injector:
     runs-on: ubuntu-latest
@@ -339,10 +349,11 @@ jobs:
           set -e
           export HELM=${{ steps.helm.outputs.helm-path }}
           KYVERNO_AUTHZ_SERVICE=kyverno-authz-server.local make install-istio install-service-entry
-      - name: Install VPOL
+      - name: Install VPOL and polex
         run: |
           set -e
           make install-vpol
+          make install-polex
       - name: Install chart
         run: |
           set -e
@@ -400,10 +411,11 @@ jobs:
           set -e
           export HELM=${{ steps.helm.outputs.helm-path }}
           make install-cert-manager install-cluster-issuer
-      - name: Install VPOL
+      - name: Install VPOL and polex
         run: |
           set -e
           make install-vpol
+          make install-polex
       - name: Install chart
         run: |
           set -e
@@ -469,10 +481,11 @@ jobs:
           set -e
           export HELM=${{ steps.helm.outputs.helm-path }}
           make install-cert-manager install-cluster-issuer
-      - name: Install VPOL
+      - name: Install VPOL and polex
         run: |
           set -e
           make install-vpol
+          make install-polex
       - name: Install chart
         run: |
           set -e

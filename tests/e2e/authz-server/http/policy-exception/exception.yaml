@@ -1,0 +1,12 @@
+apiVersion: policies.kyverno.io/v1
+kind: PolicyException
+metadata:
+  name: gateway-polex
+spec:
+  evaluationMode: HTTP
+  policyRefs:
+  - name: policy
+    kind: ValidatingPolicy
+  matchConditions:
+    - name: "check"
+      expression: 'object.attributes.header["X-Gateway"][0] == "trusted"'

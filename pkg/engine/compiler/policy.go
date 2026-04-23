@@ -21,6 +21,11 @@ type compiledPolicy[DATA dynamic.Interface, IN, OUT any] struct {
 	matchConditions []cel.Program
 	variables       map[string]cel.Program
 	rules           []cel.Program
+	exceptions      []compiledException
+}
+
+type compiledException struct {
+	matchConditions []cel.Program
 }
 
 func (p compiledPolicy[DATA, IN, OUT]) Name() string {
@@ -92,9 +97,34 @@ func (p compiledPolicy[DATA, IN, OUT]) evaluateRules(r IN) (OUT, error) {
 	} else if !match {
 		return zero, nil
 	}
+
+	// ammar: is it ok to pass the variables of the policy to the exception too ? check how kyverno does this
 	data, err := p.setupVariables(r)
 	if err != nil {
 		return zero, err
+	}
+	// run the request against the policy exceptions
+	for _, polex := range p.exceptions {
+		exceptionMatches := true
+		for _, matchCond := range polex.matchConditions {
+			out, _, err := matchCond.Eval(data)
+			if err != nil {
+				return zero, err
+			}
+
+			match, ok := out.Value().(bool)
+			if !ok {
+				return zero, fmt.Errorf("got an output for the match condition that isn't bool")
+			}
+			if !match {
+				exceptionMatches = false
+			}
+		}
+
+		// all match condtitions didn't flip the bool, we should exempt this request
+		if exceptionMatches {
+			return zero, nil
+		}
 	}
 	for _, rule := range p.rules {
 		// evaluate the rule

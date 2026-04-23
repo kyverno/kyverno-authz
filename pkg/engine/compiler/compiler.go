@@ -5,7 +5,7 @@ import (
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
-	vpol "github.com/kyverno/api/api/policies.kyverno.io/v1beta1"
+	v1 "github.com/kyverno/api/api/policies.kyverno.io/v1"
 	"github.com/kyverno/kyverno-authz/apis"
 	authzcel "github.com/kyverno/kyverno-authz/pkg/cel"
 	envoy "github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/envoy"
@@ -38,8 +38,9 @@ type compiler[DATA dynamic.Interface, IN, OUT any] struct {
 	client DATA
 }
 
-func (c *compiler[DATA, IN, OUT]) Compile(policy *vpol.ValidatingPolicy) (policy.Policy[DATA, IN, OUT], field.ErrorList) {
-	matchConditions, variables, rules, err := c.compiledEnvironment(policy)
+// exceptions that are passed here are guaranteed to be matching the policy. they are filtered in the kube policy source
+func (c *compiler[DATA, IN, OUT]) Compile(policy *v1.ValidatingPolicy, exceptions []*v1.PolicyException) (policy.Policy[DATA, IN, OUT], field.ErrorList) {
+	cp, err := c.compile(policy, exceptions)
 	if err != nil {
 		// the behavior of the sdk is to ignore compile errors and continue
 		// trying to evaluate the payload against any of the valid policies
@@ -48,20 +49,21 @@ func (c *compiler[DATA, IN, OUT]) Compile(policy *vpol.ValidatingPolicy) (policy
 		klog.Error("error compiling policy:", err.ToAggregate().Error())
 		return compiledPolicy[DATA, IN, OUT]{}, err
 	}
-	return compiledPolicy[DATA, IN, OUT]{
-		name:            policy.Name,
-		failurePolicy:   policy.GetFailurePolicy(false),
-		variables:       variables,
-		matchConditions: matchConditions,
-		rules:           rules,
-	}, err
+
+	if policy.Spec.FailurePolicy == nil {
+		cp.failurePolicy = admissionregistrationv1.Fail
+	} else {
+		cp.failurePolicy = *policy.Spec.FailurePolicy
+	}
+	return *cp, err
 }
 
-func (c *compiler[DATA, IN, OUT]) compiledEnvironment(policy *vpol.ValidatingPolicy) ([]cel.Program, map[string]cel.Program, []cel.Program, field.ErrorList) {
+func (c *compiler[DATA, IN, OUT]) compile(policy *v1.ValidatingPolicy, exceptions []*v1.PolicyException) (
+	*compiledPolicy[DATA, IN, OUT], field.ErrorList) {
 	var allErrs field.ErrorList
 	base, err := authzcel.NewEnv(policy.Spec.EvaluationMode(), c.client)
 	if err != nil {
-		return nil, nil, nil, append(allErrs, field.InternalError(nil, err))
+		return nil, append(allErrs, field.InternalError(nil, err))
 	}
 	var objectKey cel.EnvOption
 	switch policy.Spec.EvaluationMode() {
@@ -70,7 +72,7 @@ func (c *compiler[DATA, IN, OUT]) compiledEnvironment(policy *vpol.ValidatingPol
 	case apis.EvaluationModeHTTP:
 		objectKey = cel.Variable(ObjectKey, httpauth.RequestType)
 	default:
-		return nil, nil, nil, append(allErrs, field.InternalError(nil, fmt.Errorf("invalid policy evaluation mode: %s", policy.Spec.EvaluationMode())))
+		return nil, append(allErrs, field.InternalError(nil, fmt.Errorf("invalid policy evaluation mode: %s", policy.Spec.EvaluationMode())))
 	}
 	provider := authzcel.NewVariablesProvider(base.CELTypeProvider())
 	env, err := base.Extend(
@@ -82,7 +84,7 @@ func (c *compiler[DATA, IN, OUT]) compiledEnvironment(policy *vpol.ValidatingPol
 		cel.CustomTypeProvider(provider),
 	)
 	if err != nil {
-		return nil, nil, nil, append(allErrs, field.InternalError(nil, err))
+		return nil, append(allErrs, field.InternalError(nil, err))
 	}
 	path := field.NewPath("spec")
 	matchConditions := make([]cel.Program, 0, len(policy.Spec.MatchConditions))
@@ -92,14 +94,14 @@ func (c *compiler[DATA, IN, OUT]) compiledEnvironment(policy *vpol.ValidatingPol
 			path := path.Index(i).Child("expression")
 			ast, issues := env.Compile(matchCondition.Expression)
 			if err := issues.Err(); err != nil {
-				return nil, nil, nil, append(allErrs, field.Invalid(path, matchCondition.Expression, err.Error()))
+				return nil, append(allErrs, field.Invalid(path, matchCondition.Expression, err.Error()))
 			}
 			if !ast.OutputType().IsExactType(types.BoolType) {
-				return nil, nil, nil, append(allErrs, field.Invalid(path, matchCondition.Expression, "matchCondition output is expected to be of type bool"))
+				return nil, append(allErrs, field.Invalid(path, matchCondition.Expression, "matchCondition output is expected to be of type bool"))
 			}
 			prog, err := env.Program(ast)
 			if err != nil {
-				return nil, nil, nil, append(allErrs, field.Invalid(path, matchCondition.Expression, err.Error()))
+				return nil, append(allErrs, field.Invalid(path, matchCondition.Expression, err.Error()))
 			}
 			matchConditions = append(matchConditions, prog)
 		}
@@ -111,12 +113,12 @@ func (c *compiler[DATA, IN, OUT]) compiledEnvironment(policy *vpol.ValidatingPol
 			path := path.Index(i).Child("expression")
 			ast, issues := env.Compile(variable.Expression)
 			if err := issues.Err(); err != nil {
-				return nil, nil, nil, append(allErrs, field.Invalid(path, variable.Expression, err.Error()))
+				return nil, append(allErrs, field.Invalid(path, variable.Expression, err.Error()))
 			}
 			provider.RegisterField(variable.Name, ast.OutputType())
 			prog, err := env.Program(ast)
 			if err != nil {
-				return nil, nil, nil, append(allErrs, field.Invalid(path, variable.Expression, err.Error()))
+				return nil, append(allErrs, field.Invalid(path, variable.Expression, err.Error()))
 			}
 			variables[variable.Name] = prog
 		}
@@ -128,15 +130,32 @@ func (c *compiler[DATA, IN, OUT]) compiledEnvironment(policy *vpol.ValidatingPol
 			path := path.Index(i)
 			program, errs := c.compileAuthorization(path, policy.Spec.EvaluationMode(), rule, env)
 			if errs != nil {
-				return nil, nil, nil, append(allErrs, errs...)
+				return nil, append(allErrs, errs...)
 			}
 			rules = append(rules, program)
 		}
 	}
-	return matchConditions, variables, rules, nil
+	var compiledPolexs []compiledException
+	{
+		for _, ex := range exceptions {
+			cex, errs := c.compileException(*ex, env)
+			if err != nil {
+				return nil, append(allErrs, errs...)
+			}
+			compiledPolexs = append(compiledPolexs, *cex)
+		}
+	}
+
+	return &compiledPolicy[DATA, IN, OUT]{
+		matchConditions: matchConditions,
+		name:            policy.Name,
+		variables:       variables,
+		rules:           rules,
+		exceptions:      compiledPolexs,
+	}, nil
 }
 
-func (c *compiler[DATA, IN, OUT]) compileAuthorization(path *field.Path, evalMode vpol.EvaluationMode, rule admissionregistrationv1.Validation, env *cel.Env) (cel.Program, field.ErrorList) {
+func (c *compiler[DATA, IN, OUT]) compileAuthorization(path *field.Path, evalMode v1.EvaluationMode, rule admissionregistrationv1.Validation, env *cel.Env) (cel.Program, field.ErrorList) {
 	var allErrs field.ErrorList
 	{
 		path := path.Child("expression")
@@ -162,4 +181,28 @@ func (c *compiler[DATA, IN, OUT]) compileAuthorization(path *field.Path, evalMod
 		}
 		return prog, nil
 	}
+}
+
+func (c *compiler[DATA, IN, OUT]) compileException(ex v1.PolicyException, env *cel.Env) (*compiledException, field.ErrorList) {
+	compiledMatchConditions := []cel.Program{}
+	var allErrs field.ErrorList
+	for _, mc := range ex.Spec.MatchConditions {
+		path := field.NewPath("spec").Child("matchConditions")
+		ast, issues := env.Compile(mc.Expression)
+		if err := issues.Err(); err != nil {
+			return nil, append(allErrs, field.Invalid(path, mc.Expression, err.Error()))
+		}
+		if !ast.OutputType().IsExactType(types.BoolType) {
+			msg := fmt.Sprintf("output is expected to be of type %s", types.BoolType.TypeName())
+			return nil, append(allErrs, field.Invalid(path, mc.Expression, msg))
+		}
+		prog, err := env.Program(ast)
+		if err != nil {
+			return nil, append(allErrs, field.Invalid(path, mc.Expression, err.Error()))
+		}
+		compiledMatchConditions = append(compiledMatchConditions, prog)
+	}
+	return &compiledException{
+		matchConditions: compiledMatchConditions,
+	}, nil
 }

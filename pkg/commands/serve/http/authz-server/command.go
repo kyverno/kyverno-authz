@@ -7,12 +7,7 @@ import (
 	"time"
 
 	"github.com/cespare/xxhash/v2"
-	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/google/go-containerregistry/pkg/v1/remote"
-	"github.com/hairyhenderson/go-fsimpl"
-	"github.com/hairyhenderson/go-fsimpl/filefs"
-	"github.com/hairyhenderson/go-fsimpl/gitfs"
-	vpol "github.com/kyverno/api/api/policies.kyverno.io/v1beta1"
+	vpol "github.com/kyverno/api/api/policies.kyverno.io/v1"
 	"github.com/kyverno/kyverno-authz/apis"
 	"github.com/kyverno/kyverno-authz/pkg/authz/http"
 	httplib "github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/http"
@@ -24,7 +19,6 @@ import (
 	"github.com/kyverno/kyverno-authz/pkg/signals"
 	"github.com/kyverno/kyverno-authz/pkg/utils"
 	"github.com/kyverno/kyverno-authz/pkg/utils/ocifs"
-	"github.com/kyverno/sdk/core"
 	sdksources "github.com/kyverno/sdk/core/sources"
 	openreportsclient "github.com/openreports/reports-api/pkg/client/clientset/versioned/typed/openreports.io/v1alpha1"
 	"github.com/spf13/cobra"
@@ -175,7 +169,7 @@ func Command() *cobra.Command {
 						if err != nil {
 							return fmt.Errorf("failed to initialize registry opts: %w", err)
 						}
-						extSources, err := getExternalSources(compiler, nOpts, rOpts, externalPolicySources...)
+						extSources, err := utils.GetExternalSources(compiler, nOpts, rOpts, externalPolicySources...)
 						if err != nil {
 							return err
 						}
@@ -225,7 +219,7 @@ func Command() *cobra.Command {
 						if err != nil {
 							return fmt.Errorf("failed to initialize registry opts: %w", err)
 						}
-						extSources, err := getExternalSources(compiler, nOpts, rOpts, externalPolicySources...)
+						extSources, err := utils.GetExternalSources(compiler, nOpts, rOpts, externalPolicySources...)
 						if err != nil {
 							return err
 						}
@@ -240,6 +234,7 @@ func Command() *cobra.Command {
 						})
 					}
 					// auth server
+					nestedRequest = true
 					httpConfig := http.Config{
 						Address:          serverAddress,
 						NestedRequest:    nestedRequest,
@@ -280,29 +275,4 @@ func Command() *cobra.Command {
 	command.Flags().IntVar(&resultBufSize, "result-buffer-size", 500, "Event buffer size for openreports, note that if the total exceeded the 1MB etcd limit, report flushing will error")
 	clientcmd.BindOverrideFlags(&kubeConfigOverrides, command.Flags(), clientcmd.RecommendedConfigOverrideFlags("kube-"))
 	return command
-}
-
-func getExternalSources[POLICY any](vpolCompiler engine.Compiler[POLICY], nOpts []name.Option, rOpts []remote.Option, urls ...string) ([]core.Source[POLICY], error) {
-	mux := fsimpl.NewMux()
-	mux.Add(filefs.FS)
-	// mux.Add(httpfs.FS)
-	// mux.Add(blobfs.FS)
-	mux.Add(gitfs.FS)
-
-	// Create a configured ocifs.FS with registry options
-	configuredOCIFS := ocifs.ConfigureOCIFS(nOpts, rOpts)
-	mux.Add(configuredOCIFS)
-
-	var providers []core.Source[POLICY]
-	for _, url := range urls {
-		fsys, err := mux.Lookup(url)
-		if err != nil {
-			return nil, err
-		}
-		providers = append(
-			providers,
-			sdksources.NewOnce(sources.NewFs(fsys, vpolCompiler)),
-		)
-	}
-	return providers, nil
 }

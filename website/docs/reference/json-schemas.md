@@ -14,7 +14,7 @@ In VS code, simply add a comment on top of your YAML resources.
 
 ```yaml
 # yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/playground/main/schemas/json/v3/validatingpolicy-policies.kyverno.io-v1alpha1.json
-apiVersion: policies.kyverno.io/v1alpha1
+apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
   name: demo

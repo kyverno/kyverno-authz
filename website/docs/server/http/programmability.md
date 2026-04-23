@@ -59,7 +59,7 @@ The output expression transforms responses before they are sent back to the clie
 
 ### Output Type
 
-[httpserver.HttpResponse](../../cel-extensions/httpserver.md#httpresponse)
+[httpserver.HttpResponse](../../cel-extensions/httpserver.md#httpserverhttpresponse)
 
 ### Use Cases
 

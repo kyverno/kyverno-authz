@@ -1,7 +1,7 @@
 package apis
 
 import (
-	vpol "github.com/kyverno/api/api/policies.kyverno.io/v1beta1"
+	vpol "github.com/kyverno/api/api/policies.kyverno.io/v1"
 )
 
 const (
