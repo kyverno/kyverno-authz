@@ -12,6 +12,7 @@ import (
 	httpserver "github.com/kyverno/kyverno-authz/pkg/cel/libs/httpserver"
 	"github.com/kyverno/kyverno-authz/pkg/engine"
 	"github.com/kyverno/kyverno-authz/pkg/events"
+	"github.com/kyverno/kyverno-authz/pkg/metrics"
 	"github.com/kyverno/kyverno-authz/pkg/server"
 	"github.com/kyverno/sdk/core"
 	"github.com/kyverno/sdk/core/dispatchers"
@@ -87,7 +88,21 @@ has(object.ok)
 			source,
 			handlers.Handler(
 				dispatchers.Sequential(
-					policy.EvaluatorFactory[engine.HTTPPolicy](),
+					metrics.MetricsEvaluatorFactory(
+						policy.EvaluatorFactory[engine.HTTPPolicy](),
+						func(out policy.Evaluation[*httpcel.CheckResponse]) string {
+							if out.Error != nil {
+								return metrics.DecisionError
+							}
+							if out.Result == nil {
+								return metrics.DecisionNoMatch
+							}
+							if out.Result.Denied != nil {
+								return metrics.DecisionDeny
+							}
+							return metrics.DecisionAllow
+						},
+					),
 					func(ctx context.Context, fc core.FactoryContext[engine.HTTPPolicy, dynamic.Interface, *httpcel.CheckRequest]) core.Breaker[engine.HTTPPolicy, *httpcel.CheckRequest, policy.Evaluation[*httpcel.CheckResponse]] {
 						return core.MakeBreakerFunc(func(_ context.Context, _ engine.HTTPPolicy, _ *httpcel.CheckRequest, out policy.Evaluation[*httpcel.CheckResponse]) bool {
 							return out.Result != nil
