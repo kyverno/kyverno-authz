@@ -28,9 +28,9 @@ require (
 	gomodules.xyz/jsonpatch/v2 v2.5.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260316180232-0b37fe3546d5
 	google.golang.org/grpc v1.80.0
-	google.golang.org/protobuf v1.36.11
+	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af
 	k8s.io/api v0.35.4
-	k8s.io/apimachinery v0.35.4
+	k8s.io/apimachinery v0.36.0
 	k8s.io/apiserver v0.35.4
 	k8s.io/client-go v0.35.4
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
@@ -42,6 +42,7 @@ require (
 require (
 	github.com/aws/aws-sdk-go-v2/service/signin v1.0.8 // indirect
 	github.com/google/jsonschema-go v0.4.2 // indirect
+	k8s.io/streaming v0.36.0 // indirect
 )
 
 require (
@@ -134,7 +135,6 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.7.1 // indirect
-	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.1-0.20210315223345-82c243799c99 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 // indirect
@@ -208,7 +208,7 @@ require (
 	k8s.io/apiextensions-apiserver v0.35.4
 	k8s.io/component-base v0.35.4 // indirect
 	k8s.io/klog/v2 v2.140.0
-	k8s.io/kube-openapi v0.0.0-20260127142750-a19766b6e2d4 // indirect
+	k8s.io/kube-openapi v0.0.0-20260317180543-43fb72c5454a // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.34.0 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
