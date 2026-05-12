@@ -97,7 +97,9 @@ func Command() *cobra.Command {
 						if policy.Spec.EvaluationMode() == apis.EvaluationModeEnvoy {
 							// in the validation webhook we don't care about exceptions
 							_, err := envoyCompiler.Compile(policy, nil)
-							ctrl.LoggerFrom(ctx).Error(err.ToAggregate(), "Validating policy compilation error")
+							if len(err) > 0 {
+								ctrl.LoggerFrom(ctx).Error(err.ToAggregate(), "Validating policy compilation error")
+							}
 							return err
 						}
 						return nil
