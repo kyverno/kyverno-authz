@@ -209,10 +209,10 @@ func TestMCPRequestDirectAccessWithoutReParsing(t *testing.T) {
 func TestMCPRequestGetterMethodsInValidation(t *testing.T) {
 
 	tests := []struct {
-		name           string
-		mcpRequest     *MCPRequest
-		testFunc       func(*MCPRequest) bool
-		wantResult     bool
+		name       string
+		mcpRequest *MCPRequest
+		testFunc   func(*MCPRequest) bool
+		wantResult bool
 	}{
 		{
 			name: "GetStringArgument called directly",
