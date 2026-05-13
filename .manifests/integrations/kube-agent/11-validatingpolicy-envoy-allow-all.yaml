@@ -1,0 +1,16 @@
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: kan-remote-mcp-allow-all
+spec:
+  evaluation:
+    mode: Envoy
+  matchConstraints:
+    resourceRules:
+    - apiGroups: ["*"]
+      apiVersions: ["*"]
+      operations: ["*"]
+      resources: ["*"]
+  validations:
+  - expression: >
+      envoy.Allowed().Response()
