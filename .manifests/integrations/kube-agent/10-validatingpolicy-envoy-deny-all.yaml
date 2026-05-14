@@ -21,12 +21,6 @@ metadata:
 spec:
   evaluation:
     mode: Envoy
-  matchConstraints:
-    resourceRules:
-    - apiGroups: ["*"]
-      apiVersions: ["*"]
-      operations: ["*"]
-      resources: ["*"]
   validations:
   - expression: >
       envoy
