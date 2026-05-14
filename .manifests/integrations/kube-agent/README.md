@@ -201,20 +201,3 @@ kubectl -n quickstart-ns exec e2e-tester -- \
 ```
 
 **Expected result:** HTTP 200 with backend response (for example `{"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"Unknown tool: echo"}],"isError":true}}`). This confirms kyverno-authz is no longer denying and traffic reaches MCP backend logic.
-
-## Part 4: Testing via the agent UI
-
-The KAN quickstart deploys an agent UI accessible at `http://localhost:8081/dev-ui/?app=mcp_agent`. Port 8081 is typically already forwarded by the quickstart script (`run-external-auth-quickstart.sh`). If not, forward it manually:
-
-```bash
-kubectl -n quickstart-ns port-forward service/adk-agent-svc 8081:80
-```
-
-Then open http://localhost:8081/dev-ui/?app=mcp_agent in your browser.
-
-**Requirement:** The agent UI requires a configured LLM backend (HuggingFace, Gemini, or Ollama) to process natural language prompts. If Ollama was used in the quickstart, the agent is pre-configured. A `litellm.InternalServerError: Connection error` in the UI means the LLM backend is unreachable.
-
-With a working LLM, the agent triggers tool calls through the KAN gateway, which kyverno-authz then authorizes or denies:
-
-- **Deny-all policy active:** Any tool call from the agent fails with an authorization error in the UI chat.
-- **Allow-all policy active:** Tool calls succeed and the agent receives the tool response.
