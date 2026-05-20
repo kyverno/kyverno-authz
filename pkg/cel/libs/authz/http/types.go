@@ -5,6 +5,8 @@ import (
 	"net/http"
 
 	"github.com/google/cel-go/common/types"
+	celimpl "github.com/kyverno/kyverno-authz/pkg/cel/impl"
+	mcplibs "github.com/kyverno/kyverno-authz/pkg/cel/libs/mcp"
 )
 
 var (
@@ -22,6 +24,15 @@ type (
 
 type CheckRequest struct {
 	Attributes CheckRequestAttributes `json:"attributes" cel:"attributes"`
+	// Mcp holds the pre-parsed MCP request for zero-cost access in CEL via object.mcp.request.
+	// Request is always non-nil; Method is empty for non-MCP traffic.
+	Mcp *MCPCheckData `json:"mcp" cel:"mcp"`
+}
+
+// MCPCheckData materializes the MCP request object so policies can use
+// object.mcp.request.Method and object.mcp.request.Get*Argument() without mcp.Parse().
+type MCPCheckData struct {
+	Request *mcplibs.MCPRequest `json:"request" cel:"request"`
 }
 
 type CheckRequestAttributes struct {
@@ -53,6 +64,10 @@ func NewRequest(r *http.Request) (CheckRequest, error) {
 	if err != nil {
 		return CheckRequest{}, err
 	}
+	mcpReq := &mcplibs.MCPRequest{}
+	if parsed, parseErr := (&celimpl.MCPImpl{}).Parse(bodyBytes); parseErr == nil && parsed != nil {
+		mcpReq = parsed
+	}
 	return CheckRequest{
 		Attributes: CheckRequestAttributes{
 			Method:        r.Method,
@@ -66,5 +81,6 @@ func NewRequest(r *http.Request) (CheckRequest, error) {
 			Fragment:      r.URL.Fragment,
 			Scheme:        r.URL.Scheme,
 		},
+		Mcp: &MCPCheckData{Request: mcpReq},
 	}, nil
 }
