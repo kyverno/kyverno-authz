@@ -1,0 +1,29 @@
+# apiVersion: policies.kyverno.io/v1alpha1
+# kind: ValidatingPolicy
+# metadata:
+#   name: demo
+# spec:
+#   failurePolicy: Fail
+#   evaluation:
+#     mode: Envoy
+#   variables:
+#   - name: force_authorized
+#     expression: object.attributes.request.http.headers[?"x-force-authorized"].orValue("")
+#   - name: allowed
+#     expression: variables.force_authorized in ["enabled", "true"]
+#   validations:
+#   - expression: >-
+#       !variables.allowed ? envoy.Denied(403).Response() : null
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: kan-remote-mcp-deny-all
+spec:
+  evaluation:
+    mode: Envoy
+  validations:
+  - expression: >
+      envoy
+        .Denied(403)
+        .WithBody("Access to this tool is forbidden.")
+        .Response()
