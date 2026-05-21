@@ -7,6 +7,7 @@ import (
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/ext"
+	mcplibs "github.com/kyverno/kyverno-authz/pkg/cel/libs/mcp"
 )
 
 type lib struct{}
@@ -26,6 +27,8 @@ func (c *lib) CompileOptions() []cel.EnvOption {
 		ext.NativeTypes(
 			reflect.TypeFor[CheckRequest](),
 			reflect.TypeFor[CheckResponse](),
+			reflect.TypeFor[MCPCheckData](),
+			reflect.TypeFor[mcplibs.MCPRequest](),
 			ext.ParseStructTags(true),
 		),
 		// extend environment with function overloads
