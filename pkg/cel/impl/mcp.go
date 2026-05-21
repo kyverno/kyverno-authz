@@ -2,7 +2,6 @@ package impl
 
 import (
 	"encoding/json"
-	"fmt"
 
 	mcpcel "github.com/kyverno/kyverno-authz/pkg/cel/libs/mcp"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -57,7 +56,6 @@ func (m *MCPImpl) Parse(content []byte) (*mcpcel.MCPRequest, error) {
 		if err != nil {
 			return nil, err
 		}
-		fmt.Println("mcp.MethodToolsCall params", params)
 		mcpReq.ToolCall = params
 
 	case string(mcp.MethodSetLogLevel):
