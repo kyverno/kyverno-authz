@@ -131,7 +131,7 @@ func (a *authorizer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func writeErrResp(logger logr.Logger, w http.ResponseWriter, err error) {
 	w.WriteHeader(http.StatusInternalServerError)
 	fmt.Fprint(w, err.Error()) //nolint:errcheck
-	logger.Error(err, "an error has occured")
+	logger.Error(err, "an error has occurred")
 }
 
 func writeResponse(logger logr.Logger, w http.ResponseWriter, resp httpserver.HttpResponse) {
