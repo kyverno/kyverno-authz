@@ -1,6 +1,7 @@
 package http
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 
@@ -25,8 +26,9 @@ type (
 type CheckRequest struct {
 	Attributes CheckRequestAttributes `json:"attributes" cel:"attributes"`
 	// Mcp holds the pre-parsed MCP request for zero-cost access in CEL via object.mcp.request.
-	// Request is always non-nil; Method is empty for non-MCP traffic.
-	Mcp *MCPCheckData `json:"mcp" cel:"mcp"`
+	// Mcp is a value (not a pointer) so object.mcp is always safe to access.
+	// Mcp.Request is always non-nil; Method is empty for non-MCP traffic.
+	Mcp MCPCheckData `json:"mcp" cel:"mcp"`
 }
 
 // MCPCheckData materializes the MCP request object so policies can use
@@ -64,10 +66,6 @@ func NewRequest(r *http.Request) (CheckRequest, error) {
 	if err != nil {
 		return CheckRequest{}, err
 	}
-	mcpReq := &mcplibs.MCPRequest{}
-	if parsed, parseErr := (&celimpl.MCPImpl{}).Parse(bodyBytes); parseErr == nil && parsed != nil {
-		mcpReq = parsed
-	}
 	return CheckRequest{
 		Attributes: CheckRequestAttributes{
 			Method:        r.Method,
@@ -81,6 +79,33 @@ func NewRequest(r *http.Request) (CheckRequest, error) {
 			Fragment:      r.URL.Fragment,
 			Scheme:        r.URL.Scheme,
 		},
-		Mcp: &MCPCheckData{Request: mcpReq},
+		Mcp: MCPCheckData{Request: parseMCPRequest(bodyBytes)},
 	}, nil
+}
+
+// parseMCPRequest builds an MCPRequest from raw body bytes.
+// It always returns a non-nil result. For bodies that carry a JSON-RPC
+// method field but have unparseable params, Method and ID are preserved
+// from the envelope so that matchConditions like
+// object.mcp.request.Method == 'tools/call' still evaluate correctly
+// even when param parsing fails.
+func parseMCPRequest(body []byte) *mcplibs.MCPRequest {
+	// First pass: extract method/ID from the JSON-RPC envelope cheaply.
+	var envelope struct {
+		Method string `json:"method"`
+	}
+	hasMethod := json.Unmarshal(body, &envelope) == nil && envelope.Method != ""
+
+	// Second pass: attempt full params parsing.
+	if parsed, err := (&celimpl.MCPImpl{}).Parse(body); err == nil && parsed != nil {
+		return parsed
+	}
+
+	// Full parse failed. If the body looked like JSON-RPC, preserve Method so
+	// method-based matchConditions are not silently bypassed.
+	req := &mcplibs.MCPRequest{}
+	if hasMethod {
+		req.Method = envelope.Method
+	}
+	return req
 }

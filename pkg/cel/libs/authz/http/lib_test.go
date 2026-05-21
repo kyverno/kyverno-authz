@@ -60,9 +60,6 @@ func TestNewRequest_PopulatesMCPRequest(t *testing.T) {
 	body := `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"echo","arguments":{"message":"hello"}}}`
 	req := newMCPToolCallRequest(t, body)
 
-	if req.Mcp == nil {
-		t.Fatal("expected Mcp to be non-nil")
-	}
 	if req.Mcp.Request == nil {
 		t.Fatal("expected Mcp.Request to be non-nil")
 	}
@@ -80,11 +77,26 @@ func TestNewRequest_NonMCPBody_EmptyRequest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRequest failed: %v", err)
 	}
-	if req.Mcp == nil || req.Mcp.Request == nil {
+	if req.Mcp.Request == nil {
 		t.Fatal("expected Mcp.Request to be a non-nil empty MCPRequest for non-MCP traffic")
 	}
 	if req.Mcp.Request.Method != "" {
 		t.Errorf("expected empty Method for non-MCP body, got %q", req.Mcp.Request.Method)
+	}
+}
+
+// TestNewRequest_MalformedParams verifies that when a body carries a valid JSON-RPC
+// method field but unparseable params, Method is preserved so that matchConditions
+// like object.mcp.request.Method == 'tools/call' are not silently bypassed.
+func TestNewRequest_MalformedParams(t *testing.T) {
+	body := `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":"not-an-object"}`
+	req := newMCPToolCallRequest(t, body)
+
+	if req.Mcp.Request == nil {
+		t.Fatal("expected Mcp.Request to be non-nil")
+	}
+	if req.Mcp.Request.Method != "tools/call" {
+		t.Errorf("Method should be preserved from envelope even when params parse fails, got %q", req.Mcp.Request.Method)
 	}
 }
 
