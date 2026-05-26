@@ -30,7 +30,7 @@ require (
 	google.golang.org/grpc v1.80.0
 	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af
 	k8s.io/api v0.35.4
-	k8s.io/apimachinery v0.36.0
+	k8s.io/apimachinery v0.36.1
 	k8s.io/apiserver v0.35.4
 	k8s.io/client-go v0.35.4
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
@@ -43,7 +43,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.23 // indirect
 	github.com/aws/aws-sdk-go-v2/service/signin v1.0.10 // indirect
 	github.com/google/jsonschema-go v0.4.2 // indirect
-	k8s.io/streaming v0.36.0 // indirect
+	k8s.io/streaming v0.36.1 // indirect
 )
 
 require (
