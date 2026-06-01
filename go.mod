@@ -15,7 +15,7 @@ require (
 	github.com/kyverno/pkg/certmanager v0.0.10
 	github.com/kyverno/pkg/ext v0.0.0-20250303002756-48769d003e55
 	github.com/kyverno/pkg/tls v0.0.9
-	github.com/kyverno/sdk v0.0.0-20260417131151-22516a21229b
+	github.com/kyverno/sdk v0.0.0-20260601073834-e3a6b0f636cd
 	github.com/lestrrat-go/jwx/v3 v3.1.0
 	github.com/mark3labs/mcp-go v0.49.0
 	github.com/nlepage/go-tarfs v1.2.1
@@ -212,6 +212,6 @@ require (
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.34.0 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
-	sigs.k8s.io/release-utils v0.12.3 // indirect
+	sigs.k8s.io/release-utils v0.12.4 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.2 // indirect
 )

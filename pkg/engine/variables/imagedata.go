@@ -3,7 +3,7 @@ package variables
 import (
 	"context"
 
-	"github.com/kyverno/sdk/cel/utils"
+	"github.com/kyverno/sdk/extensions/cel/utils"
 	"github.com/kyverno/sdk/extensions/imagedataloader"
 	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
