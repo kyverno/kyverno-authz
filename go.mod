@@ -16,7 +16,7 @@ require (
 	github.com/kyverno/pkg/ext v0.0.0-20250303002756-48769d003e55
 	github.com/kyverno/pkg/tls v0.0.9
 	github.com/kyverno/sdk v0.0.0-20260601073834-e3a6b0f636cd
-	github.com/lestrrat-go/jwx/v3 v3.1.0
+	github.com/lestrrat-go/jwx/v3 v3.1.1
 	github.com/mark3labs/mcp-go v0.49.0
 	github.com/nlepage/go-tarfs v1.2.1
 	github.com/openreports/reports-api v0.2.1
