@@ -16,7 +16,6 @@ import (
 	"github.com/kyverno/kyverno-authz/pkg/engine/variables"
 	"github.com/kyverno/sdk/extensions/cel/libs/http"
 	"github.com/kyverno/sdk/extensions/cel/libs/image"
-	"github.com/kyverno/sdk/extensions/cel/libs/imagedata"
 	"github.com/kyverno/sdk/extensions/cel/libs/resource"
 	"k8s.io/apiserver/pkg/cel/library"
 	"k8s.io/client-go/dynamic"
@@ -72,10 +71,6 @@ func NewEnv(evalMode vpol.EvaluationMode, d dynamic.Interface) (*cel.Env, error)
 	if err != nil {
 		return nil, err
 	}
-	loader, err := variables.ImageData(nil)
-	if err != nil {
-		return nil, err
-	}
 	// create new cel env
 	return base.Extend(
 		http.Lib(http.Context{ContextInterface: http.NewHTTP()}, http.Latest()),
@@ -84,6 +79,5 @@ func NewEnv(evalMode vpol.EvaluationMode, d dynamic.Interface) (*cel.Env, error)
 		mcp.Lib(&impl.MCPImpl{}),
 		resource.Lib(resource.Context{ContextInterface: variables.NewResourceProvider(d)}, "", resource.Latest()),
 		image.Lib(image.Latest()),
-		imagedata.Lib(imagedata.Context{ContextInterface: loader}, image.Latest()),
 	)
 }
