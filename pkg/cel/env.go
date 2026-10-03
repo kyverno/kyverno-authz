@@ -84,6 +84,6 @@ func NewEnv(evalMode vpol.EvaluationMode, d dynamic.Interface) (*cel.Env, error)
 		mcp.Lib(&impl.MCPImpl{}),
 		resource.Lib(resource.Context{ContextInterface: variables.NewResourceProvider(d)}, "", resource.Latest()),
 		image.Lib(image.Latest()),
-		imagedata.Lib(imagedata.Context{ContextInterface: loader}, image.Latest()),
+		imagedata.Lib(loader, imagedata.Latest(), nil),
 	)
 }

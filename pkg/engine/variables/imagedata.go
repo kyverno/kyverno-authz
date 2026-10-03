@@ -3,14 +3,15 @@ package variables
 import (
 	"context"
 
+	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/kyverno/sdk/extensions/cel/utils"
 	"github.com/kyverno/sdk/extensions/imagedataloader"
-	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	v1 "k8s.io/client-go/listers/core/v1"
 )
 
-func ImageData(lister v1.SecretInterface, imageOpts ...imagedataloader.Option) (*imageData, error) {
+func ImageData(lister v1.SecretLister, imageOpts ...remote.Option) (*imageData, error) {
 	// TODO: secrets interface
-	idl, err := imagedataloader.New(lister, imageOpts...)
+	idl, err := imagedataloader.New(lister, imageOpts, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -23,9 +24,9 @@ type imageData struct {
 	imagedata imagedataloader.Fetcher
 }
 
-func (cp *imageData) GetImageData(image string) (map[string]any, error) {
+func (cp *imageData) GetImageData(image string, imageOpts []remote.Option) (map[string]any, error) {
 	// TODO: get image credentials from image verification policies?
-	data, err := cp.imagedata.FetchImageData(context.TODO(), image)
+	data, err := cp.imagedata.FetchImageData(context.TODO(), image, imageOpts, nil)
 	if err != nil {
 		return nil, err
 	}
