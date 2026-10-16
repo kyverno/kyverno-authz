@@ -1,0 +1,237 @@
+name: Main E2E attempt
+run-name: E2E attempt ${{ inputs.attempt }} for ${{ inputs.commit_sha }}
+
+on:
+  workflow_call:
+    inputs:
+      commit_sha:
+        type: string
+        required: true
+      claim_id:
+        type: string
+        required: true
+      suite_fingerprint:
+        type: string
+        required: true
+      trusted_sha:
+        type: string
+        required: true
+      attempt:
+        type: string
+        required: true
+    outputs:
+      failed:
+        description: Whether this full E2E attempt failed
+        value: ${{ jobs.aggregate.outputs.failed }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Validate immutable inputs
+        env:
+          COMMIT_SHA: ${{ inputs.commit_sha }}
+          CLAIM_ID: ${{ inputs.claim_id }}
+          SUITE_FINGERPRINT: ${{ inputs.suite_fingerprint }}
+          TRUSTED_SHA: ${{ inputs.trusted_sha }}
+          ATTEMPT: ${{ inputs.attempt }}
+        run: |
+          [[ "$COMMIT_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$CLAIM_ID" =~ ^[0-9a-f]{32}$ ]]
+          [[ "$SUITE_FINGERPRINT" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$TRUSTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$ATTEMPT" == 1 || "$ATTEMPT" == 2 ]]
+      - name: Checkout tested commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.commit_sha }}
+          path: source
+          persist-credentials: false
+      - name: Setup Go
+        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
+        with:
+          go-version-file: source/go.mod
+          cache-dependency-path: source/go.sum
+      - name: Build image archive
+        working-directory: source
+        run: |
+          set -e
+          make ko-build
+          make docker-save-image
+      - name: Upload image archive
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: image-${{ inputs.attempt }}
+          path: source/image.tar
+          retention-days: 1
+          if-no-files-found: error
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        suite:
+          - authz-server-envoy
+          - authz-server-http
+          - sidecar-injector
+          - validation-webhook-envoy
+          - validation-webhook-http
+        k8s-version: [v1.32.11, v1.33.7, v1.34.3, v1.35.0]
+    permissions:
+      contents: read
+    steps:
+      - name: Validate immutable inputs
+        env:
+          COMMIT_SHA: ${{ inputs.commit_sha }}
+          CLAIM_ID: ${{ inputs.claim_id }}
+          SUITE_FINGERPRINT: ${{ inputs.suite_fingerprint }}
+          TRUSTED_SHA: ${{ inputs.trusted_sha }}
+        run: |
+          [[ "$COMMIT_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$CLAIM_ID" =~ ^[0-9a-f]{32}$ ]]
+          [[ "$SUITE_FINGERPRINT" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$TRUSTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+      - name: Checkout tested commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.commit_sha }}
+          path: source
+          persist-credentials: false
+      - name: Checkout trusted CI tools
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.trusted_sha }}
+          path: trusted
+          persist-credentials: false
+          sparse-checkout: |
+            .github/scripts
+            .github/workflows
+      - name: Verify suite definition identity
+        env:
+          SUITE_FINGERPRINT: ${{ inputs.suite_fingerprint }}
+        run: |
+          calculated="$(python3 trusted/.github/scripts/suite_fingerprint.py trusted)"
+          [[ "$calculated" == "$SUITE_FINGERPRINT" ]]
+      - name: Setup Go
+        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
+        with:
+          go-version-file: source/go.mod
+          cache-dependency-path: source/go.sum
+      - name: Install helm
+        id: helm
+        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - name: Install chainsaw
+        uses: kyverno/action-install-chainsaw@1223ef75bedeb59c4e7b5455463d4316e76dff01 # v0.2.15
+        with:
+          verify: true
+      - name: Download immutable image archive
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: image-${{ inputs.attempt }}
+          path: source
+      - name: Create kind cluster
+        id: create-kind
+        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
+        with:
+          node_image: kindest/node:${{ matrix.k8s-version }}
+          cluster_name: kind
+      - name: Load image archive
+        working-directory: source
+        run: make kind-load-archive
+      - name: Run Chainsaw suite
+        id: run-e2e
+        env:
+          SUITE: ${{ matrix.suite }}
+          HELM_PATH: ${{ steps.helm.outputs.helm-path }}
+        run: trusted/.github/scripts/run-e2e-suite.sh "$SUITE" "$GITHUB_WORKSPACE/source" "$HELM_PATH"
+      - name: Dump E2E diagnostics
+        if: failure()
+        working-directory: source
+        env:
+          SUITE: ${{ matrix.suite }}
+        run: |
+          if [[ "$SUITE" == authz-server-envoy || "$SUITE" == authz-server-http ]]; then
+            kubectl logs -n kyverno deployment/kyverno-authz-server --all-containers --tail=-1 || true
+          elif [[ "$SUITE" == validation-webhook-envoy || "$SUITE" == validation-webhook-http ]]; then
+            kubectl get pods,svc,endpoints -n kyverno || true
+            kubectl describe deployment/kyverno-authz-server-validation -n kyverno || true
+            kubectl logs -n kyverno deployment/kyverno-authz-server-validation --all-containers --tail=-1 || true
+          fi
+      - name: Delete kind cluster
+        if: always() && steps.create-kind.outcome != 'skipped'
+        run: |
+          if ! kind delete cluster --name kind; then
+            echo "::error::kind cluster cleanup failed; this E2E combination is an infrastructure failure."
+            exit 1
+          fi
+      - name: Write bounded result metadata
+        if: always()
+        env:
+          SUITE: ${{ matrix.suite }}
+          K8S_VERSION: ${{ matrix.k8s-version }}
+          ATTEMPT: ${{ inputs.attempt }}
+          E2E_OUTCOME: ${{ steps.run-e2e.outcome }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          result = "success" if os.environ.get("JOB_STATUS") == "success" and os.environ.get("E2E_OUTCOME") == "success" else "failure"
+          filename = f"result-{os.environ['SUITE']}-{os.environ['K8S_VERSION']}-{os.environ['ATTEMPT']}.json"
+          with open(filename, "w", encoding="utf-8") as f:
+              json.dump({"suite": os.environ["SUITE"], "version": os.environ["K8S_VERSION"], "attempt": os.environ["ATTEMPT"], "result": result}, f)
+          PY
+      - name: Upload result metadata
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-result-${{ inputs.attempt }}-${{ matrix.suite }}-${{ matrix.k8s-version }}
+          path: result-${{ matrix.suite }}-${{ matrix.k8s-version }}-${{ inputs.attempt }}.json
+          retention-days: 1
+          if-no-files-found: warn
+
+  aggregate:
+    if: always()
+    needs: [build, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      failed: ${{ steps.aggregate.outputs.failed }}
+    steps:
+      - name: Checkout trusted result parser
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.trusted_sha }}
+          sparse-checkout: .github/scripts
+      - name: Download untrusted result metadata
+        if: always()
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: e2e-result-${{ inputs.attempt }}-*
+          path: results
+          merge-multiple: true
+      - name: Aggregate attempt outcome
+        id: aggregate
+        env:
+          BUILD_RESULT: ${{ needs.build.result }}
+          TEST_RESULT: ${{ needs.test.result }}
+        run: |
+          python3 .github/scripts/aggregate_e2e_results.py \
+            --results-dir results \
+            --build-result "$BUILD_RESULT" \
+            --test-result "$TEST_RESULT"

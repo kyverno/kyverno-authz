@@ -31,6 +31,13 @@ Note that they provide tailored documentation for different operating systems an
 
 ## Pull request process
 
+Pull requests run fast quality checks rather than Kubernetes E2E matrices.
+After merge, scheduled E2E checks test each new main-branch integration. If main
+is unhealthy, the required `main-health` check blocks ordinary PR merges until
+an administrator merges a repair and the complete E2E matrix passes. See
+[CI and main-branch health](ci.md) for the schedule, failure policy, and the
+asynchronous merge-gate limitation.
+
 In the following, we describe the general process for making pull requests. The aim here is to provide the 30k ft overview before describing details later on.
 
 ### Preparing changes and draft PR

@@ -2,7 +2,8 @@
 
 name: Code coverage
 
-permissions: {}
+permissions:
+  contents: read
 
 on:
   pull_request:
@@ -13,12 +14,13 @@ on:
       - main
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   unit-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -26,11 +28,14 @@ jobs:
         uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
         with:
           go-version-file: go.mod
-          cache-dependency-path: go.sum
+          # Keep race-instrumented build results separate from lint/codegen caches.
+          cache-dependency-path: |
+            go.sum
+            .github/workflows/code-coverage.yaml
       - name: Run tests
         run: |
           set -e
-          make tests
+          go test ./... -race -coverprofile=coverage.out -covermode=atomic
       - name: Upload coverage
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -43,6 +48,7 @@ jobs:
     needs:
       - unit-tests
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

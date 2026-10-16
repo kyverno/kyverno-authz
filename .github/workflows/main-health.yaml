@@ -1,0 +1,128 @@
+name: Main health
+
+on:
+  push:
+    branches: [main]
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main]
+  workflow_run:
+    workflows: [Main E2E]
+    types: [completed]
+  schedule:
+    - cron: "*/30 * * * *"
+
+permissions: {}
+
+concurrency:
+  group: main-e2e-controller
+  cancel-in-progress: false
+
+jobs:
+  main-commit-status:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
+    steps:
+      - name: Checkout trusted default-branch controller
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          sparse-checkout: |
+            .github/scripts
+            .github/workflows
+      - name: Publish pending or current main-health statuses
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/main_e2e_controller.py refresh-statuses
+
+  pull-request-status:
+    if: github.event_name == 'pull_request_target' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
+    steps:
+      - name: Checkout trusted default-branch controller
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          sparse-checkout: |
+            .github/scripts
+            .github/workflows
+      - name: Publish fail-closed main-health status
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 .github/scripts/main_e2e_controller.py pull-request-status \
+            --event "$GITHUB_EVENT_PATH"
+
+  reconcile:
+    if: (github.event_name == 'workflow_run' || github.event_name == 'schedule') && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: write
+      contents: write
+      issues: write
+      pull-requests: read
+      statuses: write
+    steps:
+      - name: Checkout trusted default-branch controller
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          sparse-checkout: |
+            .github/scripts
+            .github/workflows
+      - name: Download untrusted E2E result metadata
+        id: download-results
+        if: github.event_name == 'workflow_run'
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          pattern: e2e-result-*
+          path: results
+          merge-multiple: true
+      - name: Download trusted terminal result marker
+        id: download-terminal
+        if: github.event_name == 'workflow_run'
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          pattern: e2e-terminal-*
+          path: terminal-results
+      - name: Report missing result artifacts
+        if: github.event_name == 'workflow_run' && steps.download-results.outcome != 'success'
+        run: |
+          echo "::warning::E2E result artifacts were unavailable; failure reporting will rely on trusted workflow-run/job metadata and classify suite provenance as unknown if no failed matrix jobs are available."
+      - name: Report missing terminal marker
+        if: github.event_name == 'workflow_run' && steps.download-terminal.outcome != 'success'
+        run: |
+          echo "::warning::Trusted full-matrix terminal metadata was unavailable; a successful workflow conclusion will not clear unhealthy state."
+      - name: Report terminal run or reconcile health and all open PR heads
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == workflow_run ]]; then
+            python3 .github/scripts/main_e2e_controller.py report \
+              --run-id "$RUN_ID" --results-dir results --terminal-dir terminal-results
+          else
+            python3 .github/scripts/main_e2e_controller.py reconcile-health
+          fi
