@@ -155,3 +155,40 @@ func TestCompiler(t *testing.T) {
 		}
 	}
 }
+
+func TestExceptionReferencesPolicyVariables(t *testing.T) {
+	compiler := compiler.NewCompiler[dynamic.Interface, *authv3.CheckRequest, *authv3.CheckResponse](nil)
+	exception := &vpol.PolicyException{Spec: vpol.PolicyExceptionSpec{
+		EvaluationMode:  apis.EvaluationModeEnvoy,
+		MatchConditions: []admissionregistrationv1.MatchCondition{{Name: "authorized-exemption", Expression: `variables.force_authorized && object.attributes.request.http.headers[?"x-exempt"].orValue("") == "yes"`}},
+	}}
+	compiled, errs := compiler.Compile(pol, []*vpol.PolicyException{exception})
+	if !assert.NoError(t, errs.ToAggregate()) {
+		return
+	}
+	for _, tc := range []struct {
+		authorized, exempt string
+		skipped            bool
+	}{{"true", "yes", true}, {"true", "no", false}, {"false", "yes", false}} {
+		response, err := compiled.Evaluate(context.Background(), nil, &authv3.CheckRequest{Attributes: &authv3.AttributeContext{Request: &authv3.AttributeContext_Request{Http: &authv3.AttributeContext_HttpRequest{Headers: map[string]string{"x-force-authorized": tc.authorized, "x-exempt": tc.exempt}}}}})
+		assert.NoError(t, err)
+		if tc.skipped {
+			assert.Nil(t, response)
+		} else {
+			assert.NotNil(t, response)
+		}
+	}
+}
+
+func TestInvalidExceptionReturnsCompilationError(t *testing.T) {
+	compiler := compiler.NewCompiler[dynamic.Interface, *authv3.CheckRequest, *authv3.CheckResponse](nil)
+	for _, expression := range []string{`variables.unknown_variable`, `"not a boolean"`, `object.invalid_field == true`} {
+		t.Run(expression, func(t *testing.T) {
+			exception := &vpol.PolicyException{Spec: vpol.PolicyExceptionSpec{EvaluationMode: apis.EvaluationModeEnvoy, MatchConditions: []admissionregistrationv1.MatchCondition{{Name: "invalid", Expression: expression}}}}
+			assert.NotPanics(t, func() {
+				_, errs := compiler.Compile(pol, []*vpol.PolicyException{exception})
+				assert.Error(t, errs.ToAggregate())
+			})
+		})
+	}
+}

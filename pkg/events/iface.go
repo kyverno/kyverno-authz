@@ -3,6 +3,7 @@ package events
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
@@ -29,14 +30,21 @@ type ResultAccessor interface {
 }
 
 type resultAccessorImpl struct {
-	result any
-	err    error
+	result     any
+	err        error
+	policyName string
+	httpStatus int
 }
 
-func NewResultAccessor(res any, err error) *resultAccessorImpl {
+func NewResultAccessor(res any, err error, policyName ...string) *resultAccessorImpl {
+	name := ""
+	if len(policyName) != 0 {
+		name = policyName[0]
+	}
 	return &resultAccessorImpl{
-		result: res,
-		err:    err,
+		result:     res,
+		policyName: name,
+		err:        err,
 	}
 }
 
@@ -48,6 +56,11 @@ func (r *resultAccessorImpl) MustGet() (string, error) {
 	switch res := r.result.(type) {
 	case *authv3.CheckResponse:
 		if res.GetDeniedResponse() != nil {
+			return RequestDenied, nil
+		}
+		return RequestAllowed, nil
+	case *http.CheckResponse:
+		if res != nil && res.Denied != nil {
 			return RequestDenied, nil
 		}
 		return RequestAllowed, nil
@@ -78,4 +91,34 @@ func (c *CompositeEventSubscriber[Req]) Push(ctx context.Context, t time.Time, r
 	for _, sub := range c.inner {
 		sub.Push(ctx, t, req, res)
 	}
+}
+
+// ReportMetadata is optional so existing ResultAccessor implementations remain compatible.
+func (r *resultAccessorImpl) ReportMetadata() (string, map[string]string) {
+	properties := map[string]string{}
+	switch res := r.result.(type) {
+	case *authv3.CheckResponse:
+		if denied := res.GetDeniedResponse(); denied != nil {
+			properties["status"] = strconv.Itoa(int(denied.GetStatus().GetCode()))
+			properties["reason"] = denied.GetBody()
+		}
+	case http.CheckResponse:
+		if res.Denied != nil {
+			properties["reason"] = res.Denied.Reason
+		}
+	case *http.CheckResponse:
+		if res != nil && res.Denied != nil {
+			properties["reason"] = res.Denied.Reason
+		}
+	}
+	if r.httpStatus != 0 {
+		properties["status"] = strconv.Itoa(r.httpStatus)
+	}
+	return r.policyName, properties
+}
+
+// WithHTTPStatus records the status after the HTTP output expression is evaluated.
+func (r *resultAccessorImpl) WithHTTPStatus(status int) *resultAccessorImpl {
+	r.httpStatus = status
+	return r
 }

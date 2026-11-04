@@ -1,0 +1,22 @@
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyExtensionPolicy
+metadata:
+  name: kyverno-extproc-mcp
+  namespace: agentrouter-demo
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: ai-eg-mcp-main-operations
+  extProc:
+    - backendRefs:
+        - name: kyverno-authz
+          port: 9083
+      failOpen: false
+      messageTimeout: 5s
+      processingMode:
+        allowModeOverride: false
+        request:
+          body: Buffered
+        response:
+          body: Buffered

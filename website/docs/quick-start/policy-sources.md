@@ -24,6 +24,28 @@ You can pass multiple `--external-policy-source` flags to combine several source
 By default, the Authz Server watches for policies from the Kubernetes API.  
 This source allows it to dynamically load and update `ValidatingPolicy` resources from your cluster.
 
+### Live PolicyExceptions
+
+The Kubernetes source also watches `PolicyException` resources. Exceptions are
+linked to cluster-scoped policies by `spec.policyRefs[].name`; their
+`spec.evaluationMode` must match the policy's evaluation mode. Create, update,
+retarget, and delete operations invalidate the affected compiled policies.
+Subsequent authorization requests pick up the change after the Kubernetes watch
+reconciles; no server restart is required. Exceptions created before their
+referenced policies are retained and linked when those policies appear.
+
+Exception `matchConditions` can reference both `object` and the referenced
+policy's `variables.*`, using the same CEL environment as policy validations.
+Policy match conditions run first; then variables are available lazily while
+exception conditions are evaluated. All conditions of an exception must match
+to exempt a request. Invalid exception expressions cause a compilation error.
+
+An exemption skips that policy, not the entire policy chain: another policy may
+still deny the request. If no subsequent policy decides, the existing default
+allow applies. Such checks appear in reports as `pass`, with an empty `policy`
+when no policy was selected. They are not distinguished from other default
+allows: no `skip` result or exception-name property is currently emitted.
+
 ### Disable the Kubernetes Policy Source
 
 If you only want to load policies from external sources (for example, local files or Git), you can disable this behavior:
@@ -119,6 +141,14 @@ From each mounted source directory, the Authz Server loads all YAML and JSON fil
 It expects documents of the following kind:
 
 - `#!yaml apiVersion: policies.kyverno.io/v1` and `#!yaml kind: ValidatingPolicy`
+- `#!yaml apiVersion: policies.kyverno.io/v1` and `#!yaml kind: PolicyException`
+
+The embedded schemas support both kinds in `v1`, `v1beta1`, and `v1alpha1`.
+File-source exceptions must share a source directory with the policies they
+reference, specify `spec.policyRefs[].kind: ValidatingPolicy`, and use the same
+evaluation mode as the policy. External sources are loaded once: restart the
+server after changing a file policy or exception. Unlike the Kubernetes source,
+file changes do not trigger live recompilation.
 
 Invalid or non-policy documents are skipped.  
 

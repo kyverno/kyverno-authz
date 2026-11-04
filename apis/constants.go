@@ -5,6 +5,7 @@ import (
 )
 
 const (
-	EvaluationModeEnvoy vpol.EvaluationMode = "Envoy"
-	EvaluationModeHTTP  vpol.EvaluationMode = "HTTP"
+	EvaluationModeEnvoy          vpol.EvaluationMode = "Envoy"
+	EvaluationModeHTTP           vpol.EvaluationMode = "HTTP"
+	EvaluationModeEnvoyProcessor vpol.EvaluationMode = "EnvoyProcessor"
 )

@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demo-exceptions
+  namespace: agentrouter-demo
+  labels:
+    cleanup.kyverno.io/ttl: "15m"
+  annotations:
+    demo.kyverno.io/expected-denial: "known demo policies"
+    demo.kyverno.io/incident: "INC-1234"
+data:
+  exception.json: |
+    {
+      "apiVersion": "policies.kyverno.io/v1",
+      "kind": "PolicyException",
+      "metadata": {
+        "annotations": {
+          "demo.kyverno.io/expected-denial": "known demo policies",
+          "demo.kyverno.io/incident": "INC-1234"
+        },
+        "labels": {
+          "cleanup.kyverno.io/ttl": "15m"
+        },
+        "name": "exception-unknown-policy",
+        "namespace": "default"
+      },
+      "spec": {
+        "evaluationMode": "Envoy",
+        "matchConditions": [
+          {
+            "expression": "variables.http.method == \"POST\" && variables.isCall && variables.token.Valid && variables.token.Claims[\"iss\"] == \"http://keycloak.agentrouter-demo.svc.cluster.local:8080/realms/demo\" && \"agentrouter-demo\" in variables.token.Claims[\"aud\"] && variables.user == \"bob\" && variables.tool == \"kube-tools__scale_deployment\" && \"x-incident-id\" in variables.http.headers && variables.http.headers[\"x-incident-id\"] == \"INC-1234\" && variables.args.namespace == \"team-a-dev\" && variables.args.name == \"checkout\" && variables.args.all(key, key in [\"namespace\", \"name\", \"replicas\"]) && \"replicas\" in variables.args && type(variables.args.replicas) == double && variables.args.replicas >= 1.0 && variables.args.replicas <= 3.0 && variables.args.replicas == double(int(variables.args.replicas))",
+            "name": "incident-remediation-only"
+          },
+          {
+            "name": "expires-at",
+            "expression": "object.attributes.request.time < timestamp(\"2099-01-01T00:00:00Z\")"
+          }
+        ],
+        "policyRefs": [
+          {
+            "kind": "ValidatingPolicy",
+            "name": "unknown-policy"
+          }
+        ]
+      }
+    }

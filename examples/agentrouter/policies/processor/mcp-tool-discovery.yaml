@@ -1,0 +1,66 @@
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: agentrouter-tool-discovery
+spec:
+  failurePolicy: Fail
+  evaluation:
+    mode: EnvoyProcessor
+  matchConditions:
+    - name: successful-tool-discovery-response
+      expression: >-
+        object.phase == "response" && object.request.method == "POST" &&
+        object.request.path == "/mcp" && object.response.status == 200 &&
+        json.Unmarshal(object.request.body).method == "tools/list"
+  variables:
+    - name: token
+      expression: >-
+        jwt.Decode(object.request.headers["authorization"].substring(7),
+          jwks.Fetch("http://keycloak.agentrouter-demo.svc.cluster.local:8080/realms/demo/protocol/openid-connect/certs"))
+    - name: user
+      expression: variables.token.Claims["preferred_username"]
+    - name: home
+      expression: 'variables.user == "alice" ? "team-a-dev" : variables.user == "bob" ? "team-b-dev" : ""'
+    - name: sar
+      expression: >-
+        resource.Post("authorization.k8s.io/v1", "subjectaccessreviews", {
+          "apiVersion": dyn("authorization.k8s.io/v1"),
+          "kind": dyn("SubjectAccessReview"),
+          "spec": dyn({
+            "user": variables.user,
+            "resourceAttributes": dyn({
+              "namespace": dyn(variables.home),
+              "group": dyn("apps"),
+              "resource": dyn("deployments"),
+              "subresource": dyn("scale"),
+              "name": dyn("checkout"),
+              "verb": dyn("update")
+            })
+          })
+        })
+    - name: body
+      expression: json.Unmarshal(object.response.body)
+    - name: tools
+      expression: variables.body.result.tools.filter(tool, tool.name != "kube-tools__scale_deployment")
+    # Serialize each original map entry, replacing only result.tools. This keeps
+    # JSON-RPC metadata, discovery cache fields, and future extension fields.
+    - name: filteredResult
+      expression: >-
+        "{" + variables.body.result.map(key,
+          extproc.Marshal(key) + ":" + extproc.Marshal(
+            key == "tools" ? dyn(variables.tools) : variables.body.result[key])).join(",") + "}"
+    - name: filteredBody
+      expression: >-
+        "{" + variables.body.map(key,
+          extproc.Marshal(key) + ":" + (key == "result" ?
+            variables.filteredResult : extproc.Marshal(variables.body[key]))).join(",") + "}"
+  validations:
+    - expression: >-
+        !variables.token.Valid ||
+        variables.token.Claims["iss"] != "http://keycloak.agentrouter-demo.svc.cluster.local:8080/realms/demo" ||
+        !("agentrouter-demo" in variables.token.Claims["aud"]) || variables.home == "" ?
+          extproc.Respond(401).WithBody("identity rejected") : null
+    - expression: >-
+        has(variables.sar.status) && has(variables.sar.status.allowed) && variables.sar.status.allowed ?
+          extproc.Continue() :
+          extproc.ReplaceBody(variables.filteredBody).WithHeader("x-kyverno-tools-filtered", "true")
