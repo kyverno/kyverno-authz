@@ -85,6 +85,17 @@ class ToolTests(unittest.TestCase):
 
 
 class ReportingTests(unittest.TestCase):
+    def test_model_request_exercises_native_body_model_routing(self):
+        request = demo.prompt("demo-mini")
+        with patch.object(demo, "http", return_value=(200, {}, "{}")) as send, \
+                patch.object(demo, "audit", return_value=[
+                    {"demo_id": "model-request", "tenant": "alice"},
+                ]), patch.object(demo.uuid, "uuid4") as identifier:
+            identifier.return_value.hex = "request"
+            demo.model_request("jwt", request)
+        self.assertEqual(json.loads(send.call_args.args[1])["model"], "demo-mini")
+        self.assertNotIn("x-ai-eg-model", send.call_args.args[2])
+
     def test_summaries_and_credential_rejection(self):
         report = {"metadata": {"name": "sample"}, "summary": {"pass": 1, "fail": 1},
                   "results": [{"result": "pass", "description": "[timestamp] decision: allowed"}]}
@@ -245,7 +256,7 @@ class ModelBackendTests(unittest.TestCase):
 class AdmissionCaseTests(unittest.TestCase):
     def test_every_case_declares_its_expected_denial(self):
         cases = sorted((DEMO_DIR / "policies/admission/cases").glob("*.yaml"))
-        self.assertEqual(len(cases), 9)
+        self.assertEqual(len(cases), 10)
         for path in cases:
             with self.subTest(case=path.name):
                 self.assertIn("demo.kyverno.io/expected-denial:", path.read_text())

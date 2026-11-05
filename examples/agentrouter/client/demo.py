@@ -265,6 +265,8 @@ def prompt(model, text="checkout has zero replicas; what should I do?", **fields
 
 def model_request(access_token, request, reason=None):
     identifier = "model-" + uuid.uuid4().hex[:10]
+    # Agent Router's model-routing processor derives x-ai-eg-model from the
+    # OpenAI JSON model field before HTTPRoute matching; test that native path.
     headers = {"Content-Type": "application/json", "x-demo-id": identifier, "x-tenant-id": "spoofed"}
     if access_token:
         headers["Authorization"] = "Bearer " + access_token

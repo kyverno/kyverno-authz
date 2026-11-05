@@ -29,6 +29,8 @@ metadata:
   name: kube-tools
   namespace: agentrouter-demo
 spec:
+  # Demo-only: no backend authentication or network isolation. Runtime
+  # authorization claims apply to requests through the Agent Router gateway.
   selector:
     app: kube-tools
   ports:

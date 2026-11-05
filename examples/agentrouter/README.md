@@ -14,7 +14,7 @@ Simple identity/tool/argument predicates can be implemented natively.
 This demo adds:
 
 * **Live Kubernetes authorization:** Kyverno performs a SubjectAccessReview
-  for each Kubernetes tool execution. Revoke and restore Alice's scale
+  for each gateway-originated Kubernetes tool execution. Revoke and restore Alice's scale
   RoleBinding while keeping the **same JWT and MCP session**.
 * **Versioned runtime policies:** namespace/workload boundaries and bounded
   tool arguments, with compilation tests before deployment.
@@ -22,7 +22,8 @@ This demo adds:
   completion count, function-calling restrictions, and example credential
   patterns. The verified identity overwrites a spoofed `x-tenant-id`.
 * **Complementary Kyverno admission:** unsafe MCPRoutes and AIGatewayRoutes
-  are rejected before installation. Admission is not runtime authorization.
+  are rejected before installation, including model routes referencing a
+  backend other than the approved demo AIServiceBackend. Admission is not runtime authorization.
 * **Existing OpenReports summaries:** accumulated pass/fail counts, without
   attributed policy names or per-request correlation.
 * **Fail closed:** authorizer downtime must not reach the Kubernetes backend
@@ -53,6 +54,20 @@ Kyverno admission -> MCPRoute/AIGatewayRoute platform guardrails
 
 The MCP backend uses a ServiceAccount to execute calls; the authorizer checks
 the JWT user's permission separately. This is not Kubernetes impersonation.
+**Authorization claims apply only to traffic through the gateway.** This Kind
+demo has no backend authentication or network isolation: any pod able to reach
+the `kube-tools` ClusterIP can bypass JWT/SAR checks and invoke the backend's
+ServiceAccount permissions directly. Do not expose or reuse these backends
+outside this disposable demo. Production requires backend authentication and/or
+gateway-only ingress isolation using a NetworkPolicy-enforcing CNI; Kind's
+default kindnet does not enforce NetworkPolicy.
+
+For model routing, Agent Router's native model-routing processor extracts
+`model` from the OpenAI JSON body and sets `x-ai-eg-model` before HTTPRoute
+matching. The client deliberately omits that header; the live allow/deny tests
+verify this native extraction path, rather than requiring callers to set it.
+This processor belongs to Agent Router, not a Kyverno response-processing feature.
+
 Runtime policies are mounted files: changes require an authorizer restart.
 Both runtime path match conditions are complements because unmatched requests
 are allowed by the current authorizer. Invalid file policies may be skipped;
@@ -168,6 +183,10 @@ mode, password grant, example users, single replicas, and synthetic credential
 patterns. It is not production identity, DLP, spend accounting, or policy
 distribution guidance. Runtime guardrails protect the shown routes;
 admission examples illustrate complementary configuration constraints.
+The model backend allowlist restricts route references to `llm-backend` in
+`agentrouter-demo`; it does not govern edits to that AIServiceBackend or its
+underlying Backend endpoint. Those resources require separate platform ownership
+and admission controls in production.
 
 ## Offline validation
 
