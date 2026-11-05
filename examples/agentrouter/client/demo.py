@@ -329,7 +329,8 @@ def load_state():
     try:
         data = json.loads(STATE_FILE.read_text())
         saved = data["client"]
-        claims = json.loads(base64.urlsafe_b64decode(saved["token"].split(".")[1] + "==="))
+        payload = saved["token"].split(".")[1]
+        claims = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
         if data["context"] != CONTEXT or claims["exp"] <= time.time() + 20 or not saved["session"]:
             raise ValueError("expired or wrong context")
         client = Client()

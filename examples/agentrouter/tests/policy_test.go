@@ -106,6 +106,53 @@ func TestExecutionSARDecisionBranches(t *testing.T) {
 	}
 }
 
+func TestModelPolicyEvaluatesIdentityBeforeBody(t *testing.T) {
+	for _, tc := range []struct {
+		name, authorization, token string
+		wantError                  bool
+	}{
+		{name: "missing-header"},
+		{name: "non-bearer-header", authorization: "Basic sample"},
+		{name: "rejected-identity", authorization: "Bearer sample", token: `{"Valid": dyn(false)}`},
+		{
+			name: "authenticated-malformed-body", authorization: "Bearer sample", wantError: true,
+			token: `{"Valid": dyn(true), "Claims": dyn({"preferred_username": dyn("alice"), "iss": dyn("http://keycloak.agentrouter-demo.svc.cluster.local:8080/realms/demo"), "aud": dyn(["agentrouter-demo"])})}`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			policy := readPolicy(t, "llm-models")
+			if tc.token != "" {
+				for i := range policy.Spec.Variables {
+					if policy.Spec.Variables[i].Name == "token" {
+						policy.Spec.Variables[i].Expression = tc.token
+					}
+				}
+			}
+			compiled, errs := compiler.NewCompiler[dynamic.Interface, *authv3.CheckRequest, *authv3.CheckResponse](nil).Compile(policy, nil)
+			if len(errs) != 0 {
+				t.Fatal(errs.ToAggregate())
+			}
+			headers := map[string]string{}
+			if tc.authorization != "" {
+				headers["authorization"] = tc.authorization
+			}
+			request := &authv3.CheckRequest{Attributes: &authv3.AttributeContext{Request: &authv3.AttributeContext_Request{
+				Http: &authv3.AttributeContext_HttpRequest{
+					Method: "POST", Path: "/v1/chat/completions", Headers: headers, Body: "{not-json",
+				},
+			}}}
+			result, err := compiled.Evaluate(context.Background(), nil, request)
+			if tc.wantError {
+				if err == nil {
+					t.Fatal("authenticated malformed JSON must fail closed, not evaluate fallback data")
+				}
+			} else if err != nil || result == nil || result.GetDeniedResponse().GetStatus().GetCode() != 401 {
+				t.Fatalf("identity must be denied before parsing body: result=%v err=%v", result, err)
+			}
+		})
+	}
+}
+
 func TestExecutionPostsSubjectAccessReview(t *testing.T) {
 	for _, allowed := range []bool{true, false} {
 		t.Run(fmt.Sprint(allowed), func(t *testing.T) {

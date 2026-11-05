@@ -25,6 +25,17 @@ _spec.loader.exec_module(llm_backend)
 
 
 class ToolTests(unittest.TestCase):
+    def test_gateway_service_uses_one_combined_selector_argument(self):
+        with patch.object(demo, "kubectl", return_value=json.dumps({
+            "items": [{"metadata": {"name": "gateway-service"}}],
+        })) as k:
+            self.assertEqual(demo.gateway_service(), "service/gateway-service")
+        k.assert_called_once_with(
+            "get", "services", "-n", "envoy-gateway-system",
+            "-l", "gateway.envoyproxy.io/owning-gateway-name=agentrouter,"
+            "gateway.envoyproxy.io/owning-gateway-namespace=agentrouter-demo", "-o", "json",
+        )
+
     def test_scale_validation(self):
         target = {"namespace": "team-a-dev", "name": "checkout"}
         for replicas in (1, 2, 3):
@@ -116,6 +127,22 @@ class ReportingTests(unittest.TestCase):
 
 
 class StepTests(unittest.TestCase):
+    def test_state_decodes_unpadded_jwt_payload_lengths(self):
+        remainders = set()
+        claims = json.dumps({"exp": int(time.time()) + 600})
+        for spaces in range(3):
+            payload = base64.urlsafe_b64encode(
+                (claims + " " * spaces).encode(),
+            ).decode().rstrip("=")
+            remainders.add(len(payload) % 4)
+            token = f"header.{payload}.signature"
+            with self.subTest(remainder=len(payload) % 4), patch.object(Path, "read_text", return_value=json.dumps({
+                "context": demo.CONTEXT,
+                "client": {"token": token, "session": "session"},
+            })):
+                self.assertEqual(demo.load_state().token, token)
+        self.assertEqual(remainders, {0, 2, 3})
+
     def test_argument_selection(self):
         self.assertEqual(demo.parse_args(["--step", "revoke"]).step, "revoke")
         self.assertTrue(demo.parse_args(["--check"]).check)
