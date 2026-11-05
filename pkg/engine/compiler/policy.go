@@ -98,7 +98,6 @@ func (p compiledPolicy[DATA, IN, OUT]) evaluateRules(r IN) (OUT, error) {
 		return zero, nil
 	}
 
-	// ammar: is it ok to pass the variables of the policy to the exception too ? check how kyverno does this
 	data, err := p.setupVariables(r)
 	if err != nil {
 		return zero, err

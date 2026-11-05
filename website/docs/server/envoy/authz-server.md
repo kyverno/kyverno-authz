@@ -11,6 +11,8 @@ kyverno-authz serve envoy authz-server [flags]
       --allow-insecure-registry              Allow insecure registry
       --events-enabled                       Enable k8s events on authz, if not running in k8s this flag won't take effect
       --external-policy-source stringArray   External policy sources
+      --extproc-address string               Enable Envoy External Processing gRPC on this address (for example :9083)
+      --extproc-fail-open                    Continue unmodified when an ext_proc policy evaluation fails (default is fail closed)
       --grpc-address string                  Address to listen on (default ":9081")
       --grpc-network string                  Network to listen on (default "tcp")
   -h, --help                                 help for authz-server

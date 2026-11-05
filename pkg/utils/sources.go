@@ -65,6 +65,14 @@ func (s *staticSource[POLICY]) Load(_ context.Context) ([]POLICY, error) {
 }
 
 func GetExternalSources[POLICY any](vpolCompiler engine.Compiler[POLICY], nOpts []name.Option, rOpts []remote.Option, urls ...string) ([]core.Source[POLICY], error) {
+	return getExternalSources(vpolCompiler, nOpts, rOpts, nil, urls...)
+}
+
+func GetExternalSourcesForMode[POLICY any](vpolCompiler engine.Compiler[POLICY], nOpts []name.Option, rOpts []remote.Option, mode vpolv1.EvaluationMode, urls ...string) ([]core.Source[POLICY], error) {
+	return getExternalSources(vpolCompiler, nOpts, rOpts, &mode, urls...)
+}
+
+func getExternalSources[POLICY any](vpolCompiler engine.Compiler[POLICY], nOpts []name.Option, rOpts []remote.Option, mode *vpolv1.EvaluationMode, urls ...string) ([]core.Source[POLICY], error) {
 	mux := fsimpl.NewMux()
 	mux.Add(filefs.FS)
 	// mux.Add(httpfs.FS)
@@ -85,6 +93,9 @@ func GetExternalSources[POLICY any](vpolCompiler engine.Compiler[POLICY], nOpts 
 		if err != nil {
 			return nil, err
 		}
+		if mode != nil {
+			policies = filterPoliciesByMode(policies, *mode)
+		}
 
 		providers = append(
 			providers,
@@ -92,4 +103,14 @@ func GetExternalSources[POLICY any](vpolCompiler engine.Compiler[POLICY], nOpts 
 		)
 	}
 	return providers, nil
+}
+
+func filterPoliciesByMode(policies []*vpolv1.ValidatingPolicy, mode vpolv1.EvaluationMode) []*vpolv1.ValidatingPolicy {
+	selected := make([]*vpolv1.ValidatingPolicy, 0, len(policies))
+	for _, policy := range policies {
+		if policy.Spec.EvaluationMode() == mode {
+			selected = append(selected, policy)
+		}
+	}
+	return selected
 }

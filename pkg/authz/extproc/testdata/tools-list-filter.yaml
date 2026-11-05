@@ -1,0 +1,38 @@
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: tools-list-filter
+spec:
+  evaluation:
+    mode: EnvoyProcessor
+  failurePolicy: Fail
+  variables:
+    - name: body
+      expression: json.Unmarshal(object.response.body)
+  validations:
+    - expression: >-
+        object.phase == "response"
+        && (object.request.method != "POST" || object.request.path != "/mcp" || object.response.status != 200)
+        ? extproc.Respond(500).WithBody("unexpected request context")
+        : null
+    - expression: >-
+        object.phase == "response"
+        && (object.response.events.size() != 1
+          || object.response.events[0].event != "message"
+          || object.response.events[0].id == "")
+        ? extproc.Respond(500).WithBody("expected one identified SSE event")
+        : null
+    - expression: >-
+        object.phase != "response" || object.request.headers["x-user"] == "bob"
+        ? null
+        : extproc.ReplaceBody(extproc.Marshal(dyn({
+            "jsonrpc": dyn(variables.body.jsonrpc),
+            "id": dyn(variables.body.id),
+            "result": dyn({
+              "ttlMs": dyn(variables.body.result.ttlMs),
+              "cacheScope": dyn(variables.body.result.cacheScope),
+              "tools": dyn(variables.body.result.tools.filter(
+                tool, tool.name != "kube-tools__scale_deployment"
+              ))
+            })
+          })))

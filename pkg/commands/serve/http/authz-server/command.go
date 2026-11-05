@@ -169,7 +169,7 @@ func Command() *cobra.Command {
 						if err != nil {
 							return fmt.Errorf("failed to initialize registry opts: %w", err)
 						}
-						extSources, err := utils.GetExternalSources(compiler, nOpts, rOpts, externalPolicySources...)
+						extSources, err := utils.GetExternalSourcesForMode(compiler, nOpts, rOpts, apis.EvaluationModeHTTP, externalPolicySources...)
 						if err != nil {
 							return err
 						}
@@ -219,7 +219,7 @@ func Command() *cobra.Command {
 						if err != nil {
 							return fmt.Errorf("failed to initialize registry opts: %w", err)
 						}
-						extSources, err := utils.GetExternalSources(compiler, nOpts, rOpts, externalPolicySources...)
+						extSources, err := utils.GetExternalSourcesForMode(compiler, nOpts, rOpts, apis.EvaluationModeHTTP, externalPolicySources...)
 						if err != nil {
 							return err
 						}

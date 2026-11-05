@@ -1,0 +1,13 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: alice-scale
+  namespace: team-a-dev
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: checkout-scaler
+subjects:
+  - kind: User
+    name: alice
+    apiGroup: rbac.authorization.k8s.io

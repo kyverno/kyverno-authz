@@ -1,0 +1,34 @@
+# Lets the Kyverno admission controller look up the approved-model catalog and
+# the SecurityPolicy that must protect each AIGatewayRoute.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kyverno:agentrouter-guardrails
+  labels:
+    rbac.kyverno.io/aggregate-to-admission-controller: "true"
+rules:
+  - apiGroups: [""]
+    resources: [configmaps]
+    verbs: [get, list, watch]
+  - apiGroups: [gateway.envoyproxy.io]
+    resources: [securitypolicies]
+    verbs: [get, list, watch]
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: approved-models
+  namespace: agentrouter-demo
+data:
+  models: demo-mini,demo-pro
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kyverno:agentrouter-exception-cleanup
+  labels:
+    rbac.kyverno.io/aggregate-to-cleanup-controller: "true"
+rules:
+  - apiGroups: [""]
+    resources: [configmaps]
+    verbs: [get, list, watch, delete]
