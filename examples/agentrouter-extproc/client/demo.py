@@ -270,6 +270,8 @@ def authorizer_ready():
 
 def chat(access_token, request, demo_id, extra_headers=None):
     REQUEST_IDS.add(demo_id)
+    # Agent Router derives x-ai-eg-model from the JSON model field before routing.
+    # Deliberately omit that header to exercise its native extraction path.
     headers = {"Content-Type": "application/json", "x-demo-id": demo_id, **(extra_headers or {})}
     if access_token:
         headers["Authorization"] = "Bearer " + access_token

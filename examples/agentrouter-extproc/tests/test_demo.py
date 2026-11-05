@@ -291,7 +291,7 @@ class ModelBackendTests(unittest.TestCase):
 class AdmissionCaseTests(unittest.TestCase):
     def test_every_case_declares_its_expected_denial(self):
         cases = sorted((DEMO_DIR / "policies/admission/cases").glob("*.yaml"))
-        self.assertEqual(len(cases), 16)
+        self.assertEqual(len(cases), 17)
         for path in cases:
             with self.subTest(case=path.name):
                 self.assertIn("demo.kyverno.io/expected-denial:", path.read_text())

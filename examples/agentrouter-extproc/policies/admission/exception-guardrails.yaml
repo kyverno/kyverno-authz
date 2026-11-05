@@ -21,6 +21,8 @@ spec:
         (object.kind == "ConfigMap" && object.metadata.namespace == "agentrouter-demo" && object.metadata.name == "demo-exceptions")
   variables:
     - name: exception
+      # Kyverno admission's JSON library uses lowercase json.unmarshal;
+      # the standalone Authz processor library uses json.Unmarshal instead.
       expression: 'object.kind == "ConfigMap" ? json.unmarshal(object.data["exception.json"]) : object'
   validations:
     - expression: size(object.metadata.?annotations.orValue({})[?"demo.kyverno.io/incident"].orValue("")) > 0

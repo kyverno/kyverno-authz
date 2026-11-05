@@ -30,6 +30,9 @@ The typed result helpers are:
 - `result.WithBody(string)`, `.WithHeader(name, value)`, `.WithoutHeader(name)`
 - `extproc.Marshal(dynValue)` for JSON serialization after `json.Unmarshal` and CEL transformations.
 
+JSON serialization recursively handles dynamic maps and lists, preserves integer
+precision, and requires string object keys. It does not stringify non-string keys.
+
 `WithBody` marks the result as a body replacement; it can be chained from either `Continue`, `Respond`, or `ReplaceBody`. `Respond` creates an Envoy ImmediateResponse. Header mutations apply to the current phase. When replacing a normal body, the processor sets `content-length` to the new byte length. For a rewritten SSE event, it preserves the event and ID fields and removes `content-length` (the expected framing is chunked). When setting a new normal-body length, it also removes `transfer-encoding` to avoid conflicting framing headers.
 
 ## Example: filter MCP tools/list by user

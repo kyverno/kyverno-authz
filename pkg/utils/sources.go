@@ -32,8 +32,7 @@ func newStatic[POLICY any](compiler engine.Compiler[POLICY], policies []*vpolv1.
 			}
 			exceptionMatched := false
 			for _, pol := range ex.Spec.PolicyRefs {
-				// no need to check for kind here because its already been checked in the filesystem load
-				if pol.Name == p.Name {
+				if pol.Kind == "ValidatingPolicy" && pol.Name == p.Name {
 					exceptionMatched = true
 					break
 				}

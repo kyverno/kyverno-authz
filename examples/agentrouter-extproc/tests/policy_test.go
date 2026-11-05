@@ -19,7 +19,12 @@ import (
 	celproc "github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/extproc"
 	"github.com/kyverno/kyverno-authz/pkg/engine/compiler"
 	"github.com/kyverno/kyverno-authz/pkg/engine/sources"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/dynamic/fake"
+	clienttesting "k8s.io/client-go/testing"
 	"sigs.k8s.io/yaml"
 )
 
@@ -163,6 +168,59 @@ func TestDiscoveryFiltersAndPreservesFields(t *testing.T) {
 			input.Response.Body = "not-json"
 			if _, err := compiled.Evaluate(context.Background(), nil, input); err == nil {
 				t.Fatal("malformed discovery response must fail closed")
+			}
+		})
+	}
+}
+
+func TestDiscoveryPostsSubjectAccessReview(t *testing.T) {
+	for _, allowed := range []bool{false, true} {
+		t.Run(fmt.Sprint(allowed), func(t *testing.T) {
+			policy := discoveryPolicy(t)
+			for i := range policy.Spec.Variables {
+				if policy.Spec.Variables[i].Name == "token" {
+					policy.Spec.Variables[i].Expression = `{"Valid": dyn(true), "Claims": dyn({"preferred_username": dyn("alice"), "iss": dyn("http://keycloak.agentrouter-demo.svc.cluster.local:8080/realms/demo"), "aud": dyn(["agentrouter-demo"])})}`
+				}
+			}
+			client := fake.NewSimpleDynamicClient(runtime.NewScheme())
+			calls := 0
+			client.PrependReactor("create", "subjectaccessreviews", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				calls++
+				expectedResource := schema.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1", Resource: "subjectaccessreviews"}
+				if action.GetResource() != expectedResource || action.GetNamespace() != "" {
+					t.Fatalf("SAR must target the cluster-scoped authorization API: %+v", action)
+				}
+				review := action.(clienttesting.CreateAction).GetObject().(*unstructured.Unstructured)
+				expected := map[string]any{
+					"apiVersion": "authorization.k8s.io/v1", "kind": "SubjectAccessReview",
+					"spec": map[string]any{
+						"user": "alice",
+						"resourceAttributes": map[string]any{
+							"namespace": "team-a-dev", "group": "apps", "resource": "deployments",
+							"subresource": "scale", "name": "checkout", "verb": "update",
+						},
+					},
+				}
+				if !reflect.DeepEqual(review.Object, expected) {
+					t.Fatalf("unexpected SAR body: %#v", review.Object)
+				}
+				response := review.DeepCopy()
+				response.Object["status"] = map[string]any{"allowed": allowed}
+				return true, response, nil
+			})
+			compiled, errs := compiler.NewCompiler[dynamic.Interface, celproc.Input, *celproc.Result](client).Compile(&policy, nil)
+			if len(errs) != 0 {
+				t.Fatal(errs.ToAggregate())
+			}
+			body := `{"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"runbooks__get_runbook"},{"name":"kube-tools__scale_deployment"}]}}`
+			input := celproc.Input{Phase: "response",
+				Request: celproc.Request{Method: "POST", Path: "/mcp", Body: `{"method":"tools/list"}`},
+				Response: celproc.Response{Status: 200, Body: body,
+					Events: []celproc.SSEEvent{{Event: "message", ID: "1", Data: body}}},
+			}
+			result, err := compiled.Evaluate(context.Background(), client, input)
+			if err != nil || calls != 1 || result == nil || result.ReplaceBody == allowed {
+				t.Fatalf("SAR allowed=%t, posts=%d, result=%+v, err=%v", allowed, calls, result, err)
 			}
 		})
 	}

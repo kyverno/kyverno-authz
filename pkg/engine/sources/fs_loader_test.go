@@ -3,6 +3,7 @@ package sources
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"testing/fstest"
 
@@ -59,6 +60,36 @@ spec:
 					require.NotNil(t, response)
 					assert.NotNil(t, response.GetDeniedResponse())
 				}
+
+			}
+		})
+	}
+}
+
+func TestLoadPoliciesRejectsUnsupportedExceptionReferenceKind(t *testing.T) {
+	document := `apiVersion: policies.kyverno.io/v1
+kind: PolicyException
+metadata:
+  name: wrong-kind
+spec:
+  evaluationMode: Envoy
+  policyRefs:
+  - kind: MutatingPolicy
+    name: guardrails
+  matchConditions:
+  - name: exempt
+    expression: 'true'
+`
+	for _, kind := range []string{"MutatingPolicy", "ValidatingPolicy"} {
+		t.Run(kind, func(t *testing.T) {
+			_, exceptions, err := LoadPolicies(fstest.MapFS{
+				"exception.yaml": &fstest.MapFile{Data: []byte(strings.ReplaceAll(document, "MutatingPolicy", kind))},
+			})
+			require.NoError(t, err)
+			if kind == "ValidatingPolicy" {
+				require.Len(t, exceptions, 1)
+			} else {
+				require.Empty(t, exceptions)
 			}
 		})
 	}

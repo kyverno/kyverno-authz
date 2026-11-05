@@ -47,12 +47,25 @@ func TestLibraryOutputsAndJSONEncoding(t *testing.T) {
 			expression: `extproc.Marshal(dyn({"name": dyn("visible"), "count": dyn(2)}))`,
 			check:      func(value any) bool { return reflect.DeepEqual(value, `{"count":2,"name":"visible"}`) },
 		},
+		{
+			name:       "nested heterogeneous dynamic collections",
+			expression: `extproc.Marshal(dyn({"outer": dyn([dyn({"number": dyn(2), "flag": dyn(true), "empty": dyn(null), "text": dyn("visible")}), dyn(3), dyn("tail")]), "empty": dyn({})}))`,
+			check: func(value any) bool {
+				return value == `{"empty":{},"outer":[{"empty":null,"flag":true,"number":2,"text":"visible"},3,"tail"]}`
+			},
+		},
+		{
+			name:       "preserve integer precision",
+			expression: `extproc.Marshal(dyn([9223372036854775807, 18446744073709551615u]))`,
+			check:      func(value any) bool { return value == `[9223372036854775807,18446744073709551615]` },
+		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			ast, issues := env.Compile(test.expression)
 			if err := issues.Err(); err != nil {
 				t.Fatal(err)
 			}
+
 			program, err := env.Program(ast)
 			if err != nil {
 				t.Fatal(err)
@@ -65,5 +78,23 @@ func TestLibraryOutputsAndJSONEncoding(t *testing.T) {
 				t.Fatalf("unexpected result: %#v", got)
 			}
 		})
+	}
+}
+
+func TestJSONEncodingRejectsNonStringObjectKeys(t *testing.T) {
+	env, err := cel.NewEnv(celproc.Lib())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ast, issues := env.Compile(`extproc.Marshal(dyn({"nested": dyn({1: "not a JSON key"})}))`)
+	if err := issues.Err(); err != nil {
+		t.Fatal(err)
+	}
+	program, err := env.Program(ast)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := program.Eval(map[string]any{}); err == nil {
+		t.Fatal("non-string map keys must fail rather than silently changing JSON semantics")
 	}
 }

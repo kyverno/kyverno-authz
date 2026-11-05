@@ -2,6 +2,7 @@ package sources
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -34,9 +35,50 @@ func testPolicy(name string) *v1.ValidatingPolicy {
 }
 func testException(name string) *v1.PolicyException {
 	return &v1.PolicyException{ObjectMeta: metav1.ObjectMeta{Name: "exemption", ResourceVersion: "1"}, Spec: v1.PolicyExceptionSpec{
-		EvaluationMode: apis.EvaluationModeEnvoy, PolicyRefs: []v1.PolicyRef{{Name: name}},
+		EvaluationMode: apis.EvaluationModeEnvoy, PolicyRefs: []v1.PolicyRef{{Kind: "ValidatingPolicy", Name: name}},
 		MatchConditions: []admissionregistrationv1.MatchCondition{{Name: "exempt", Expression: `variables.exempt`}},
 	}}
+}
+
+func TestExceptionKindCannotExemptSameNamedPolicy(t *testing.T) {
+	for _, exceptionFirst := range []bool{false, true} {
+		t.Run(fmt.Sprint(exceptionFirst), func(t *testing.T) {
+			ctx := context.Background()
+			store := newCompositeStore()
+			p := testPolicy("guardrails")
+			exc := testException(p.Name)
+			exc.Spec.PolicyRefs[0].Kind = "MutatingPolicy"
+			if exceptionFirst {
+				store.handlePolex("/exemption", exc, false)
+			}
+			store.handlePolicy("/guardrails", p, false)
+			if !exceptionFirst {
+				store.handlePolex("/exemption", exc, false)
+			}
+			cache := newPolicyCache[engine.EnvoyPolicy](store, &countingCompiler{})
+			check := func(exempt bool) {
+				t.Helper()
+				policies, err := cache.Load(ctx)
+				require.NoError(t, err)
+				require.Len(t, policies, 1)
+				result, err := policies[0].Evaluate(ctx, nil, &authv3.CheckRequest{})
+				require.NoError(t, err)
+				if exempt {
+					require.Nil(t, result)
+				} else {
+					require.NotNil(t, result)
+					require.NotNil(t, result.GetDeniedResponse())
+				}
+			}
+			check(false)
+			exc.Spec.PolicyRefs[0].Kind = "ValidatingPolicy"
+			store.handlePolex("/exemption", exc, false)
+			check(true)
+			exc.Spec.PolicyRefs[0].Kind = "MutatingPolicy"
+			store.handlePolex("/exemption", exc, false)
+			check(false)
+		})
+	}
 }
 
 func TestExceptionLifecycleRecompilesPolicy(t *testing.T) {

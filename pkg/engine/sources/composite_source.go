@@ -85,7 +85,7 @@ func (s *compositeStore) handlePolicy(policyKey string, policy *v1.ValidatingPol
 	s.policies[policyKey] = polState
 	for excKey, exc := range s.exceptions {
 		for _, ref := range exc.exception.Spec.PolicyRefs {
-			if ref.Name == policyKey {
+			if ref.Kind == "ValidatingPolicy" && ref.Name == policyKey {
 				exc.references[policyKey] = s.policies[policyKey]
 				polState.exceptions[excKey] = exc
 			}
@@ -115,6 +115,9 @@ func (s *compositeStore) handlePolex(excKey string, exc *v1.PolicyException, isD
 	// Retain exceptions even when their referenced policies do not exist yet.
 	s.exceptions[excKey] = excState
 	for _, polRef := range exc.Spec.PolicyRefs {
+		if polRef.Kind != "ValidatingPolicy" {
+			continue
+		}
 		polState, ok := s.policies[polRef.Name]
 		if ok {
 			polState.exceptions[excKey] = excState

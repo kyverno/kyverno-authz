@@ -124,6 +124,9 @@ spec:
 		t.Fatal(err)
 	}
 	jsonMutation := jsonStream.responses[3].GetResponseBody().GetResponse()
+	if jsonMutation.GetStatus() != extprocv3.CommonResponse_CONTINUE {
+		t.Fatalf("buffered body mutation must continue normal processing: %v", jsonMutation.GetStatus())
+	}
 	if string(jsonMutation.GetBodyMutation().GetBody()) != "redacted" {
 		t.Fatalf("replacement body = %q", jsonMutation.GetBodyMutation().GetBody())
 	}

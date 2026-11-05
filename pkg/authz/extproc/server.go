@@ -167,6 +167,8 @@ func (s *service) response(ctx context.Context, state *streamState, phase string
 		result.Body = frameSSE(state.sseEvents[0], result.Body)
 	}
 	common := &extprocv3.CommonResponse{Status: extprocv3.CommonResponse_CONTINUE}
+	// Body messages apply BodyMutation with CONTINUE. Header messages require
+	// CONTINUE_AND_REPLACE to supply a body and stop further messages for this phase.
 	if headers && result.ReplaceBody {
 		common.Status = extprocv3.CommonResponse_CONTINUE_AND_REPLACE
 	}

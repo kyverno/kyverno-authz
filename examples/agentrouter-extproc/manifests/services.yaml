@@ -32,6 +32,8 @@ metadata:
   name: kube-tools
   namespace: agentrouter-demo
 spec:
+  # Demo-only backend: JWT/SAR authorization applies to gateway-originated traffic,
+  # not direct ClusterIP access. Production requires authentication or isolation.
   selector:
     app: kube-tools
   ports:

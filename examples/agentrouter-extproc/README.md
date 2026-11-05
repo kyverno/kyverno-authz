@@ -8,6 +8,12 @@ and MCP session**. Bob's discovery remains unchanged.
 
 Hiding a tool is **not a security boundary**. The existing ext_authz request
 policy independently denies Alice's direct `tools/call` while RBAC is revoked.
+These authorization claims apply to **gateway-originated traffic only**. This
+disposable demo has no backend authentication or network isolation: pods able
+to reach the `kube-tools` ClusterIP can bypass the gateway and use its backend
+ServiceAccount directly. Production requires backend authentication and/or
+gateway-only ingress with a NetworkPolicy-enforcing CNI; Kind's default kindnet
+does not enforce NetworkPolicy.
 This example is self-contained and does not require `examples/agentrouter`.
 The independent [baseline-demo PR #249](https://github.com/kyverno/kyverno-authz/pull/249)
 demonstrates request governance on the existing authorizer without introducing
@@ -33,6 +39,10 @@ Envoy Gateway v1.9.2, Agent Router v1.2.0 and Kyverno v1.19.1, builds this check
 installs OpenReports, and deploys real Keycloak and bounded MCP backends. A local
 OpenAI-compatible backend supplies contextual model-policy tests without an
 external provider or API key. Setup is deliberately not part of each presenter step.
+Agent Router's native model-routing processor derives `x-ai-eg-model` from the
+OpenAI JSON body before route matching; the client intentionally omits the header
+and its live model checks verify this extraction path. This is Agent Router's
+request routing, not Kyverno's response extension.
 
 ## Presenter runbook: one meaningful action per command
 
@@ -112,6 +122,10 @@ OpenReports. Reporting attribution/redaction, exception source merging and
 mode filtering, and embedded PolicyException schemas are supporting prototype
 fixes. They are useful independently and are **not capabilities inherently
 dependent on ext_proc**.
+The model-route guardrail restricts references to the demo's `llm-backend`
+AIServiceBackend in `agentrouter-demo`, but does not govern changes to that
+resource or its underlying Backend endpoint; those require separate ownership
+and admission controls.
 
 The file-backed exception skips the **entire matching policy, including its SAR**.
 Other policies still execute. Its incident, user, operation, workload, replica,

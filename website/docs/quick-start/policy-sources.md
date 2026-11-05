@@ -147,7 +147,10 @@ The embedded schemas support both kinds in `v1`, `v1beta1`, and `v1alpha1`.
 File-source exceptions must share a source directory with the policies they
 reference, specify `spec.policyRefs[].kind: ValidatingPolicy`, and use the same
 evaluation mode as the policy. External sources are loaded once: restart the
-server after changing a file policy or exception. Unlike the Kubernetes source,
+server after changing a file policy or exception. File exceptions containing
+references to another kind are skipped; static and Kubernetes linking also
+require an exact `ValidatingPolicy` kind, so same-named policies of another kind
+cannot exempt authorization policies. Unlike the Kubernetes source,
 file changes do not trigger live recompilation.
 
 Invalid or non-policy documents are skipped.  
