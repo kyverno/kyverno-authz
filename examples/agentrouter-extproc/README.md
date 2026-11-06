@@ -1,33 +1,37 @@
-# Show the right tools with Agent Router and Kyverno Authz
+# Limit an SRE assistant's tools with Agent Router and Kyverno Authz
 
-An AI assistant needs to know which tools it can use. Showing a tool that the
-person can't use can lead to failed calls and confusion.
+Alice is a site reliability engineer (SRE). She keeps apps running. Her AI
+assistant uses tools to help her, but it must stay within her permissions.
+Showing it tools Alice can't use can lead to failed calls and confusion.
 
 Agent Router connects your assistant to models and tools. **This Kyverno Authz
-prototype checks what the person may do and removes tools they can't use from
-the list sent back to the assistant.** It also checks each call, so the assistant
-can't bypass the rules by remembering a tool's name.
+prototype checks Alice's current permissions and filters the tool list sent
+back to her assistant.** It also checks each call, so the assistant can't bypass
+the rules by remembering a tool's name.
 
 ## What you'll show
 
-Alice manages a small app. She starts with five tools, including one that changes
-how many copies of the app run.
+Alice asks her SRE assistant to run two copies of the checkout app. The assistant
+starts with five tools, including one that changes the number of copies.
 
-1. Alice uses that tool to run two copies. The call succeeds.
-2. You remove her permission to change the number of copies.
-3. Alice repeats the call. Kyverno Authz blocks it.
-4. You refresh her tool list. She now sees four tools, without the change tool.
-5. You restore her permission and refresh again. All five tools return, and
-   the call works.
+1. The assistant calls that tool on Alice's behalf. The call succeeds.
+2. You remove Alice's permission to change the number of copies.
+3. The assistant repeats the call. Kyverno Authz blocks it.
+4. You refresh its tool list. It now sees four tools, without the change tool.
+5. You restore Alice's permission and refresh again. All five tools return,
+   and the assistant's call works.
 
-Alice stays signed in. Bob's tool list doesn't change because his permissions
-haven't changed. Alice can still use her read tools.
+The assistant keeps using the same Alice sign-in token and connection. It can
+still read app status for her. Bob's tool list doesn't change because his
+permissions haven't changed.
 
 ## Why it matters
 
-**Block actions a person can't take, and help the assistant avoid those actions
-in the first place.** The same live Kubernetes permissions guide both checks.
-You don't need to keep a separate tool list for each person.
+**Acting for Alice doesn't give her assistant extra access.** Kyverno Authz
+blocks actions she can't take and helps the assistant avoid those actions in
+the first place. The same live Kubernetes permissions guide both checks.
+You don't need to keep a separate tool list for each person. The checks happen
+outside the assistant; they don't rely on it following instructions.
 
 The [request-only demo](https://github.com/kyverno/kyverno-authz/tree/agent-router-demo/examples/agentrouter) checks calls but leaves the
 tool list unchanged. This prototype also changes the response before the
@@ -40,6 +44,12 @@ The request check uses Envoy's external authorization interface, `ext_authz`.
 The new response check uses its external processing interface, `ext_proc`, to
 filter the `tools/list` response. This demo requires the prototype implementation
 in this branch, not just the current Kyverno Authz release.
+
+Inspector or the Python client stands in for Alice's assistant and sends her
+JWT, a signed identity token. The demo does not run an autonomous agent or a
+model-driven tool loop. It has no separate agent identity, token exchange, or
+proof that Alice approved a specific action. It demonstrates tool calls checked
+against Alice's permissions, not a full delegation system.
 
 **Hiding a tool doesn't secure it.** The separate request check blocks direct
 calls to a hidden tool. These checks protect
@@ -71,7 +81,7 @@ Docker memory for both clusters. Setup is not repeated during the walkthrough.
 
 ## Demo
 
-### Live demo: permissions change what Alice can do and discover
+### Live demo: permissions limit Alice's assistant
 
 Use [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector)
 to show the actual tools and results, with a terminal beside it for RBAC changes.
@@ -139,8 +149,9 @@ Restore the grant, refresh again, then run scale:
 kubectl --context "$CONTEXT" apply -f examples/agentrouter-extproc/manifests/alice-scale.yaml
 ```
 
-**Takeaway:** “ext_authz decides whether a call may execute. The new ext_proc
-integration shapes what the caller discovers using the same live permissions.”
+**Takeaway:** “Alice's assistant acts for her, not above her permissions.
+Kyverno Authz blocks calls she can't make and removes that tool from the
+assistant's list. The assistant keeps the same token and connection.”
 
 Keep execution to three minutes and discovery to one more. A pre-connected Bob
 tab can optionally show unaffected access, but avoid switching identities in the
