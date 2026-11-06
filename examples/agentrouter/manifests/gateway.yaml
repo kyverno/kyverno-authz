@@ -1,0 +1,82 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: agentrouter-demo
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: agentrouter
+  namespace: agentrouter-demo
+spec:
+  gatewayClassName: agentrouter-demo
+  infrastructure:
+    parametersRef:
+      group: gateway.envoyproxy.io
+      kind: EnvoyProxy
+      name: agentrouter-local
+  listeners:
+    - name: mcp
+      protocol: HTTP
+      port: 8080
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: agentrouter-local
+  namespace: agentrouter-demo
+spec:
+  filterOrder:
+    - name: envoy.filters.http.jwt_authn
+      before: envoy.filters.http.ext_authz
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyService:
+        type: ClusterIP
+---
+apiVersion: aigateway.envoyproxy.io/v1beta1
+kind: MCPRoute
+metadata:
+  name: operations
+  namespace: agentrouter-demo
+spec:
+  parentRefs:
+    - name: agentrouter
+  path: /mcp
+  securityPolicy:
+    oauth:
+      issuer: http://keycloak.agentrouter-demo.svc.cluster.local:8080/realms/demo
+      audiences: [agentrouter-demo]
+      jwks:
+        remoteJWKS:
+          uri: http://keycloak.agentrouter-demo.svc.cluster.local:8080/realms/demo/protocol/openid-connect/certs
+      protectedResourceMetadata:
+        resource: http://localhost:18080/mcp
+        scopesSupported: [openid, profile]
+    extAuth:
+      grpc:
+        backendRefs:
+          - name: kyverno-authz
+            port: 9081
+      headersToExtAuth: [authorization, x-demo-id]
+      bodyToExtAuth:
+        maxRequestBytes: 16384
+      failOpen: false
+      statusOnError: 503
+      timeout: 5s
+  backendRefs:
+    - name: kube-tools
+      port: 8080
+      toolSelector:
+        include: [get_workload_status, get_events, get_logs, scale_deployment]
+      forwardHeaders:
+        - name: x-demo-id
+    - name: runbooks
+      port: 8080
+      toolSelector:
+        include: [get_runbook]
+      forwardHeaders:
+        - name: x-demo-id

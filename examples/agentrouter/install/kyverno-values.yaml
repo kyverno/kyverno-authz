@@ -1,0 +1,9 @@
+# Admission enforces platform guardrails.
+admissionController:
+  replicas: 1
+backgroundController:
+  enabled: false
+cleanupController:
+  enabled: false
+reportsController:
+  enabled: false

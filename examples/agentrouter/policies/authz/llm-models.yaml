@@ -1,0 +1,79 @@
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: agentrouter-model-governance
+spec:
+  failurePolicy: Fail
+  evaluation:
+    mode: Envoy
+  # Complements the not-model-api condition in mcp-operations.yaml.
+  matchConditions:
+    - name: model-api
+      expression: object.attributes.request.http.path.startsWith("/v1/")
+  variables:
+    - name: http
+      expression: object.attributes.request.http
+    - name: token
+      expression: >-
+        jwt.Decode(variables.http.headers["authorization"].substring(7),
+          jwks.Fetch("http://keycloak.agentrouter-demo.svc.cluster.local:8080/realms/demo/protocol/openid-connect/certs"))
+    - name: user
+      expression: variables.token.Claims["preferred_username"]
+    # Per-user entitlements. In production these would come from group claims or a ConfigMap.
+    - name: models
+      expression: >-
+        variables.user == "alice" ? ["demo-mini"] :
+        variables.user == "bob" ? ["demo-mini", "demo-pro"] : dyn([])
+    - name: tokenLimit
+      expression: 'variables.user == "alice" ? 256.0 : variables.user == "bob" ? 1024.0 : 0.0'
+    - name: body
+      expression: json.Unmarshal(variables.http.body)
+    - name: maxTokens
+      expression: >-
+        "max_completion_tokens" in variables.body ? variables.body.max_completion_tokens :
+        "max_tokens" in variables.body ? variables.body.max_tokens : dyn(null)
+    - name: credential
+      expression: '"(AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|ghp_[A-Za-z0-9]{36})"'
+  validations:
+    - expression: >-
+        !("authorization" in variables.http.headers) ||
+        !variables.http.headers["authorization"].startsWith("Bearer ") ?
+          envoy.Denied(401).WithBody("Blocked by Kyverno policy agentrouter-model-governance: bearer token required").Response() : null
+    - expression: >-
+        !variables.token.Valid ||
+        variables.token.Claims["iss"] != "http://keycloak.agentrouter-demo.svc.cluster.local:8080/realms/demo" ||
+        !("agentrouter-demo" in variables.token.Claims["aud"]) ||
+        size(variables.models) == 0 ?
+          envoy.Denied(401).WithBody("Blocked by Kyverno policy agentrouter-model-governance: identity rejected").Response() : null
+    - expression: >-
+        variables.http.method != "POST" || variables.http.path.split("?")[0] != "/v1/chat/completions" ?
+          envoy.Denied(403).WithBody("Blocked by Kyverno policy agentrouter-model-governance: only chat completions are exposed").Response() : null
+    - expression: >-
+        !("model" in variables.body) || type(variables.body.model) != string ||
+        !(variables.body.model in variables.models) ?
+          envoy.Denied(403).WithBody("Blocked by Kyverno policy agentrouter-model-governance: model not allowed for " + variables.user).Response() : null
+    - expression: >-
+        type(variables.maxTokens) != double || variables.maxTokens < 1.0 ||
+        variables.maxTokens != double(int(variables.maxTokens)) ?
+          envoy.Denied(403).WithBody("Blocked by Kyverno policy agentrouter-model-governance: max_tokens is required").Response() : null
+    - expression: >-
+        variables.maxTokens > variables.tokenLimit ?
+          envoy.Denied(403).WithBody("Blocked by Kyverno policy agentrouter-model-governance: max_tokens exceeds the limit for " + variables.user).Response() : null
+    - expression: >-
+        "n" in variables.body && variables.body.n != 1.0 ?
+          envoy.Denied(403).WithBody("Blocked by Kyverno policy agentrouter-model-governance: only one completion per request").Response() : null
+    - expression: >-
+        "tools" in variables.body && variables.user != "bob" ?
+          envoy.Denied(403).WithBody("Blocked by Kyverno policy agentrouter-model-governance: tool calling not allowed for " + variables.user).Response() : null
+    - expression: >-
+        !("messages" in variables.body) || type(variables.body.messages) != list ?
+          envoy.Denied(400).WithBody("Blocked by Kyverno policy agentrouter-model-governance: messages must be a list").Response() : null
+    - expression: >-
+        variables.body.messages.exists(m, "content" in m && (
+          type(m.content) == string ? m.content.matches(variables.credential) :
+          type(m.content) == list && m.content.exists(part,
+            "text" in part && type(part.text) == string && part.text.matches(variables.credential)))) ?
+          envoy.Denied(403).WithBody("Blocked by Kyverno policy agentrouter-model-governance: prompt contains a credential").Response() : null
+    # Identity is asserted by Kyverno, overwriting any client-supplied tenant header,
+    # so token quotas and spend reports can key on it safely.
+    - expression: envoy.Allowed().WithHeader("x-tenant-id", variables.user).Response()
