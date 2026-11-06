@@ -35,6 +35,83 @@ Docker memory for both clusters. Setup is not repeated during the walkthrough.
 
 ## Demo
 
+### Live demo: permissions change what Alice can do and discover
+
+Use [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector)
+to show the actual tools and results, with a terminal beside it for RBAC changes.
+Pre-stage transport, identity, and arguments; do not explain curl or JSON-RPC
+framing during the live story.
+
+**Rehearsal prerequisite:** the raw commands below are tested, but Inspector
+compatibility with this gateway is not yet validated. Test authenticated
+Streamable HTTP, denial rendering, and explicit catalog refresh without
+reconnecting. Pin the working Inspector version and install its supported Node.js
+runtime before presenting.
+
+#### Pre-stage
+
+1. Run setup and reset. Keep the gateway port-forward from the reproduction
+   runbook below running.
+2. Launch `npx @modelcontextprotocol/inspector`; open its printed authenticated
+   local URL and configure Streamable HTTP at `http://127.0.0.1:19080/mcp`.
+3. Use the authentication section below to acquire Alice's token privately.
+   Configure her Authorization header and connect before screen sharing.
+   Do not project bearer tokens, header panes, or authentication settings.
+   Do not disable Inspector's own access-token protection.
+4. Fetch the catalog: Alice should see five tools. Prepare the scale tool
+   `kube-tools__scale_deployment` with `team-a-dev / checkout / 2` and the
+   workload-status tool with `team-a-dev / checkout`.
+5. Export the context in the demonstration terminal:
+
+   ```bash
+   export CONTEXT="${CONTEXT:-kind-kyverno-agentrouter-extproc}"
+   ```
+
+Keep the same authenticated connection through the story. Tokens expire after
+30 minutes; acquire them shortly before presenting, not before a long session.
+
+#### Show the execution boundary first
+
+Click **Run Tool** for scale: the call succeeds. Revoke Alice's permission:
+
+```bash
+kubectl --context "$CONTEXT" -n team-a-dev delete rolebinding alice-scale
+```
+
+Repeat the same prepared scale call **before refreshing the tool catalog**:
+it must be denied. Read workload status: reads still work and desired replicas
+remain 2. The UI may retain cached tools, but execution remains authorized.
+
+#### Then show the response-governance extension
+
+Explicitly refresh **List Tools** on the existing connection:
+
+| State | Expected discovery | Execution |
+|---|---|---|
+| Grant present | 5 tools, including scale | Scale allowed |
+| Grant revoked | 4 tools, scale absent | Direct scale denied |
+| Grant restored | 5 tools, scale returns | Scale allowed |
+
+Restore the grant, refresh again, then run scale:
+
+```bash
+kubectl --context "$CONTEXT" apply -f examples/agentrouter-extproc/manifests/alice-scale.yaml
+```
+
+**Takeaway:** “ext_authz decides whether a call may execute. The new ext_proc
+integration shapes what the caller discovers using the same live permissions.”
+
+Keep execution to three minutes and discovery to one more. A pre-connected Bob
+tab can optionally show unaffected access, but avoid switching identities in the
+main story. Exceptions and reports are supplementary sections below. Discovery
+filtering is not a substitute for execution authorization, and the demo's
+unisolated backends remain reachable outside the gateway.
+
+If Inspector reconnects, renews credentials, or cannot render the denial,
+do not claim an unchanged session. Use the tested raw runbook instead.
+
+### Reproduction runbook: raw commands and optional follow-ons
+
 Run the story one command at a time, as in the
 [native network-policy demo](https://github.com/nirmata/demo-network-policy-automation#demo).
 Use Bash and keep the main terminal open: tokens and sessions live in shell
