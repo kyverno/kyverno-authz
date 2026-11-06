@@ -171,13 +171,32 @@ Do not install or upgrade it during the presentation.
 
    Start the gateway port-forward from the reproduction walkthrough below.
 2. Launch Inspector with `npx @modelcontextprotocol/inspector` and open the
-   authenticated local URL it prints. Use Streamable HTTP and
-   `http://127.0.0.1:18080/mcp`.
-3. Acquire Alice's token using
-   `examples/agentrouter/scripts/get-token.sh alice` through a private
-   capture, configure the connection's Authorization header privately, and
-   connect once. Never project the token, authentication settings, or network
-   header pane. Keep Inspector's own access-token protection enabled.
+   authenticated local URL it prints. In **Add server**, enter a server ID
+   such as `alice-sre`, select **streamable-http**, and set **URL** to
+   `http://127.0.0.1:18080/mcp`. Click **Add**.
+3. Configure Alice's Authorization header before connecting. Inspector v2
+   doesn't show authentication fields in **Add server**. On the new server
+   card, click **Settings**, expand **Custom Headers**, and click **+ Add Header**.
+   Set the header name to `Authorization`.
+
+   On macOS, run this from the repository root to copy the complete header
+   value without printing it:
+
+   ```bash
+   set +x
+   ALICE_TOKEN=$(./examples/agentrouter/scripts/get-token.sh alice)
+   test -n "$ALICE_TOKEN" && printf 'Bearer %s' "$ALICE_TOKEN" | pbcopy
+   unset ALICE_TOKEN
+   ```
+
+   Paste into the header value field. The value must start with `Bearer`
+   followed by a space and Alice's token. Close settings, then connect.
+   On other systems, capture the token privately and use a local clipboard tool.
+   Don't configure the OAuth section for this manual-token flow.
+   Alice's token is not Inspector's **Proxy Session Token**; that separate
+   token protects Inspector itself. Keep Inspector's access-token protection
+   enabled. Never project the token, authentication settings, or network headers.
+   After pasting, run `printf '' | pbcopy` on macOS to clear the clipboard.
 4. Select `kube-tools__scale_deployment`; fill `namespace=team-a-dev`,
    `name=checkout`, `replicas=2`. Also locate
    `kube-tools__get_workload_status` with the same namespace/name.
