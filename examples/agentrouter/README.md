@@ -162,12 +162,19 @@ Do not install or upgrade it during the presentation.
 
 ### Pre-stage before the audience arrives
 
-1. Run setup and `scripts/reset.sh`. Start the gateway port-forward from the
-   reproduction walkthrough below.
+1. From the repository root, set up and reset the demo:
+
+   ```bash
+   examples/agentrouter/scripts/setup.sh
+   examples/agentrouter/scripts/reset.sh
+   ```
+
+   Start the gateway port-forward from the reproduction walkthrough below.
 2. Launch Inspector with `npx @modelcontextprotocol/inspector` and open the
    authenticated local URL it prints. Use Streamable HTTP and
    `http://127.0.0.1:18080/mcp`.
-3. Acquire Alice's token using `scripts/get-token.sh alice` through a private
+3. Acquire Alice's token using
+   `examples/agentrouter/scripts/get-token.sh alice` through a private
    capture, configure the connection's Authorization header privately, and
    connect once. Never project the token, authentication settings, or network
    header pane. Keep Inspector's own access-token protection enabled.
@@ -225,8 +232,8 @@ outage recovery are optional follow-ons, not prerequisites to the main point.
 This baseline does not filter discovery: scale may remain listed after
 revocation, but execution is denied. Enforcement applies to gateway traffic;
 the demo's backends are not isolated. The live story ends with the grant removed.
-To restore the default state after the demo, apply `manifests/alice-scale.yaml`
-using the grant command above.
+To restore the default state after the demo, apply
+`examples/agentrouter/manifests/alice-scale.yaml` using the grant command above.
 
 ## Reproduction runbook: raw commands and optional follow-ons
 
@@ -471,7 +478,8 @@ If Kubernetes `can-i` has not yet reflected a RoleBinding change, repeat it
 before continuing. If recovery briefly returns 503, retry the read after
 endpoints propagate. To restart the incident, rerun section 1's seed commands.
 After interruption, restore the RoleBinding and authorizer as shown above
-(or run `scripts/reset.sh` **after** stopping the manual port-forward).
+(or run `examples/agentrouter/scripts/reset.sh` **after** stopping the manual
+port-forward).
 
 ## Full suite and non-mutating checks
 
@@ -490,7 +498,7 @@ scale deployments. Requests still
 produce ordinary backend audit records and authorizer reports.
 
 `run.sh` saves noncredential output to ignored `.state/*.log`.
-`scripts/get-token.sh alice` deliberately prints a token for manual clients;
+`examples/agentrouter/scripts/get-token.sh alice` deliberately prints a token for manual clients;
 do not use it on a projected terminal or log its output.
 
 ## Reporting and local-demo limitations
