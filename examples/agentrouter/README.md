@@ -1,41 +1,45 @@
-# Control an assistant's tool access with Agent Router and Kyverno Authz
+# Limit an SRE assistant's actions with Agent Router and Kyverno Authz
 
-An AI assistant can use tools to read information or make changes. But a tool
-that works for one person might not be safe for everyone.
+Alice is a site reliability engineer (SRE). She keeps apps running. Her AI
+assistant helps by checking app status and using tools to make changes.
+The assistant acts on Alice's behalf, but that doesn't give it unlimited access.
 
 [Agent Router](https://aigateway.envoyproxy.io/) gives your assistant one place
-to reach models and tools. **Kyverno Authz checks whether the person using the
-assistant is allowed to make each call.** In this demo, it checks the person's
+to reach models and tools. **Kyverno Authz checks whether Alice is allowed to
+perform each action her assistant requests.** In this demo, it checks her
 current Kubernetes permissions, not just who signed in.
 
 ## What you'll show
 
-Alice uses an assistant to manage a small app. She can read the app's status
-and change how many copies run. Kubernetes calls each copy a *replica*.
+Alice asks her SRE assistant to run two copies of the checkout app.
+Kubernetes calls each copy a *replica*.
 
-1. Alice asks a tool to run two copies. The call succeeds.
-2. You remove her permission to change the number of copies.
-3. Alice repeats the same call. Kyverno Authz blocks it.
-4. Alice can still read the app's status.
-5. You restore her permission. The change works again.
+1. The assistant calls the tool on Alice's behalf. The call succeeds.
+2. You remove Alice's permission to change the number of copies.
+3. The assistant repeats the same call. Kyverno Authz blocks it.
+4. The assistant can still read the app's status for Alice.
+5. You restore Alice's permission. The assistant's change works again.
 
-Alice stays signed in throughout the demo. You don't change the tool, restart
-the gateway, or issue a new sign-in token between these steps.
+The assistant keeps using the same Alice sign-in token and connection.
+You don't change the tool, restart the gateway, or issue a new token between
+these steps.
 
 ## Why it matters
 
-**Signing in proves who you are. It doesn't mean you can do everything.**
-People change roles, and teams sometimes need to remove access quickly.
-Kyverno Authz checks current permissions for each tool call through the gateway.
-You can change access without waiting for Alice's sign-in token to expire.
+**An assistant acting for Alice must stay within Alice's current permissions.**
+A request from Alice, or a plan made by the assistant, doesn't grant extra access.
+Kyverno Authz checks each tool call through the gateway. If Alice loses a
+permission, her assistant loses it too, without waiting for her token to expire.
+The check happens outside the assistant, so it doesn't depend on the assistant
+following instructions to stay within those limits.
 
 Agent Router already supports sign-in checks, model routing, and simple tool
 rules. The added value here is the live Kubernetes permission check. This demo
 uses the Model Context Protocol (MCP), which lets an assistant find and call
 tools.
 
-Alice still sees all five tools after you remove her permission. This demo
-blocks the action; it doesn't hide the tool.
+Alice's assistant still sees all five tools after you remove her permission.
+This demo blocks the action; it doesn't hide the tool.
 
 ## Implementation and additional checks
 
@@ -66,6 +70,14 @@ The full runbook also covers these checks:
 discovery is **not** permission-filtered; calls are authorized at execution.
 Policy exceptions, response filtering, and attributed/redacted reporting are
 not part of this demo.
+
+### What acting on Alice's behalf means here
+
+Inspector or the Python client stands in for the assistant and sends Alice's
+JWT, a signed identity token. The demo does not run an autonomous agent or a
+model-driven tool loop. It has no separate agent identity, token exchange, or
+proof that Alice approved a specific action. It demonstrates tool calls checked
+against Alice's permissions, not a full delegation system.
 
 ## Architecture
 
@@ -196,8 +208,9 @@ kubectl --context "$CONTEXT" -n team-a-dev get deployment checkout \
   -o jsonpath='{.spec.replicas}{" desired replicas\n"}'
 ```
 
-**Takeaway:** “The tool, token, and route did not change. Agent Router routes
-the request; Kyverno Authz checks whether Alice may execute it now.”
+**Takeaway:** “Alice's assistant can help her, but it can't gain extra access
+by acting for her. The tool and token stayed the same. Kyverno Authz checked
+Alice's current permission before letting the assistant act.”
 
 Keep this story to roughly three minutes. Model checks, reports, admission, and
 outage recovery are optional follow-ons, not prerequisites to the main point.
