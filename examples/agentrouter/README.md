@@ -14,15 +14,22 @@ current Kubernetes permissions, not just who signed in.
 Alice asks her SRE assistant to run two copies of the checkout app.
 Kubernetes calls each copy a *replica*.
 
-1. The assistant calls the tool on Alice's behalf. The call succeeds.
-2. You remove Alice's permission to change the number of copies.
-3. The assistant repeats the same call. Kyverno Authz blocks it.
-4. The assistant can still read the app's status for Alice.
-5. You restore Alice's permission. The assistant's change works again.
+1. The assistant sees the tool and calls it for Alice. Kyverno Authz blocks it:
+   Alice doesn't yet have permission to change the number of copies.
+2. Alice approves access. You add her Kubernetes permission.
+3. The assistant repeats the same call. It succeeds and runs two copies.
+4. Alice withdraws access. You remove her permission.
+5. The assistant tries again. Kyverno Authz blocks it, but reads still work.
 
 The assistant keeps using the same Alice sign-in token and connection.
 You don't change the tool, restart the gateway, or issue a new token between
 these steps.
+
+In the story, Alice approves and withdraws access. In the demo, you use an
+administrator terminal to add and remove Alice's Kubernetes permission.
+There is no approval screen or separate permission grant for the assistant.
+The assistant cannot grant itself access, and removing this permission also
+limits Alice's own calls through the gateway.
 
 ## Why it matters
 
@@ -141,7 +148,7 @@ Do not run the suite while the manual port-forward is active.
 
 # Demo
 
-## Live demo: one call, one permission change
+## Live demo: blocked, granted, then revoked
 
 Use [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector)
 for the audience-facing interaction. Keep the terminal for the two RBAC
@@ -167,11 +174,11 @@ Do not install or upgrade it during the presentation.
 4. Select `kube-tools__scale_deployment`; fill `namespace=team-a-dev`,
    `name=checkout`, `replicas=2`. Also locate
    `kube-tools__get_workload_status` with the same namespace/name.
-5. In the demonstration terminal, export the context and confirm Alice's grant:
+5. In the demonstration terminal, export the context and remove Alice's grant:
 
    ```bash
    export CONTEXT="${CONTEXT:-kind-${CLUSTER_NAME:-kyverno-agentrouter}}"
-   kubectl --context "$CONTEXT" apply -f examples/agentrouter/manifests/alice-scale.yaml
+   kubectl --context "$CONTEXT" -n team-a-dev delete rolebinding alice-scale --ignore-not-found
    ```
 
 Keep the Inspector connection open. Tokens last 24 hours for this local demo:
@@ -179,26 +186,27 @@ authenticate before presenting and rehearse without reconnecting or refreshing.
 This extended lifetime is not a production recommendation; live RBAC changes
 still take effect without replacing the token.
 
-### Show allowed → blocked → allowed
+### Show blocked → allowed → blocked
 
 | Action | Expected result | What to explain |
 |---|---|---|
-| In Inspector, click **Run Tool** for scale | Successful MCP result; desired replicas become 2 | A real MCP call reaches Kubernetes through Agent Router |
-| Delete Alice's grant with the command below | RoleBinding deleted | Change Kubernetes permissions, not the agent, token, or route |
-| Repeat the identical scale call | HTTP 403 / authorization denial | Kyverno Authz checks live RBAC through SubjectAccessReview |
+| Show the scale tool, then click **Run Tool** | HTTP 403 / authorization denial | Seeing a tool doesn't grant permission to use it |
+| Alice approves; add her grant below | RoleBinding created | You apply the permission as an administrator; the assistant cannot grant it |
+| Repeat the identical scale call | Success; desired replicas become 2 | The same assistant connection can now make the call for Alice |
+| Alice withdraws access; delete her grant below | RoleBinding deleted | Permission can change without replacing the token |
+| Repeat the identical scale call again | HTTP 403 / authorization denial | Kyverno Authz checks current permission on every call |
 | Call workload status | Read succeeds; desired replicas remain 2 | Removing writes does not remove reads |
-| Restore the grant below; repeat scale | Success | The same connection can act again with current permissions |
+
+Grant:
+
+```bash
+kubectl --context "$CONTEXT" apply -f examples/agentrouter/manifests/alice-scale.yaml
+```
 
 Revoke:
 
 ```bash
 kubectl --context "$CONTEXT" -n team-a-dev delete rolebinding alice-scale
-```
-
-Restore:
-
-```bash
-kubectl --context "$CONTEXT" apply -f examples/agentrouter/manifests/alice-scale.yaml
 ```
 
 Optionally show the actual desired state, rather than waiting for pod readiness:
@@ -210,17 +218,21 @@ kubectl --context "$CONTEXT" -n team-a-dev get deployment checkout \
 
 **Takeaway:** “Alice's assistant can help her, but it can't gain extra access
 by acting for her. The tool and token stayed the same. Kyverno Authz checked
-Alice's current permission before letting the assistant act.”
+Alice's current permission each time: blocked, allowed, then blocked again.”
 
 Keep this story to roughly three minutes. Model checks, reports, admission, and
 outage recovery are optional follow-ons, not prerequisites to the main point.
 This baseline does not filter discovery: scale may remain listed after
 revocation, but execution is denied. Enforcement applies to gateway traffic;
-the demo's backends are not isolated.
+the demo's backends are not isolated. The live story ends with the grant removed.
+To restore the default state after the demo, apply `manifests/alice-scale.yaml`
+using the grant command above.
 
 ## Reproduction runbook: raw commands and optional follow-ons
 
 Run setup once, then follow these numbered sections from the repository root.
+This fuller runbook starts with access granted, then revokes and restores it;
+the shorter live story above starts and ends with access blocked.
 All Kubernetes commands explicitly select the demo context; no context switch
 is required. The examples use Bash, `curl`, and Python's standard library
 (no `jq`). Keep terminal tracing off: never print the token or use `curl -v`.
