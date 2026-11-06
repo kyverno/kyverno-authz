@@ -5,7 +5,6 @@ set -euo pipefail
 source "$(dirname "$0")/common.sh"
 require_tools kubectl
 require_cluster
-rm -f "$DEMO_DIR/.state/session.json"
 k apply -f "$DEMO_DIR/manifests/alice-scale.yaml"
 k scale -n "$NAMESPACE" deployment/kyverno-authz --replicas=1
 k rollout status -n "$NAMESPACE" deployment/kyverno-authz --timeout=120s

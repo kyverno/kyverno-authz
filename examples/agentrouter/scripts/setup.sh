@@ -98,4 +98,4 @@ done
 
 printf '\nChecking the public MCP and model endpoints...\n'
 python3 "$DEMO_DIR/client/demo.py" --check
-printf '\nReady. Start the presentation: %s/scripts/step.sh status\nOr run the full suite: %s/scripts/run.sh\n' "$DEMO_DIR" "$DEMO_DIR"
+printf '\nReady. Follow the README Demo runbook, or run the full suite: %s/scripts/run.sh\n' "$DEMO_DIR"

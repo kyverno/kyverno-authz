@@ -21,25 +21,12 @@ KEYCLOAK = "http://127.0.0.1:18081/realms/demo"
 AUDIT = "http://127.0.0.1:18082/audit"
 MODELS = "http://127.0.0.1:18080/v1/chat/completions"
 MODEL_AUDIT = "http://127.0.0.1:18083/audit"
-STATE_FILE = DEMO_DIR / ".state/session.json"
 OWN = {"namespace": "team-a-dev", "name": "checkout"}
 OTHER = {"namespace": "team-b-dev", "name": "checkout"}
 SCALE_TOOL = "kube-tools__scale_deployment"
 EXPECTED_TOOLS = {
     "kube-tools__get_workload_status", "kube-tools__get_events",
     "kube-tools__get_logs", SCALE_TOOL, "runbooks__get_runbook",
-}
-STEPS = {
-    "status": "Start a fresh incident: zero replicas, one bounded Alice token and MCP session.",
-    "read": "Alice reads her actual deployment through Agent Router.",
-    "revoke": "Revoke Alice's Kubernetes scale permission; do not change her JWT or session.",
-    "denied": "The same JWT/session cannot scale: live SubjectAccessReview denies execution.",
-    "restore": "Restore Kubernetes permission; the existing JWT/session is still used.",
-    "scale": "Bounded remediation: the same Alice scales checkout to two ready replicas.",
-    "models": "Request-body governance allows demo-mini but denies Alice's premium model.",
-    "reports": "Existing OpenReports show pass/fail summaries, not policy attribution.",
-    "guardrails": "Complementary admission denies unsafe routes before they are installed.",
-    "fail-closed": "An unavailable authorizer blocks execution; restore it and verify recovery.",
 }
 
 
@@ -317,97 +304,19 @@ def decision_reports(tokens):
     print("PASS | REPORT | accumulated summaries only; no policy attribution or per-request correlation", flush=True)
 
 
-def save_state(client):
-    STATE_FILE.parent.mkdir(mode=0o700, exist_ok=True)
-    os.chmod(STATE_FILE.parent, 0o700)
-    with os.fdopen(os.open(STATE_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as output:
-        os.chmod(STATE_FILE, 0o600)
-        json.dump({"context": CONTEXT, "client": vars(client)}, output)
-
-
-def load_state():
+def fail_closed(client):
+    kubectl("scale", "deployment/kyverno-authz", "-n", NAMESPACE, "--replicas=0")
     try:
-        data = json.loads(STATE_FILE.read_text())
-        saved = data["client"]
-        payload = saved["token"].split(".")[1]
-        claims = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
-        if data["context"] != CONTEXT or claims["exp"] <= time.time() + 20 or not saved["session"]:
-            raise ValueError("expired or wrong context")
-        client = Client()
-        client.__dict__.update(saved)
-        return client
-    except (OSError, ValueError, KeyError, TypeError, IndexError) as error:
-        raise RuntimeError("Missing, invalid, or expired presentation session. Run scripts/step.sh status "
-                           "to start again (this resets the incident).") from error
-
-
-def execute_step(name, client=None):
-    print(f"\nSAY | {STEPS[name]}", flush=True)
-    if name == "status":
-        print("ACTION | reset.sh; acquire Alice token; initialize MCP session; read zero replicas", flush=True)
-        subprocess.run([str(DEMO_DIR / "scripts/reset.sh")], check=True)
-        client = Client(token("alice", password()))
-        client.initialize()
-        status = json.loads(allowed(client, "kube-tools__get_workload_status", OWN))
-        if status["replicas"] != 0 or not alice_can_scale():
-            raise AssertionError("incident was not seeded")
-        print("PASS | incident seeded; token/session retained privately in .state (never printed)", flush=True)
-    else:
-        client = client or load_state()
-        if name == "read":
-            print("ACTION | tools/call kube-tools__get_workload_status team-a-dev/checkout", flush=True)
-            print(allowed(client, "kube-tools__get_workload_status", OWN), flush=True)
-        elif name == "revoke":
-            print("ACTION | kubectl delete rolebinding alice-scale -n team-a-dev", flush=True)
-            kubectl("delete", "rolebinding", "alice-scale", "-n", "team-a-dev")
-            wait_until("RBAC revocation not observed", lambda: not alice_can_scale())
-            print("PASS | Alice can no longer update deployments/scale; JWT/session unchanged", flush=True)
-        elif name == "denied":
-            if alice_can_scale():
-                raise RuntimeError("Run scripts/step.sh revoke before denied.")
-            print("ACTION | same JWT/session tools/call scale_deployment replicas=2", flush=True)
-            denied(client, SCALE_TOOL, {**OWN, "replicas": 2}, "Kubernetes SAR denied")
-        elif name == "restore":
-            print("ACTION | kubectl apply -f manifests/alice-scale.yaml", flush=True)
-            kubectl("apply", "-f", str(DEMO_DIR / "manifests/alice-scale.yaml"))
-            wait_until("RBAC restoration not observed", alice_can_scale)
-            print("PASS | Alice scale permission restored; JWT/session unchanged", flush=True)
-        elif name == "scale":
-            if not alice_can_scale():
-                raise RuntimeError("Run scripts/step.sh restore before scale.")
-            print("ACTION | same JWT/session tools/call scale_deployment replicas=2; verify rollout", flush=True)
-            allowed(client, SCALE_TOOL, {**OWN, "replicas": 2})
-            kubectl("rollout", "status", "deployment/checkout", "-n", "team-a-dev", "--timeout=120s")
-            status = json.loads(allowed(client, "kube-tools__get_workload_status", OWN))
-            if status["replicas"] != 2 or status["readyReplicas"] != 2:
-                raise AssertionError("checkout did not recover")
-            print("PASS | checkout has two ready replicas", flush=True)
-        elif name == "models":
-            print("ACTION | POST /v1/chat/completions: demo-mini allowed; demo-pro denied", flush=True)
-            model_request(client.token, prompt("demo-mini"))
-            model_request(client.token, prompt("demo-pro"), "model not allowed for alice")
-        elif name == "reports":
-            print("ACTION | kubectl get reports.openreports.io -n agentrouter-demo (summaries only)", flush=True)
-            decision_reports([client.token])
-        elif name == "guardrails":
-            print("ACTION | kubectl apply --dry-run=server for unsafe route examples", flush=True)
-            admission_cases()
-        elif name == "fail-closed":
-            print("ACTION | stop authorizer; attempt scale; restore authorizer in finally; verify read", flush=True)
-            kubectl("scale", "deployment/kyverno-authz", "-n", NAMESPACE, "--replicas=0")
-            try:
-                wait_until("authorizer endpoints did not disappear", lambda: not authorizer_ready())
-                denied(client, SCALE_TOOL, {**OWN, "replicas": 2}, "", (500, 503), "authorizer unavailable")
-            finally:
-                kubectl("scale", "deployment/kyverno-authz", "-n", NAMESPACE, "--replicas=1")
-                kubectl("rollout", "status", "deployment/kyverno-authz", "-n", NAMESPACE, "--timeout=120s")
-            wait_until("authorizer did not recover", authorizer_ready)
-            wait_until("gateway did not observe recovery", lambda: client.raw(
-                b'{"jsonrpc":"2.0","id":"recovery","method":"ping"}')[0] == 200)
-            allowed(client, "kube-tools__get_workload_status", OWN)
-            print("PASS | authorizer restored and real backend read succeeds", flush=True)
-    save_state(client)
-    return client
+        wait_until("authorizer endpoints did not disappear", lambda: not authorizer_ready())
+        denied(client, SCALE_TOOL, {**OWN, "replicas": 2}, "", (500, 503), "authorizer unavailable")
+    finally:
+        kubectl("scale", "deployment/kyverno-authz", "-n", NAMESPACE, "--replicas=1")
+        kubectl("rollout", "status", "deployment/kyverno-authz", "-n", NAMESPACE, "--timeout=120s")
+    wait_until("authorizer did not recover", authorizer_ready)
+    wait_until("gateway did not observe recovery", lambda: client.raw(
+        b'{"jsonrpc":"2.0","id":"recovery","method":"ping"}')[0] == 200)
+    allowed(client, "kube-tools__get_workload_status", OWN)
+    print("PASS | authorizer restored and real backend read succeeds", flush=True)
 
 
 def request_guardrails(client):
@@ -420,22 +329,34 @@ def request_guardrails(client):
 
 
 def run_demo(only=None):
-    client = execute_step("status")
+    subprocess.run([str(DEMO_DIR / "scripts/reset.sh")], check=True)
+    client = Client(token("alice", password()))
+    client.initialize()
+    if replicas("team-a-dev") != 0:
+        raise AssertionError("incident was not seeded")
     if only is None or only == 1:
         try:
-            for name in ("read", "revoke", "denied", "restore", "scale"):
-                client = execute_step(name, client)
-                if name == "denied":
-                    check_discovery(client, "Alice after revoke (same JWT/session)")
-                    allowed(client, "kube-tools__get_workload_status", OWN)
-                    print("PASS | revoking scale preserves Alice's read access", flush=True)
+            allowed(client, "kube-tools__get_workload_status", OWN)
+            kubectl("delete", "rolebinding", "alice-scale", "-n", "team-a-dev")
+            wait_until("RBAC revocation not observed", lambda: not alice_can_scale())
+            denied(client, SCALE_TOOL, {**OWN, "replicas": 2}, "Kubernetes SAR denied")
+            check_discovery(client, "Alice after revoke (same JWT/session)")
+            allowed(client, "kube-tools__get_workload_status", OWN)
+            print("PASS | revoking scale preserves Alice's read access", flush=True)
         finally:
-            if not alice_can_scale():
-                kubectl("apply", "-f", str(DEMO_DIR / "manifests/alice-scale.yaml"))
+            kubectl("apply", "-f", str(DEMO_DIR / "manifests/alice-scale.yaml"))
+        wait_until("RBAC restoration not observed", alice_can_scale)
+        allowed(client, SCALE_TOOL, {**OWN, "replicas": 2})
+        kubectl("rollout", "status", "deployment/checkout", "-n", "team-a-dev", "--timeout=120s")
+        status = json.loads(allowed(client, "kube-tools__get_workload_status", OWN))
+        if status["replicas"] != 2 or status["readyReplicas"] != 2:
+            raise AssertionError("checkout did not recover")
+        print("PASS | same JWT/session recovers checkout to two ready replicas", flush=True)
     if only is None or only == 2:
         request_guardrails(client)
     if only is None or only == 3:
-        execute_step("models", client)
+        model_request(client.token, prompt("demo-mini"))
+        model_request(client.token, prompt("demo-pro"), "model not allowed for alice")
         model_request(client.token, prompt("demo-mini", max_tokens=4000), "max_tokens exceeds the limit for alice")
         model_request(client.token, prompt("demo-mini", n=5), "only one completion per request")
         model_request(client.token, prompt("demo-mini", tools=[]), "tool calling not allowed for alice")
@@ -443,9 +364,9 @@ def run_demo(only=None):
     if only is None or only == 4:
         if only == 4:
             denied(client, SCALE_TOOL, {**OWN, "replicas": 50}, "replicas must be an integer from 1 through 3")
-        execute_step("reports", client)
+        decision_reports([client.token])
     if only is None or only == 5:
-        execute_step("guardrails", client)
+        admission_cases()
     if only is None or only == 6:
         denied(Client(), SCALE_TOOL, {**OWN, "replicas": 2}, "", 401, "missing JWT")
         denied(Client("not-a-jwt"), SCALE_TOOL, {**OWN, "replicas": 2}, "", 401, "malformed JWT")
@@ -455,7 +376,7 @@ def run_demo(only=None):
             if status != expected or len(audit()) != before:
                 raise AssertionError(f"malformed/oversized body not rejected: HTTP {status}")
             print(f"PASS | bad body rejected: HTTP {status}", flush=True)
-        execute_step("fail-closed", client)
+        fail_closed(client)
     print("\nPASS: requested demo scenarios completed against the real gateway.", flush=True)
 
 
@@ -477,15 +398,12 @@ def parse_args(argv=None):
     modes.add_argument("--token", choices=("alice", "bob"), help="Print a demo token without logging it.")
     modes.add_argument("--scenario", type=int, choices=range(1, 7), metavar="N",
                        help="Run scenario 1-6 after resetting the incident.")
-    modes.add_argument("--step", choices=tuple(STEPS), help="Run one presentation step; status starts/reset the session.")
     return parser.parse_args(argv)
 
 
 def main():
     os.umask(0o077)
     args = parse_args()
-    if args.step and args.step != "status":
-        load_state()
     with ExitStack() as stack:
         if args.token:
             stack.enter_context(port_forward(NAMESPACE, "service/keycloak", 18081, 8080,
@@ -501,8 +419,6 @@ def main():
             stack.enter_context(port_forward(namespace, resource, local, remote, probe))
         if args.check:
             smoke_check()
-        elif args.step:
-            execute_step(args.step)
         else:
             run_demo(args.scenario)
 

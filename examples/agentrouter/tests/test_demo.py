@@ -1,11 +1,8 @@
-import base64
 import importlib.util
 import json
-import os
 from pathlib import Path
 import sys
 import threading
-import time
 import unittest
 from unittest.mock import Mock, patch
 from urllib.error import HTTPError
@@ -126,72 +123,13 @@ class ReportingTests(unittest.TestCase):
         self.assertEqual(request.call_args.args[2]["Mcp-Session-Id"], "same-session")
 
 
-class StepTests(unittest.TestCase):
-    def test_state_decodes_unpadded_jwt_payload_lengths(self):
-        remainders = set()
-        claims = json.dumps({"exp": int(time.time()) + 600})
-        for spaces in range(3):
-            payload = base64.urlsafe_b64encode(
-                (claims + " " * spaces).encode(),
-            ).decode().rstrip("=")
-            remainders.add(len(payload) % 4)
-            token = f"header.{payload}.signature"
-            with self.subTest(remainder=len(payload) % 4), patch.object(Path, "read_text", return_value=json.dumps({
-                "context": demo.CONTEXT,
-                "client": {"token": token, "session": "session"},
-            })):
-                self.assertEqual(demo.load_state().token, token)
-        self.assertEqual(remainders, {0, 2, 3})
-
+class RunnerTests(unittest.TestCase):
     def test_argument_selection(self):
-        self.assertEqual(demo.parse_args(["--step", "revoke"]).step, "revoke")
+        self.assertEqual(demo.parse_args(["--scenario", "1"]).scenario, 1)
         self.assertTrue(demo.parse_args(["--check"]).check)
-        for args in (["--step", "unknown"], ["--step", "read", "--check"], ["--scenario", "7"]):
+        for args in (["--step", "read"], ["--scenario", "1", "--check"], ["--scenario", "7"]):
             with self.subTest(args=args), self.assertRaises(SystemExit):
                 demo.parse_args(args)
-
-    def test_missing_or_expired_state_fails_before_cluster_actions(self):
-        with patch.object(Path, "read_text", side_effect=FileNotFoundError), patch.object(demo, "kubectl") as k:
-            with self.assertRaisesRegex(RuntimeError, "step.sh status"):
-                demo.execute_step("read")
-            k.assert_not_called()
-        expired = "header." + base64.urlsafe_b64encode(b'{"exp":0}').decode() + ".signature"
-        with patch.object(Path, "read_text", return_value=json.dumps({
-            "context": demo.CONTEXT, "client": {"token": expired, "session": "session"},
-        })):
-            with self.assertRaisesRegex(RuntimeError, "expired"):
-                demo.load_state()
-
-    def test_read_only_selects_read_action_and_preserves_identity(self):
-        client = demo.Client("same-jwt")
-        client.session = "same-session"
-        with patch.object(demo, "allowed", return_value='{"replicas":0}') as call, \
-                patch.object(demo, "kubectl") as k, patch.object(demo, "save_state") as save:
-            self.assertIs(demo.execute_step("read", client), client)
-        call.assert_called_once_with(client, "kube-tools__get_workload_status", demo.OWN)
-        k.assert_not_called()
-        save.assert_called_once_with(client)
-        self.assertEqual((client.token, client.session), ("same-jwt", "same-session"))
-
-    def test_denied_requires_revocation(self):
-        with patch.object(demo, "alice_can_scale", return_value=True), patch.object(demo, "denied") as call:
-            with self.assertRaisesRegex(RuntimeError, "step.sh revoke"):
-                demo.execute_step("denied", demo.Client("jwt"))
-            call.assert_not_called()
-
-    def test_state_is_private_and_retains_session(self):
-        client = demo.Client("header." + base64.urlsafe_b64encode(
-            json.dumps({"exp": time.time() + 600}).encode()).decode() + ".signature")
-        client.session = "persisted-session"
-        state = DEMO_DIR / ".state/test-session.json"
-        try:
-            with patch.object(demo, "STATE_FILE", state):
-                demo.save_state(client)
-                loaded = demo.load_state()
-            self.assertEqual(os.stat(state).st_mode & 0o777, 0o600)
-            self.assertEqual((loaded.token, loaded.session), (client.token, client.session))
-        finally:
-            state.unlink(missing_ok=True)
 
     def test_smoke_check_never_resets_or_scales(self):
         with patch.object(demo, "password", return_value="password"), \
@@ -208,7 +146,7 @@ class StepTests(unittest.TestCase):
         with patch.object(demo, "kubectl") as k, patch.object(demo, "wait_until"), \
                 patch.object(demo, "denied", side_effect=AssertionError("verification failed")):
             with self.assertRaisesRegex(AssertionError, "verification failed"):
-                demo.execute_step("fail-closed", demo.Client("jwt"))
+                demo.fail_closed(demo.Client("jwt"))
         commands = [call.args for call in k.call_args_list]
         self.assertIn(("scale", "deployment/kyverno-authz", "-n", demo.NAMESPACE, "--replicas=0"), commands)
         self.assertIn(("scale", "deployment/kyverno-authz", "-n", demo.NAMESPACE, "--replicas=1"), commands)

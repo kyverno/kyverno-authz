@@ -90,55 +90,239 @@ examples/agentrouter/scripts/setup.sh
 The default context is `kind-kyverno-agentrouter`. To use an independent
 cluster, export `CLUSTER_NAME=your-demo-name` before **all** commands
 (`CONTEXT` can also be overridden). Other contexts are not modified.
-Local ports 18080–18083 must be free; each command opens and closes its own
-loopback-only port-forwards. Do not run clients concurrently.
+Local ports 18080–18083 must be free for the automated suite. The manual
+walkthrough uses 18080 for the gateway and briefly 18081 for the token helper.
+Do not run the suite while the manual port-forward is active.
 
-## Presentation: ordered copy/paste runbook
+# Demo
 
-Run setup once beforehand. Each invocation below executes one named segment
-and prints `SAY`, `ACTION`, and verified `PASS` output. It never automatically
-runs the remaining segments. Only `status` resets the incident and acquires
-identity; other steps require the saved session and do not silently refresh it.
+Run setup once, then follow these numbered sections from the repository root.
+All Kubernetes commands explicitly select the demo context; no context switch
+is required. The examples use Bash, `curl`, and Python's standard library
+(no `jq`). Keep terminal tracing off: never print the token or use `curl -v`.
+
+## 1. Connect to the gateway and establish Alice's identity
+
+In **terminal A**, discover the generated gateway Service and keep this
+port-forward running in the foreground. Wait for `Forwarding from 127.0.0.1:18080`.
+Stop it with **Ctrl-C** when the walkthrough ends.
 
 ```bash
-# 1. Seed zero replicas and establish a private Alice JWT + MCP session.
-examples/agentrouter/scripts/step.sh status
-
-# 2. "Alice reads her actual deployment through the router."
-examples/agentrouter/scripts/step.sh read
-
-# 3. "Now revoke Kubernetes write permission, not the token or session."
-examples/agentrouter/scripts/step.sh revoke
-
-# 4. "Same JWT, same session: execution now fails a live SAR."
-examples/agentrouter/scripts/step.sh denied
-
-# 5. "Restore permission without issuing a new token."
-examples/agentrouter/scripts/step.sh restore
-
-# 6. "The same identity can recover checkout, but only within the bounds."
-examples/agentrouter/scripts/step.sh scale
-
-# 7. "Alice can use demo-mini; a premium model request never reaches the backend."
-examples/agentrouter/scripts/step.sh models
-
-# 8. "Existing reports persist accumulated pass/fail summaries."
-examples/agentrouter/scripts/step.sh reports
-
-# 9. "Admission prevents unsafe routing configuration before runtime."
-examples/agentrouter/scripts/step.sh guardrails
-
-# 10. "Stop the authorizer: no execution. Restore it and verify recovery."
-examples/agentrouter/scripts/step.sh fail-closed
+GATEWAY_SERVICE=$(kubectl --context kind-kyverno-agentrouter \
+  -n envoy-gateway-system get services \
+  -l 'gateway.envoyproxy.io/owning-gateway-name=agentrouter,gateway.envoyproxy.io/owning-gateway-namespace=agentrouter-demo' \
+  -o jsonpath='{.items[0].metadata.name}')
+kubectl --context kind-kyverno-agentrouter -n envoy-gateway-system \
+  port-forward --address=127.0.0.1 "service/$GATEWAY_SERVICE" 18080:8080
 ```
 
-Tokens have a bounded 30-minute lifetime. Token, session, sequence, and run ID
-persist in ignored `.state/session.json` (directory 0700, file 0600). Tokens
-are never printed by the presentation steps. An absent, expired, or
-wrong-context session gives a prerequisite error: restart at `status`.
-`fail-closed` restores the authorizer in `finally`; after an interrupted
-presentation, use `scripts/reset.sh` to restore permission and authorizer
-availability, then `step.sh status` to start again.
+In **terminal B**, seed the incident once and acquire a finite-lived JWT into
+a shell variable. The helper opens/closes its own Keycloak port-forward;
+command substitution captures its token instead of printing it.
+
+```bash
+set +x
+kubectl --context kind-kyverno-agentrouter apply -f examples/agentrouter/manifests/alice-scale.yaml
+kubectl --context kind-kyverno-agentrouter -n team-a-dev scale deployment/checkout --replicas=0
+kubectl --context kind-kyverno-agentrouter -n team-a-dev get deployment checkout
+ALICE_TOKEN=$(examples/agentrouter/scripts/get-token.sh alice)
+test -n "$ALICE_TOKEN" && printf 'Alice token acquired (not displayed).\n'
+```
+
+Expected: checkout has desired replicas `0`; the token remains only in this
+shell. Initialize MCP, capture the response headers, and extract the
+`Mcp-Session-Id` without exposing the bearer token:
+
+```bash
+INITIALIZE=$(curl -sS -i --max-time 20 http://127.0.0.1:18080/mcp \
+  -H "Authorization: Bearer $ALICE_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -H 'MCP-Protocol-Version: 2025-06-18' \
+  --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"manual-demo","version":"1.0"}}}')
+SESSION_ID=$(printf '%s\n' "$INITIALIZE" | python3 -c \
+  'import sys; print(next(line.split(":",1)[1].strip() for line in sys.stdin if line.lower().startswith("mcp-session-id:")))')
+test -n "$SESSION_ID" && printf 'MCP session established (HTTP 200 expected).\n'
+printf '%s\n' "$INITIALIZE" | python3 -c \
+  'import sys; print(sys.stdin.read().split("\r\n\r\n",1)[1])'
+curl -sS --max-time 20 -w '\nHTTP %{http_code}\n' http://127.0.0.1:18080/mcp \
+  -H "Authorization: Bearer $ALICE_TOKEN" -H "Mcp-Session-Id: $SESSION_ID" \
+  -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+  -H 'MCP-Protocol-Version: 2025-06-18' \
+  --data '{"jsonrpc":"2.0","method":"notifications/initialized"}'
+```
+
+Expected: initialize returns `result` with server capabilities (JSON or SSE
+`data: {...}`); the notification returns HTTP 202. Keep **these same shell
+variables and this terminal** through revocation and restoration.
+
+## 2. Diagnose the real deployment
+
+“The catalog advertises a tool; authorization decides whether it can execute.”
+
+```bash
+curl -sS --max-time 20 -w '\nHTTP %{http_code}\n' http://127.0.0.1:18080/mcp \
+  -H "Authorization: Bearer $ALICE_TOKEN" -H "Mcp-Session-Id: $SESSION_ID" \
+  -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+  -H 'MCP-Protocol-Version: 2025-06-18' \
+  --data '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+curl -sS --max-time 20 -w '\nHTTP %{http_code}\n' http://127.0.0.1:18080/mcp \
+  -H "Authorization: Bearer $ALICE_TOKEN" -H "Mcp-Session-Id: $SESSION_ID" \
+  -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+  -H 'MCP-Protocol-Version: 2025-06-18' \
+  --data '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"kube-tools__get_workload_status","arguments":{"namespace":"team-a-dev","name":"checkout"}}}'
+```
+
+Expected: HTTP 200, five tools including `kube-tools__scale_deployment`.
+The read result's text contains `"replicas": 0` and `"readyReplicas": 0`.
+MCP responses may be SSE (`event: message`, `data: {...}`), not bare JSON.
+
+## 3. Revoke writes, not the token or session
+
+“A live Kubernetes SubjectAccessReview overrides an already authenticated
+session.” Delete the RoleBinding and confirm the API says `no`:
+
+```bash
+kubectl --context kind-kyverno-agentrouter -n team-a-dev delete rolebinding alice-scale
+kubectl --context kind-kyverno-agentrouter auth can-i update deployments/checkout \
+  --subresource=scale -n team-a-dev --as=alice
+curl -sS --max-time 20 -w '\nHTTP %{http_code}\n' http://127.0.0.1:18080/mcp \
+  -H "Authorization: Bearer $ALICE_TOKEN" -H "Mcp-Session-Id: $SESSION_ID" \
+  -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+  -H 'MCP-Protocol-Version: 2025-06-18' \
+  --data '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"kube-tools__scale_deployment","arguments":{"namespace":"team-a-dev","name":"checkout","replicas":2}}}'
+kubectl --context kind-kyverno-agentrouter -n team-a-dev get deployment checkout \
+  -o jsonpath='{.spec.replicas}{"\n"}'
+```
+
+Expected: `no` (`can-i` exits 1 intentionally), HTTP **403** with
+`Kubernetes SAR denied`, and replicas still **0**. Discovery remains unfiltered;
+the tool's presence does not grant permission.
+
+## 4. Restore permission and recover checkout
+
+“No new JWT or MCP session: Kubernetes permission changed, so execution changes.”
+
+```bash
+kubectl --context kind-kyverno-agentrouter apply -f examples/agentrouter/manifests/alice-scale.yaml
+kubectl --context kind-kyverno-agentrouter auth can-i update deployments/checkout \
+  --subresource=scale -n team-a-dev --as=alice
+curl -sS --max-time 20 -w '\nHTTP %{http_code}\n' http://127.0.0.1:18080/mcp \
+  -H "Authorization: Bearer $ALICE_TOKEN" -H "Mcp-Session-Id: $SESSION_ID" \
+  -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+  -H 'MCP-Protocol-Version: 2025-06-18' \
+  --data '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"kube-tools__scale_deployment","arguments":{"namespace":"team-a-dev","name":"checkout","replicas":2}}}'
+kubectl --context kind-kyverno-agentrouter -n team-a-dev rollout status deployment/checkout --timeout=120s
+kubectl --context kind-kyverno-agentrouter -n team-a-dev get deployment checkout
+```
+
+Expected: `yes`, HTTP 200, `isError: false`, then **2/2** ready replicas.
+Permission alone is not enough to bypass argument governance:
+
+```bash
+curl -sS --max-time 20 -w '\nHTTP %{http_code}\n' http://127.0.0.1:18080/mcp \
+  -H "Authorization: Bearer $ALICE_TOKEN" -H "Mcp-Session-Id: $SESSION_ID" \
+  -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+  -H 'MCP-Protocol-Version: 2025-06-18' \
+  --data '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"kube-tools__scale_deployment","arguments":{"namespace":"team-a-dev","name":"checkout","replicas":50}}}'
+```
+
+Expected: HTTP **403**, `replicas must be an integer from 1 through 3`.
+
+## 5. Govern the model request body
+
+“Alice's entitlement permits demo-mini, not demo-pro.” Agent Router derives
+its routing header from the body; callers do not need `x-ai-eg-model`.
+
+```bash
+curl -sS --max-time 20 -w '\nHTTP %{http_code}\n' http://127.0.0.1:18080/v1/chat/completions \
+  -H "Authorization: Bearer $ALICE_TOKEN" -H 'Content-Type: application/json' \
+  --data '{"model":"demo-mini","messages":[{"role":"user","content":"How should I recover checkout?"}],"max_tokens":128}'
+curl -sS --max-time 20 -w '\nHTTP %{http_code}\n' http://127.0.0.1:18080/v1/chat/completions \
+  -H "Authorization: Bearer $ALICE_TOKEN" -H 'Content-Type: application/json' \
+  --data '{"model":"demo-pro","messages":[{"role":"user","content":"How should I recover checkout?"}],"max_tokens":128}'
+```
+
+Expected: HTTP **200** with a deterministic `choices` response, then HTTP
+**403** with `model not allowed for alice`. No paid model API is involved.
+
+## 6. Persist summaries without serializing credentials
+
+“Existing OpenReports show accumulated pass/fail counts, not policy
+attribution or per-request correlation.” Allow the two-second flush to settle,
+then print only safe summary fields:
+
+```bash
+sleep 3
+kubectl --context kind-kyverno-agentrouter -n agentrouter-demo get reports.openreports.io \
+  -o 'custom-columns=NAME:.metadata.name,PASS:.summary.pass,FAIL:.summary.fail'
+```
+
+Expected: report rows with nonzero pass/fail counts (counts vary by prior runs).
+Do not project raw report descriptions; setup explicitly disables request
+serialization through the positional log format described below.
+
+## 7. Block unsafe routes at admission
+
+“Runtime checks are complemented by platform admission guardrails.” These
+server dry-runs intentionally fail and do **not** replace the working routes:
+
+```bash
+kubectl --context kind-kyverno-agentrouter apply --dry-run=server \
+  -f examples/agentrouter/policies/admission/cases/mcproute-fail-open.yaml
+kubectl --context kind-kyverno-agentrouter apply --dry-run=server \
+  -f examples/agentrouter/policies/admission/cases/aigatewayroute-unapproved-backend.yaml
+```
+
+Expected: admission `denied the request`, respectively `fail closed` and
+`approved demo AIServiceBackend`. Both commands intentionally exit nonzero.
+
+## 8. Fail closed when the authorizer is unavailable
+
+“No authorizer means no execution, not unrestricted remediation.” Scale it
+down and wait until its pods are gone before attempting a call:
+
+```bash
+kubectl --context kind-kyverno-agentrouter -n agentrouter-demo scale deployment/kyverno-authz --replicas=0
+kubectl --context kind-kyverno-agentrouter -n agentrouter-demo wait \
+  --for=delete pod -l app=kyverno-authz --timeout=120s
+curl -sS --max-time 20 -w '\nHTTP %{http_code}\n' http://127.0.0.1:18080/mcp \
+  -H "Authorization: Bearer $ALICE_TOKEN" -H "Mcp-Session-Id: $SESSION_ID" \
+  -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+  -H 'MCP-Protocol-Version: 2025-06-18' \
+  --data '{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"kube-tools__scale_deployment","arguments":{"namespace":"team-a-dev","name":"checkout","replicas":3}}}'
+kubectl --context kind-kyverno-agentrouter -n team-a-dev get deployment checkout \
+  -o jsonpath='{.spec.replicas}{"\n"}'
+```
+
+Expected: HTTP **500 or 503** (gateway-generated error), replicas still **2**,
+not 3. Always run the recovery commands, even if the demonstration is interrupted:
+
+```bash
+kubectl --context kind-kyverno-agentrouter -n agentrouter-demo scale deployment/kyverno-authz --replicas=1
+kubectl --context kind-kyverno-agentrouter -n agentrouter-demo rollout status deployment/kyverno-authz --timeout=120s
+sleep 3
+curl -sS --max-time 20 -w '\nHTTP %{http_code}\n' http://127.0.0.1:18080/mcp \
+  -H "Authorization: Bearer $ALICE_TOKEN" -H "Mcp-Session-Id: $SESSION_ID" \
+  -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+  -H 'MCP-Protocol-Version: 2025-06-18' \
+  --data '{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"kube-tools__get_workload_status","arguments":{"namespace":"team-a-dev","name":"checkout"}}}'
+unset ALICE_TOKEN SESSION_ID INITIALIZE
+```
+
+Expected: HTTP **200**, the actual deployment still has **2** replicas.
+Stop terminal A's port-forward with Ctrl-C.
+
+### Troubleshooting and repeating the demo
+
+JWTs expire after 30 minutes. If requests return 401, reacquire the token and
+repeat initialization in section 1; do not silently change identity during
+the revoke/restore comparison. A lost MCP session requires reinitialization.
+If Kubernetes `can-i` has not yet reflected a RoleBinding change, repeat it
+before continuing. If recovery briefly returns 503, retry the read after
+endpoints propagate. To restart the incident, rerun section 1's seed commands.
+After interruption, restore the RoleBinding and authorizer as shown above
+(or run `scripts/reset.sh` **after** stopping the manual port-forward).
 
 ## Full suite and non-mutating checks
 
@@ -153,7 +337,7 @@ governance, summaries, admission, and fail-closed behavior. `--scenario 1`
 through `6` selects those respective scenarios (each begins with a reset).
 `--check` verifies authentication, the unfiltered catalog, read authorization,
 and allowed/denied model requests. It does **not** reset, revoke/grant RBAC,
-scale deployments, or write presentation session state. Requests still
+scale deployments. Requests still
 produce ordinary backend audit records and authorizer reports.
 
 `run.sh` saves noncredential output to ignored `.state/*.log`.
@@ -196,13 +380,10 @@ python3 -m unittest discover -s examples/agentrouter/tests -p 'test_*.py'
 shellcheck examples/agentrouter/scripts/*.sh
 ```
 
-Validated on 2026-11-05 against upstream/main `fe9504b`: fresh
-`setup.sh`, full `run.sh`, `run.sh --check`, and all ten presentation steps
-in the order above passed on Kind. A separate check compared the saved JWT
-and session after every step (unchanged, mode 0600), and verified `--check`
-preserved workload specs, RBAC, and presentation state. Persisted reports
-contained neither the presentation token nor bearer/request authorization
-strings. This evidence applies to that checkout, not release v0.4.0.
+Validated on 2026-11-05 against upstream/main `fe9504b`: fresh setup, the
+automated suite and non-mutating checks, and the manual Demo commands above
+passed on Kind. The manual revoke/restore requests use the same shell-held
+JWT/session. This evidence applies to that checkout, not release v0.4.0.
 
 ## Cleanup
 
