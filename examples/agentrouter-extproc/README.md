@@ -103,8 +103,14 @@ runtime before presenting.
 
 #### Pre-stage
 
-1. Run setup and reset. Keep the gateway port-forward from the reproduction
-   runbook below running.
+1. From the repository root, set up and reset the demo:
+
+   ```bash
+   examples/agentrouter-extproc/scripts/setup.sh
+   examples/agentrouter-extproc/scripts/reset.sh
+   ```
+
+   Keep the gateway port-forward from the reproduction runbook below running.
 2. Launch `npx @modelcontextprotocol/inspector`; open its printed authenticated
    local URL and configure Streamable HTTP at `http://127.0.0.1:19080/mcp`.
 3. Use the authentication section below to acquire Alice's token privately.
