@@ -360,7 +360,8 @@ kubectl --context "$CONTEXT" -n team-a-dev get deployment checkout \
 ```
 
 Expected: `no` (`can-i` exits 1 intentionally), HTTP **403** with
-`Kubernetes SAR denied`, and replicas still **0**. Discovery remains unfiltered;
+`Blocked by Kyverno policy agentrouter-bounded-operations: Kubernetes SAR denied`,
+and replicas still **0**. Discovery remains unfiltered;
 the tool's presence does not grant permission.
 
 ## 4. Restore permission and recover checkout
@@ -391,7 +392,8 @@ curl -sS --max-time 20 -w '\nHTTP %{http_code}\n' http://127.0.0.1:18080/mcp \
   --data '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"kube-tools__scale_deployment","arguments":{"namespace":"team-a-dev","name":"checkout","replicas":50}}}'
 ```
 
-Expected: HTTP **403**, `replicas must be an integer from 1 through 3`.
+Expected: HTTP **403**,
+`Blocked by Kyverno policy agentrouter-bounded-operations: replicas must be an integer from 1 through 3`.
 
 ## 5. Govern the model request body
 

@@ -165,6 +165,9 @@ func TestExecutionSARDecisionBranches(t *testing.T) {
 			if result == nil || (allowed && result.GetOkResponse() == nil) || (!allowed && result.GetDeniedResponse() == nil) {
 				t.Fatalf("SAR allowed=%t: %v", allowed, result)
 			}
+			if !allowed && result.GetDeniedResponse().GetBody() != "Blocked by Kyverno policy agentrouter-bounded-operations: Kubernetes SAR denied" {
+				t.Fatalf("denial must identify the policy and reason: %v", result)
+			}
 		})
 	}
 }
@@ -211,6 +214,8 @@ func TestModelPolicyEvaluatesIdentityBeforeBody(t *testing.T) {
 				}
 			} else if err != nil || result == nil || result.GetDeniedResponse().GetStatus().GetCode() != 401 {
 				t.Fatalf("identity must be denied before parsing body: result=%v err=%v", result, err)
+			} else if !strings.HasPrefix(result.GetDeniedResponse().GetBody(), "Blocked by Kyverno policy agentrouter-model-governance: ") {
+				t.Fatalf("identity denial must identify the policy: %v", result)
 			}
 		})
 	}
