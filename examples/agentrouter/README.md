@@ -1,17 +1,50 @@
-# Agent Router + current Kyverno Authz
+# Control an assistant's tool access with Agent Router and Kyverno Authz
 
-A live, local demo of [Envoy Agent Router](https://aigateway.envoyproxy.io/)
-with **the current upstream/main Kyverno Authz implementation**. Setup builds
-the unchanged authorizer from this checkout with `ko`; it does not use a
-prototype or modify the authorizer. The latest published release, v0.4.0,
+An AI assistant can use tools to read information or make changes. But a tool
+that works for one person might not be safe for everyone.
+
+[Agent Router](https://aigateway.envoyproxy.io/) gives your assistant one place
+to reach models and tools. **Kyverno Authz checks whether the person using the
+assistant is allowed to make each call.** In this demo, it checks the person's
+current Kubernetes permissions, not just who signed in.
+
+## What you'll show
+
+Alice uses an assistant to manage a small app. She can read the app's status
+and change how many copies run. Kubernetes calls each copy a *replica*.
+
+1. Alice asks a tool to run two copies. The call succeeds.
+2. You remove her permission to change the number of copies.
+3. Alice repeats the same call. Kyverno Authz blocks it.
+4. Alice can still read the app's status.
+5. You restore her permission. The change works again.
+
+Alice stays signed in throughout the demo. You don't change the tool, restart
+the gateway, or issue a new sign-in token between these steps.
+
+## Why it matters
+
+**Signing in proves who you are. It doesn't mean you can do everything.**
+People change roles, and teams sometimes need to remove access quickly.
+Kyverno Authz checks current permissions for each tool call through the gateway.
+You can change access without waiting for Alice's sign-in token to expire.
+
+Agent Router already supports sign-in checks, model routing, and simple tool
+rules. The added value here is the live Kubernetes permission check. This demo
+uses the Model Context Protocol (MCP), which lets an assistant find and call
+tools.
+
+Alice still sees all five tools after you remove her permission. This demo
+blocks the action; it doesn't hide the tool.
+
+## Implementation and additional checks
+
+This demo uses **the current upstream/main Kyverno Authz implementation**.
+Setup builds the unchanged authorizer from this checkout with `ko`; it does not
+use a prototype or modify the authorizer. The latest published release, v0.4.0,
 predates upstream/main; release compatibility is not asserted here.
 
-## Native capability vs. added value
-
-Agent Router already provides OAuth/JWT authentication, MCP aggregation,
-explicit tool selection, request CEL authorization, and model routing.
-Simple identity/tool/argument predicates can be implemented natively.
-This demo adds:
+The full runbook also covers these checks:
 
 * **Live Kubernetes authorization:** Kyverno performs a SubjectAccessReview
   for each gateway-originated Kubernetes tool execution. Revoke and restore Alice's scale
@@ -129,7 +162,7 @@ Do not install or upgrade it during the presentation.
    kubectl --context "$CONTEXT" apply -f examples/agentrouter/manifests/alice-scale.yaml
    ```
 
-Keep the Inspector connection open. Tokens last 12 hours for this local demo:
+Keep the Inspector connection open. Tokens last 24 hours for this local demo:
 authenticate before presenting and rehearse without reconnecting or refreshing.
 This extended lifetime is not a production recommendation; live RBAC changes
 still take effect without replacing the token.
@@ -402,7 +435,7 @@ Stop terminal A's port-forward with Ctrl-C.
 
 ### Troubleshooting and repeating the demo
 
-New demo realms issue JWTs lasting 12 hours, with matching Keycloak session limits.
+New demo realms issue JWTs lasting 24 hours, with matching Keycloak session limits.
 Setup preserves existing identity Secrets: older clusters retain their original
 realm settings unless updated or recreated. Existing JWTs keep their original
 expiry; acquire new tokens after changing realm settings.

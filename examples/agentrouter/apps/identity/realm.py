@@ -10,9 +10,9 @@ def identity_secret():
         "realm": "demo",
         "enabled": True,
         "sslRequired": "none",
-        "accessTokenLifespan": 43200,
-        "ssoSessionIdleTimeout": 43200,
-        "ssoSessionMaxLifespan": 43200,
+        "accessTokenLifespan": 86400,
+        "ssoSessionIdleTimeout": 86400,
+        "ssoSessionMaxLifespan": 86400,
         "clients": [{
             "clientId": "demo-cli",
             "enabled": True,
