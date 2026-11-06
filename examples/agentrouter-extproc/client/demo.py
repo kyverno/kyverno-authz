@@ -5,7 +5,6 @@ import base64
 from contextlib import ExitStack, contextmanager
 from datetime import datetime, timedelta, timezone
 import json
-import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -627,183 +626,10 @@ def smoke_check():
     print("PASS: discovery, tool calls, models, reports, and absence of break-glass exception verified.", flush=True)
 
 
-STEPS = (
-    "reset", "list", "revoke", "list-hidden", "direct-denied", "bob-list",
-    "grant", "list-visible", "scale", "exception-activate", "exception-allow",
-    "exception-narrow", "exception-revoke", "reports",
-)
-
-
-def token_expiry(access_token):
-    payload = access_token.split(".")[1]
-    return int(json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))["exp"])
-
-
-def state_identity():
-    def runtime(namespace, selector):
-        pods = json.loads(kubectl("get", "pods", "-n", namespace, "-l", selector, "-o", "json"))["items"]
-        return sorted(
-            [pod["metadata"]["uid"], sorted(
-                [container["name"], container.get("restartCount", 0)]
-                for container in pod.get("status", {}).get("containerStatuses", [])
-            )]
-            for pod in pods if not pod["metadata"].get("deletionTimestamp")
-        )
-    return {
-        "cluster": kubectl("get", "namespace", "kube-system", "-o", "jsonpath={.metadata.uid}"),
-        "identity": kubectl("get", "secret", "demo-identity", "-n", NAMESPACE,
-                            "-o", "jsonpath={.metadata.uid}"),
-        "keycloak": runtime(NAMESPACE, "app=keycloak"),
-        "gateway": runtime("envoy-gateway-system",
-                           "gateway.envoyproxy.io/owning-gateway-name=agentrouter,"
-                           "gateway.envoyproxy.io/owning-gateway-namespace=" + NAMESPACE),
-    }
-
-
-def save_session(state, clients):
-    directory = DEMO_DIR / ".state"
-    directory.mkdir(mode=0o700, exist_ok=True)
-    directory.chmod(0o700)
-    state["clients"] = {
-        name: {key: getattr(client, key) for key in ("token", "session", "sequence", "run_id")}
-        for name, client in clients.items()
-    }
-    state["request_ids"] = sorted(REQUEST_IDS)
-    state["break_glass_id"] = BREAK_GLASS_ID
-    with tempfile.NamedTemporaryFile(mode="w", dir=directory, delete=False) as stream:
-        path = Path(stream.name)
-        try:
-            os.chmod(path, 0o600)
-            json.dump(state, stream)
-            stream.flush()
-            os.replace(path, directory / "session.json")
-        finally:
-            path.unlink(missing_ok=True)
-
-
-def load_session():
-    path = DEMO_DIR / ".state/session.json"
-    if not path.exists():
-        raise RuntimeError("No presenter session; run scripts/step.sh reset first.")
-    if not path.is_file() or path.is_symlink() or path.stat().st_mode & 0o077:
-        raise RuntimeError("Presenter session must be a private regular file (0600). Run reset.")
-    state = json.loads(path.read_text())
-    if state["identity"] != state_identity():
-        path.unlink()
-        raise RuntimeError("Cluster, identity, or session server changed; run scripts/step.sh reset.")
-    clients = {}
-    for name, saved in state["clients"].items():
-        if token_expiry(saved["token"]) <= time.time() + 30:
-            path.unlink()
-            raise RuntimeError("Presenter token expired; run scripts/step.sh reset (no automatic refresh).")
-        client = Client()
-        for key in ("token", "session", "sequence", "run_id"):
-            setattr(client, key, saved[key])
-        clients[name] = client
-    REQUEST_IDS.update(state["request_ids"])
-    return state, clients
-
-
-def presenter_step(step):
-    global BREAK_GLASS_ID
-    own = {"namespace": "team-a-dev", "name": "checkout"}
-    arguments = {**own, "replicas": 2}
-    if step == "reset":
-        subprocess.run([str(DEMO_DIR / "scripts/reset.sh")], check=True)
-        REQUEST_IDS.clear()
-        BREAK_GLASS_ID = None
-        clients = {name: Client(token(name, password())) for name in ("alice", "bob")}
-        for client in clients.values():
-            client.initialize()
-        state = {"identity": state_identity()}
-        print("PASS | SESSION | new Alice and Bob sessions; private finite-lived tokens saved, not printed")
-    else:
-        state, clients = load_session()
-        original_sessions = {name: (client.token, client.session) for name, client in clients.items()}
-        BREAK_GLASS_ID = state["break_glass_id"]
-        alice, bob = clients["alice"], clients["bob"]
-        if step in ("list", "list-visible"):
-            if not alice_can_scale():
-                raise AssertionError("Expected Alice RBAC grant; run grant first.")
-            check_discovery(alice, "Alice, same token/session", True)
-        elif step == "revoke":
-            kubectl("delete", "rolebinding", "alice-scale", "-n", "team-a-dev", "--ignore-not-found")
-            wait_until("Alice revocation not observed", lambda: not alice_can_scale())
-            print("PASS | RBAC | revoked Alice scale; session and token unchanged")
-        elif step == "list-hidden":
-            if alice_can_scale():
-                raise AssertionError("Expected revoked Alice RBAC; run revoke first.")
-            check_discovery(alice, "Alice, same token/session", False)
-        elif step == "direct-denied":
-            denied(alice, SCALE_TOOL, arguments, "Kubernetes SAR denied")
-        elif step == "bob-list":
-            check_discovery(bob, "Bob unaffected by Alice revocation", True)
-        elif step == "grant":
-            kubectl("apply", "-f", str(DEMO_DIR / "manifests/alice-scale.yaml"))
-            wait_until("Alice grant not observed", alice_can_scale)
-            print("PASS | RBAC | restored Alice scale; session and token unchanged")
-        elif step == "scale":
-            allowed(alice, SCALE_TOOL, arguments)
-            if replicas("team-a-dev") != 2:
-                raise AssertionError("Alice scale did not update the Deployment.")
-            print("PASS | EXECUTE | Alice scaled checkout to 2, correlated backend execution")
-        elif step == "exception-activate":
-            denied(bob, SCALE_TOOL, arguments, "namespace or workload boundary")
-            decision_reports([alice.token, bob.token], {"agentrouter-bounded-operations"})
-            subprocess.check_output(["kubectl", "--context", CONTEXT, "apply", "-f", "-"],
-                                    input=json.dumps(incident_configmap()), text=True)
-            reload_authorizer()
-            state["exception_expires"] = time.time() + 15 * 60
-            print("PASS | EXCEPTION | incident ConfigMap admitted; authorizer explicitly reloaded; 15m TTL")
-        elif step == "exception-allow":
-            if time.time() >= state.get("exception_expires", 0):
-                raise AssertionError("Activate a fresh incident exception first.")
-            bob.headers["x-incident-id"] = "INC-1234"
-            try:
-                allowed(bob, SCALE_TOOL, arguments)
-                BREAK_GLASS_ID = f"{bob.run_id}-{bob.sequence}"
-                if replicas("team-a-dev") != 2:
-                    raise AssertionError("Exception did not execute scale.")
-            finally:
-                bob.headers.clear()
-            print("PASS | EXCEPTION | Bob + incident scales team A; entire matching policy skipped")
-        elif step == "exception-narrow":
-            denied(bob, SCALE_TOOL, arguments, "namespace or workload boundary",
-                   label="Bob without incident cannot use exception")
-            bob.headers["x-incident-id"] = "INC-1234"
-            try:
-                denied(bob, SCALE_TOOL, {**arguments, "replicas": 50}, "namespace or workload boundary")
-                denied(bob, "kube-tools__get_workload_status", own, "namespace or workload boundary")
-            finally:
-                bob.headers.clear()
-        elif step == "exception-revoke":
-            # Flush ext_authz reports before replacing the process-local reporter on reload.
-            decision_reports([alice.token, bob.token], {"agentrouter-bounded-operations"})
-            kubectl("delete", "configmap", "demo-exceptions", "-n", NAMESPACE, "--ignore-not-found")
-            reload_authorizer()
-            bob.headers["x-incident-id"] = "INC-1234"
-            try:
-                denied(bob, SCALE_TOOL, arguments, "namespace or workload boundary",
-                       label="incident exception revoked")
-            finally:
-                bob.headers.clear()
-            state.pop("exception_expires", None)
-        elif step == "reports":
-            decision_reports([alice.token, bob.token], {"agentrouter-bounded-operations"})
-            print("NOTE | REPORT | ext_authz only; ext_proc response decisions are not reported")
-        else:
-            raise ValueError(step)
-        if any((client.token, client.session) != original_sessions[name]
-               for name, client in clients.items()):
-            raise AssertionError("Presenter token/session changed unexpectedly; run reset explicitly.")
-    save_session(state, clients)
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--check", action="store_true", help="Run non-mutating authentication and policy smoke checks.")
-    modes.add_argument("--step", choices=STEPS, help="One isolated presenter action, preserving token/session.")
     modes.add_argument("--scenario", type=int, choices=range(1, 8), metavar="N",
                        help="Run only scenario N (1-7) after the usual reset, e.g. --scenario 1 for a live talk.")
     args = parser.parse_args()
@@ -811,12 +637,11 @@ def main():
         stack.enter_context(port_forward(
             "envoy-gateway-system", gateway_service(), 19080, 8080, GATEWAY,
         ))
-        if not args.step:
-            wait_until("gateway did not publish its OAuth challenge", lambda: http(
-                GATEWAY, b'{"jsonrpc":"2.0","id":0,"method":"tools/list"}',
-                {"Content-Type": "application/json", "Accept": "application/json, text/event-stream"},
-            )[0] == 401, timeout=90)
-            print("PASS | DENY  | public MCP endpoint requires a verified OAuth token", flush=True)
+        wait_until("gateway did not publish its OAuth challenge", lambda: http(
+            GATEWAY, b'{"jsonrpc":"2.0","id":0,"method":"tools/list"}',
+            {"Content-Type": "application/json", "Accept": "application/json, text/event-stream"},
+        )[0] == 401, timeout=90)
+        print("PASS | DENY  | public MCP endpoint requires a verified OAuth token", flush=True)
         stack.enter_context(port_forward(
             NAMESPACE, "service/keycloak", 19081, 8080, KEYCLOAK + "/.well-known/openid-configuration",
         ))
@@ -826,15 +651,9 @@ def main():
         stack.enter_context(port_forward(
             NAMESPACE, "service/llm-backend", 19083, 8080, MODEL_AUDIT,
         ))
-        if args.step:
-            presenter_step(args.step)
-        elif args.check:
+        if args.check:
             smoke_check()
         else:
-            if args.scenario is None:
-                print("\nResponse governance: isolated presenter actions, same Alice token/session.", flush=True)
-                for step in STEPS:
-                    presenter_step(step)
             run_demo(args.scenario)
 
 

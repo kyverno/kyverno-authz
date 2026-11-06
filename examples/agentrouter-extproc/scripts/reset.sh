@@ -5,7 +5,6 @@ set -euo pipefail
 source "$(dirname "$0")/common.sh"
 require_tools kubectl
 require_cluster
-rm -f "$DEMO_DIR/.state/session.json"
 k delete policyexceptions.policies.kyverno.io break-glass-inc-1234 --ignore-not-found
 if k get configmap demo-exceptions -n "$NAMESPACE" >/dev/null 2>&1; then
   k delete configmap demo-exceptions -n "$NAMESPACE"

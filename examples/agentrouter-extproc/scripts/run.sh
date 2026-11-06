@@ -6,7 +6,7 @@ source "$(dirname "$0")/common.sh"
 require_tools kubectl python3
 require_cluster
 usage() {
-  printf 'Usage: %s [--check|--scenario N|--help]\nUse scripts/step.sh for isolated presenter actions.\n' "$0" >&2
+  printf 'Usage: %s [--check|--scenario N|--help]\nFor the native kubectl/curl walkthrough, see README.md#demo.\n' "$0" >&2
   exit 1
 }
 log="last-run.log"

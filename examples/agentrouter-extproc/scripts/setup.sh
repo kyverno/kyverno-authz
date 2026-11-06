@@ -11,7 +11,6 @@ docker info >/dev/null
 # A policy file that fails to compile is skipped by the authorizer, so check before deploying.
 printf 'Checking that every demo policy compiles before deploying it...\n'
 (cd "$REPO_ROOT" && go test ./examples/agentrouter-extproc/tests -count=1)
-rm -f "$DEMO_DIR/.state/session.json"
 
 if ! kind get clusters | grep -Fxq "$CLUSTER_NAME"; then
   kind create cluster --name "$CLUSTER_NAME" --image kindest/node:v1.35.1 --wait 120s

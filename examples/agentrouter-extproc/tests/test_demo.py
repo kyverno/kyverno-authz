@@ -1,10 +1,8 @@
 import importlib.util
-import base64
 import json
 from pathlib import Path
 import sys
 import threading
-import time
 import unittest
 from unittest.mock import Mock, patch
 from urllib.error import HTTPError
@@ -118,100 +116,6 @@ class ReportingTests(unittest.TestCase):
             client.raw(b"{}", "correlated")
         self.assertEqual(request.call_args.args[2]["x-incident-id"], "INC-1234")
         self.assertIn("correlated", demo.REQUEST_IDS)
-
-
-class PresenterSessionTests(unittest.TestCase):
-    def setUp(self):
-        self.root = DEMO_DIR / "tests"
-        self.path = self.root / ".state/session.json"
-        self.identity = {"cluster": "cluster-uid", "identity": "secret-uid"}
-        payload = base64.urlsafe_b64encode(json.dumps({"exp": int(time.time()) + 1800}).encode())
-        self.token = "header." + payload.decode().rstrip("=") + ".signature"
-        self.clients = {name: demo.Client(self.token) for name in ("alice", "bob")}
-        for name, client in self.clients.items():
-            client.session = name + "-same-session"
-            client.sequence = 3
-        self.root_patch = patch.object(demo, "DEMO_DIR", self.root)
-        self.root_patch.start()
-        self.ids_patch = patch.object(demo, "REQUEST_IDS", {"original-request"})
-        self.ids_patch.start()
-        self.identity_patch = patch.object(demo, "state_identity", return_value=self.identity)
-        self.identity_patch.start()
-        demo.save_session({"identity": self.identity}, self.clients)
-
-    def tearDown(self):
-        self.path.unlink(missing_ok=True)
-        self.path.parent.rmdir()
-        self.identity_patch.stop()
-        self.ids_patch.stop()
-        self.root_patch.stop()
-
-    def test_round_trip_preserves_private_tokens_sessions_and_request_sequence(self):
-        _, clients = demo.load_session()
-        self.assertEqual(self.path.stat().st_mode & 0o777, 0o600)
-        for name, client in clients.items():
-            self.assertEqual(client.token, self.token)
-            self.assertEqual(client.session, name + "-same-session")
-            self.assertEqual(client.sequence, 3)
-            self.assertEqual(client.run_id, self.clients[name].run_id)
-        with patch.object(demo, "kubectl"), patch.object(demo, "wait_until"), \
-                patch.object(demo.Client, "initialize") as initialize, \
-                patch.object(demo, "token") as refresh, \
-                patch.object(demo.subprocess, "run") as reset:
-            demo.presenter_step("revoke")
-            demo.presenter_step("grant")
-        initialize.assert_not_called()
-        refresh.assert_not_called()
-        reset.assert_not_called()
-        _, clients = demo.load_session()
-        self.assertEqual(clients["alice"].session, "alice-same-session")
-        self.assertEqual(clients["alice"].token, self.token)
-
-    def test_expired_or_replaced_identity_invalidates_state_without_refresh(self):
-        with patch.object(demo, "token_expiry", return_value=0):
-            with self.assertRaisesRegex(RuntimeError, "expired"):
-                demo.load_session()
-        self.assertFalse(self.path.exists())
-        demo.save_session({"identity": self.identity}, self.clients)
-        with patch.object(demo, "state_identity", return_value={"cluster": "new"}):
-            with self.assertRaisesRegex(RuntimeError, "changed"):
-                demo.load_session()
-        self.assertFalse(self.path.exists())
-
-    def test_world_readable_state_is_rejected(self):
-        self.path.chmod(0o644)
-        with self.assertRaisesRegex(RuntimeError, "private"):
-            demo.load_session()
-
-    def test_discovery_cannot_silently_replace_the_presenter_session(self):
-        def replace_session(client, *_):
-            client.session = "unexpected-new-session"
-        with patch.object(demo, "alice_can_scale", return_value=True), \
-                patch.object(demo, "check_discovery", side_effect=replace_session):
-            with self.assertRaisesRegex(AssertionError, "changed unexpectedly"):
-                demo.presenter_step("list")
-        _, clients = demo.load_session()
-        self.assertEqual(clients["alice"].session, "alice-same-session")
-
-    def test_presenter_reports_require_only_the_demonstrated_request_policy(self):
-        with patch.object(demo, "decision_reports") as reports, \
-                patch.object(demo, "kubectl"), patch.object(demo, "reload_authorizer"), \
-                patch.object(demo, "denied"):
-            for step in ("reports", "exception-revoke"):
-                demo.presenter_step(step)
-                reports.assert_called_with(
-                    [self.token, self.token], {"agentrouter-bounded-operations"},
-                )
-
-    def test_exception_cannot_replace_reporter_before_request_decisions_flush(self):
-        with patch.object(demo, "denied"), \
-                patch.object(demo, "decision_reports", side_effect=RuntimeError("flush failed")), \
-                patch.object(demo.subprocess, "check_output") as apply, \
-                patch.object(demo, "reload_authorizer") as reload:
-            with self.assertRaisesRegex(RuntimeError, "flush failed"):
-                demo.presenter_step("exception-activate")
-        apply.assert_not_called()
-        reload.assert_not_called()
 
 
 class HTTPTests(unittest.TestCase):
