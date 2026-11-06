@@ -129,8 +129,10 @@ Do not install or upgrade it during the presentation.
    kubectl --context "$CONTEXT" apply -f examples/agentrouter/manifests/alice-scale.yaml
    ```
 
-Keep the Inspector connection open. Tokens last 30 minutes: authenticate shortly
-before presenting and rehearse the sequence without reconnecting or refreshing.
+Keep the Inspector connection open. Tokens last 12 hours for this local demo:
+authenticate before presenting and rehearse without reconnecting or refreshing.
+This extended lifetime is not a production recommendation; live RBAC changes
+still take effect without replacing the token.
 
 ### Show allowed → blocked → allowed
 
@@ -400,7 +402,11 @@ Stop terminal A's port-forward with Ctrl-C.
 
 ### Troubleshooting and repeating the demo
 
-JWTs expire after 30 minutes. If requests return 401, reacquire the token and
+New demo realms issue JWTs lasting 12 hours, with matching Keycloak session limits.
+Setup preserves existing identity Secrets: older clusters retain their original
+realm settings unless updated or recreated. Existing JWTs keep their original
+expiry; acquire new tokens after changing realm settings.
+If requests return 401, reacquire the token and
 repeat initialization in section 1; do not silently change identity during
 the revoke/restore comparison. A lost MCP session requires reinitialization.
 If Kubernetes `can-i` has not yet reflected a RoleBinding change, repeat it
