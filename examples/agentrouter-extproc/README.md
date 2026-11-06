@@ -12,18 +12,25 @@ the rules by remembering a tool's name.
 ## What you'll show
 
 Alice asks her SRE assistant to run two copies of the checkout app. The assistant
-starts with five tools, including one that changes the number of copies.
+remembers the tool from an earlier tool list, but permission has changed.
 
-1. The assistant calls that tool on Alice's behalf. The call succeeds.
-2. You remove Alice's permission to change the number of copies.
-3. The assistant repeats the call. Kyverno Authz blocks it.
-4. You refresh its tool list. It now sees four tools, without the change tool.
-5. You restore Alice's permission and refresh again. All five tools return,
-   and the assistant's call works.
+1. The assistant calls the remembered tool. Kyverno Authz blocks it because
+   Alice doesn't currently have permission.
+2. Alice approves access. You add her Kubernetes permission.
+3. You refresh the tool list. All five tools appear, and the same call succeeds.
+4. Alice withdraws access. You remove her permission.
+5. The assistant tries the remembered tool again. The call is blocked.
+   Refresh the list: only four tools remain.
 
 The assistant keeps using the same Alice sign-in token and connection. It can
 still read app status for her. Bob's tool list doesn't change because his
 permissions haven't changed.
+
+In the story, Alice approves and withdraws access. In the demo, you use an
+administrator terminal to add and remove Alice's Kubernetes permission.
+There is no approval screen or separate permission grant for the assistant.
+The assistant cannot grant itself access, and removing this permission also
+limits Alice's own calls through the gateway.
 
 ## Why it matters
 
@@ -111,7 +118,11 @@ runtime before presenting.
 
    ```bash
    export CONTEXT="${CONTEXT:-kind-kyverno-agentrouter-extproc}"
+   kubectl --context "$CONTEXT" -n team-a-dev delete rolebinding alice-scale --ignore-not-found
    ```
+
+   Keep the scale tool selected from step 4. Don't refresh the list yet.
+   Explain that this is a remembered tool: a fresh list would already hide it.
 
 Keep the same authenticated connection through the story. Tokens last 24 hours
 for this local demo, with matching Keycloak session limits. This extended
@@ -123,35 +134,43 @@ expiry; acquire new tokens after changing realm settings.
 
 #### Show the execution boundary first
 
-Click **Run Tool** for scale: the call succeeds. Revoke Alice's permission:
+Click **Run Tool** for the selected scale tool: the call must be denied.
+The assistant knows the tool's name, but that doesn't grant permission.
+Read workload status to show that reads still work.
 
-```bash
-kubectl --context "$CONTEXT" -n team-a-dev delete rolebinding alice-scale
-```
-
-Repeat the same prepared scale call **before refreshing the tool catalog**:
-it must be denied. Read workload status: reads still work and desired replicas
-remain 2. The UI may retain cached tools, but execution remains authorized.
-
-#### Then show the response-governance extension
-
-Explicitly refresh **List Tools** on the existing connection:
-
-| State | Expected discovery | Execution |
-|---|---|---|
-| Grant present | 5 tools, including scale | Scale allowed |
-| Grant revoked | 4 tools, scale absent | Direct scale denied |
-| Grant restored | 5 tools, scale returns | Scale allowed |
-
-Restore the grant, refresh again, then run scale:
+Alice approves access. In the administrator terminal, grant permission:
 
 ```bash
 kubectl --context "$CONTEXT" apply -f examples/agentrouter-extproc/manifests/alice-scale.yaml
 ```
 
+Refresh **List Tools** on the same connection: all five tools appear.
+Repeat the prepared scale call. It succeeds; desired replicas become 2.
+
+#### Revoke access and show the response change
+
+Alice withdraws access. Remove her permission:
+
+```bash
+kubectl --context "$CONTEXT" -n team-a-dev delete rolebinding alice-scale
+```
+
+Repeat the scale call **before refreshing the tool list**: it must be denied.
+Then refresh **List Tools**. Only four tools remain; scale is absent.
+Read workload status: reads still work and desired replicas remain 2.
+
+| State | Tool list | Execution |
+|---|---|---|
+| Before approval | Remembered scale tool; a fresh list has 4 tools | Scale blocked |
+| Permission granted | Fresh list has 5 tools, including scale | Scale allowed |
+| Permission revoked | Fresh list has 4 tools, without scale | Remembered scale call blocked |
+
 **Takeaway:** “Alice's assistant acts for her, not above her permissions.
 Kyverno Authz blocks calls she can't make and removes that tool from the
 assistant's list. The assistant keeps the same token and connection.”
+
+The live story ends with the grant removed. To restore the default state after
+the demo, run the grant command above.
 
 Keep execution to three minutes and discovery to one more. A pre-connected Bob
 tab can optionally show unaffected access, but avoid switching identities in the
@@ -166,6 +185,8 @@ do not claim an unchanged session. Use the tested raw runbook instead.
 
 Run the story one command at a time, as in the
 [native network-policy demo](https://github.com/nirmata/demo-network-policy-automation#demo).
+This fuller runbook starts with access granted, then revokes and restores it;
+the shorter live story above starts and ends with access blocked.
 Use Bash and keep the main terminal open: tokens and sessions live in shell
 variables, not a presenter-state file. Do not enable `set -x`, print tokens,
 record authentication commands with expanded credentials, or share `.state`.
