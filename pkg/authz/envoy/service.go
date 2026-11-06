@@ -5,16 +5,16 @@ import (
 	"time"
 
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
+	"github.com/kyverno/kyverno-authz/pkg/engine"
 	"github.com/kyverno/kyverno-authz/pkg/events"
 	"github.com/kyverno/kyverno-authz/pkg/metrics"
 	"github.com/kyverno/sdk/core"
-	"github.com/kyverno/sdk/extensions/policy"
 	"k8s.io/client-go/dynamic"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 type service struct {
-	engine       core.Engine[dynamic.Interface, *authv3.CheckRequest, policy.Evaluation[*authv3.CheckResponse]]
+	engine       core.Engine[dynamic.Interface, *authv3.CheckRequest, engine.Evaluation[*authv3.CheckResponse]]
 	dynclient    dynamic.Interface
 	eventHandler events.EventIface[*authv3.CheckRequest]
 }
@@ -27,12 +27,12 @@ func (s *service) Check(ctx context.Context, r *authv3.CheckRequest) (*authv3.Ch
 		metrics.RecordAuthzDecision(metrics.ModeEnvoy, decision, source, start)
 	}()
 	// execute check
-	response, err := s.check(ctx, r)
+	response, policyName, err := s.check(ctx, r)
 	// log error if any
 	if err != nil {
 		source = metrics.SourceEngine
 		metrics.RecordEnvoyRequestError(ctx, r, err)
-		s.eventHandler.Push(ctx, time.Now(), r, events.NewResultAccessor(nil, err))
+		s.eventHandler.Push(ctx, time.Now(), r, events.NewResultAccessor(nil, err, policyName))
 		ctrl.LoggerFrom(ctx).Error(err, "Check failed")
 	} else {
 		if response.GetDeniedResponse() != nil {
@@ -46,7 +46,7 @@ func (s *service) Check(ctx context.Context, r *authv3.CheckRequest) (*authv3.Ch
 			source = metrics.SourceDefault
 		}
 		defer func() {
-			s.eventHandler.Push(ctx, time.Now(), r, events.NewResultAccessor(response, nil))
+			s.eventHandler.Push(ctx, time.Now(), r, events.NewResultAccessor(response, nil, policyName))
 			metrics.RecordEnvoyRequest(ctx, start, r, response)
 		}()
 	}
@@ -54,12 +54,12 @@ func (s *service) Check(ctx context.Context, r *authv3.CheckRequest) (*authv3.Ch
 	return response, err
 }
 
-func (s *service) check(ctx context.Context, r *authv3.CheckRequest) (_r *authv3.CheckResponse, _err error) {
+func (s *service) check(ctx context.Context, r *authv3.CheckRequest) (_r *authv3.CheckResponse, _policy string, _err error) {
 	// invoke engine
 	response := s.engine.Handle(ctx, s.dynclient, r)
 	if response.Result == nil {
 		// we didn't have a response
-		return &authv3.CheckResponse{}, response.Error
+		return &authv3.CheckResponse{}, response.PolicyName, response.Error
 	}
-	return response.Result, nil
+	return response.Result, response.PolicyName, nil
 }

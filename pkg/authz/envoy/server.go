@@ -12,7 +12,6 @@ import (
 	"github.com/kyverno/sdk/core"
 	"github.com/kyverno/sdk/core/dispatchers"
 	"github.com/kyverno/sdk/core/handlers"
-	"github.com/kyverno/sdk/core/resulters"
 	"github.com/kyverno/sdk/extensions/policy"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -49,8 +48,8 @@ func NewServer(network, addr string, source engine.EnvoySource, dynclient dynami
 						})
 					},
 				),
-				func(ctx context.Context, fc core.FactoryContext[engine.EnvoyPolicy, dynamic.Interface, *authv3.CheckRequest]) core.Resulter[engine.EnvoyPolicy, *authv3.CheckRequest, policy.Evaluation[*authv3.CheckResponse], policy.Evaluation[*authv3.CheckResponse]] {
-					return resulters.NewFirst[engine.EnvoyPolicy, *authv3.CheckRequest](func(out policy.Evaluation[*authv3.CheckResponse]) bool {
+				func(ctx context.Context, fc core.FactoryContext[engine.EnvoyPolicy, dynamic.Interface, *authv3.CheckRequest]) core.Resulter[engine.EnvoyPolicy, *authv3.CheckRequest, policy.Evaluation[*authv3.CheckResponse], engine.Evaluation[*authv3.CheckResponse]] {
+					return engine.NewPolicyResulter[engine.EnvoyPolicy, *authv3.CheckRequest](func(out policy.Evaluation[*authv3.CheckResponse]) bool {
 						return out.Result != nil || out.Error != nil
 					})
 				},

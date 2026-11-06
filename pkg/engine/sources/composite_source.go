@@ -49,7 +49,7 @@ func (s *compositeStore) Load(_ context.Context) ([]*v1.ValidatingPolicy, error)
 
 	policies := []*v1.ValidatingPolicy{}
 	for _, key := range keys {
-		policies = append(policies, &s.policies[key].policy)
+		policies = append(policies, s.policies[key].policy.DeepCopy())
 	}
 	return policies, nil
 }
@@ -72,20 +72,20 @@ func (s *compositeStore) handlePolicy(policyKey string, policy *v1.ValidatingPol
 
 	// update: replace the policy in place
 	if policyState, ok := s.policies[policyKey]; ok {
-		policyState.policy = *policy
+		policyState.policy = *policy.DeepCopy()
 		return
 	}
 
 	// create: build the policy state and link any exceptions that already reference it
 	polState := &policyState{
-		policy:     *policy,
+		policy:     *policy.DeepCopy(),
 		exceptions: make(map[string]*exceptionState),
 	}
 
 	s.policies[policyKey] = polState
 	for excKey, exc := range s.exceptions {
 		for _, ref := range exc.exception.Spec.PolicyRefs {
-			if ref.Name == policyKey {
+			if ref.Kind == "ValidatingPolicy" && ref.Name == policyKey {
 				exc.references[policyKey] = s.policies[policyKey]
 				polState.exceptions[excKey] = exc
 			}
@@ -97,27 +97,32 @@ func (s *compositeStore) handlePolex(excKey string, exc *v1.PolicyException, isD
 	s.Lock()
 	defer s.Unlock()
 
-	if isDelete {
-		delete(s.exceptions, excKey)
-		for _, polState := range s.policies {
-			// increment the polex event counter to that during recomputing the cache
-			// we get a different value and recompile the policy with its exceptions
-			polState.exceptionEventCounter++
+	// Unlink the previous references first, including references removed by an update.
+	if previous, ok := s.exceptions[excKey]; ok {
+		for _, polState := range previous.references {
 			delete(polState.exceptions, excKey)
+			polState.exceptionEventCounter++
 		}
+		delete(s.exceptions, excKey)
+	}
+	if isDelete {
 		return
 	}
 	excState := &exceptionState{
-		exception:  *exc,
+		exception:  *exc.DeepCopy(),
 		references: map[string]*policyState{},
 	}
+	// Retain exceptions even when their referenced policies do not exist yet.
+	s.exceptions[excKey] = excState
 	for _, polRef := range exc.Spec.PolicyRefs {
+		if polRef.Kind != "ValidatingPolicy" {
+			continue
+		}
 		polState, ok := s.policies[polRef.Name]
 		if ok {
 			polState.exceptions[excKey] = excState
 			polState.exceptionEventCounter++
 			excState.references[polRef.Name] = polState
-			s.exceptions[excKey] = excState
 		}
 	}
 }
@@ -130,5 +135,22 @@ func (s *compositeStore) keyFunc(_ context.Context, policy *v1.ValidatingPolicy)
 	if !ok {
 		return "", fmt.Errorf("attempting to get the cache key for a non existing policy")
 	}
-	return policy.Name + policy.ResourceVersion + strconv.Itoa(polState.exceptionEventCounter), nil
+	return policy.Name + ":" + policy.ResourceVersion + ":" + strconv.Itoa(polState.exceptionEventCounter), nil
+}
+
+// policyExceptions snapshots exceptions under the lock; compilation must not hold it.
+func (s *compositeStore) policyExceptions(policy *v1.ValidatingPolicy) ([]*v1.PolicyException, error) {
+	s.Lock()
+	defer s.Unlock()
+	state, ok := s.policies[policy.Name]
+	if !ok {
+		return nil, fmt.Errorf("attempting to fetch and compile a policy that doesn't exist")
+	}
+	exceptions := make([]*v1.PolicyException, 0, len(state.exceptions))
+	for _, exc := range state.exceptions {
+		if exc.exception.Spec.EvaluationMode == policy.Spec.EvaluationMode() {
+			exceptions = append(exceptions, exc.exception.DeepCopy())
+		}
+	}
+	return exceptions, nil
 }

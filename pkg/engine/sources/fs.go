@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"slices"
 	"sync"
 
 	"k8s.io/klog/v2"
@@ -87,6 +88,12 @@ func LoadPolicies(f fs.FS) ([]*vpolv1.ValidatingPolicy, []*vpolv1.PolicyExceptio
 				typed, err := convert.To[vpolv1.PolicyException](untyped)
 				if err != nil {
 					klog.Errorf("skipping document in %s: failed to convert to PolicyException: %v", entry.Name(), err)
+					continue
+				}
+				if slices.ContainsFunc(typed.Spec.PolicyRefs, func(ref vpolv1.PolicyRef) bool {
+					return ref.Kind != "ValidatingPolicy"
+				}) {
+					klog.Errorf("skipping PolicyException in %s: policyRefs must target ValidatingPolicy", entry.Name())
 					continue
 				}
 				policyExceptions = append(policyExceptions, typed)

@@ -9,6 +9,7 @@ import (
 	"github.com/kyverno/kyverno-authz/apis"
 	authzcel "github.com/kyverno/kyverno-authz/pkg/cel"
 	envoy "github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/envoy"
+	extproc "github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/extproc"
 	httpauth "github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/http"
 	"github.com/kyverno/sdk/extensions/cel/libs/http"
 	"github.com/kyverno/sdk/extensions/cel/libs/imagedata"
@@ -71,6 +72,8 @@ func (c *compiler[DATA, IN, OUT]) compile(policy *v1.ValidatingPolicy, exception
 		objectKey = cel.Variable(ObjectKey, envoy.CheckRequest)
 	case apis.EvaluationModeHTTP:
 		objectKey = cel.Variable(ObjectKey, httpauth.RequestType)
+	case apis.EvaluationModeEnvoyProcessor:
+		objectKey = cel.Variable(ObjectKey, extproc.InputType)
 	default:
 		return nil, append(allErrs, field.InternalError(nil, fmt.Errorf("invalid policy evaluation mode: %s", policy.Spec.EvaluationMode())))
 	}
@@ -139,7 +142,7 @@ func (c *compiler[DATA, IN, OUT]) compile(policy *v1.ValidatingPolicy, exception
 	{
 		for _, ex := range exceptions {
 			cex, errs := c.compileException(*ex, env)
-			if err != nil {
+			if len(errs) != 0 {
 				return nil, append(allErrs, errs...)
 			}
 			compiledPolexs = append(compiledPolexs, *cex)
@@ -172,6 +175,11 @@ func (c *compiler[DATA, IN, OUT]) compileAuthorization(path *field.Path, evalMod
 		case apis.EvaluationModeHTTP:
 			if !ast.OutputType().IsExactType(httpauth.ResponseType) && !ast.OutputType().IsExactType(types.NullType) {
 				msg := fmt.Sprintf("rule response output is expected to be of type %s", httpauth.ResponseType.TypeName())
+				return nil, append(allErrs, field.Invalid(path, rule.Expression, msg))
+			}
+		case apis.EvaluationModeEnvoyProcessor:
+			if !ast.OutputType().IsExactType(extproc.ResultType) && !ast.OutputType().IsExactType(types.NullType) {
+				msg := fmt.Sprintf("rule response output is expected to be of type %s", extproc.ResultType.TypeName())
 				return nil, append(allErrs, field.Invalid(path, rule.Expression, msg))
 			}
 		}

@@ -1,0 +1,40 @@
+apiVersion: aigateway.envoyproxy.io/v1beta1
+kind: MCPRoute
+metadata:
+  namespace: agentrouter-demo
+  name: mcproute-inline-api-key
+  annotations:
+    demo.kyverno.io/expected-denial: not an inline value
+spec:
+  parentRefs:
+  - name: agentrouter
+  path: /unsafe-mcp
+  securityPolicy:
+    oauth:
+      issuer: http://keycloak.agentrouter-demo.svc.cluster.local:8080/realms/demo
+      audiences:
+      - agentrouter-demo
+      jwks:
+        remoteJWKS:
+          uri: http://keycloak.agentrouter-demo.svc.cluster.local:8080/realms/demo/protocol/openid-connect/certs
+      protectedResourceMetadata:
+        resource: http://localhost:19080/unsafe-mcp
+    extAuth:
+      grpc:
+        backendRefs:
+        - name: kyverno-authz
+          port: 9081
+      headersToExtAuth:
+      - authorization
+      bodyToExtAuth:
+        maxRequestBytes: 16384
+      failOpen: false
+  backendRefs:
+  - name: kube-tools
+    port: 8080
+    toolSelector:
+      include:
+      - get_workload_status
+    securityPolicy:
+      apiKey:
+        inline: sk-demo-not-a-secret

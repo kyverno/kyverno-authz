@@ -11,6 +11,8 @@ import (
 	vpol "github.com/kyverno/api/api/policies.kyverno.io/v1"
 	"github.com/kyverno/kyverno-authz/apis"
 	"github.com/kyverno/kyverno-authz/pkg/authz/envoy"
+	extprocserver "github.com/kyverno/kyverno-authz/pkg/authz/extproc"
+	celproc "github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/extproc"
 	"github.com/kyverno/kyverno-authz/pkg/engine"
 	vpolcompiler "github.com/kyverno/kyverno-authz/pkg/engine/compiler"
 	"github.com/kyverno/kyverno-authz/pkg/engine/sources"
@@ -40,6 +42,8 @@ func Command() *cobra.Command {
 		probesAddress         string
 		metricsAddress        string
 		grpcAddress           string
+		extprocAddress        string
+		extprocFailOpen       bool
 		grpcNetwork           string
 		kubeConfigOverrides   clientcmd.ConfigOverrides
 		externalPolicySources []string
@@ -59,7 +63,7 @@ func Command() *cobra.Command {
 			// setup signals aware context
 			return signals.Do(context.Background(), func(ctx context.Context) error {
 				// track errors
-				var probesErr, serverErr, mgrErr error
+				var probesErr, serverErr, processorErr, mgrErr error
 				err := func(ctx context.Context) error {
 					logger := ctrl.LoggerFrom(ctx)
 					kubeOk := true
@@ -83,6 +87,7 @@ func Command() *cobra.Command {
 					defer group.Wait()
 					// load sources
 					var source engine.EnvoySource
+					var processorSource engine.ProcessorSource
 					var dyn dynamic.Interface
 
 					// envoy type generics need to be pointers due to the fact that they are protos and contain mutexes
@@ -161,11 +166,19 @@ func Command() *cobra.Command {
 						if err != nil {
 							return fmt.Errorf("failed to initialize registry opts: %w", err)
 						}
-						extSources, err := utils.GetExternalSources(compiler, nOpts, rOpts, externalPolicySources...)
+						extSources, err := utils.GetExternalSourcesForMode(compiler, nOpts, rOpts, apis.EvaluationModeEnvoy, externalPolicySources...)
 						if err != nil {
 							return err
 						}
 						source = sdksources.NewComposite(extSources...)
+						if extprocAddress != "" {
+							processorCompiler := vpolcompiler.NewCompiler[dynamic.Interface, celproc.Input, *celproc.Result](dynclient)
+							processorSources, err := utils.GetExternalSourcesForMode(processorCompiler, nOpts, rOpts, apis.EvaluationModeEnvoyProcessor, externalPolicySources...)
+							if err != nil {
+								return err
+							}
+							processorSource = sdksources.NewComposite(processorSources...)
+						}
 						// if kube policy source is enabled
 						if kubePolicySource {
 							// create a controller manager
@@ -212,11 +225,19 @@ func Command() *cobra.Command {
 						}
 						// initialize compiler
 						compiler := vpolcompiler.NewCompiler[dynamic.Interface, *authv3.CheckRequest, *authv3.CheckResponse](nil)
-						extSources, err := utils.GetExternalSources(compiler, nOpts, rOpts, externalPolicySources...)
+						extSources, err := utils.GetExternalSourcesForMode(compiler, nOpts, rOpts, apis.EvaluationModeEnvoy, externalPolicySources...)
 						if err != nil {
 							return err
 						}
 						source = sdksources.NewComposite(extSources...)
+						if extprocAddress != "" {
+							processorCompiler := vpolcompiler.NewCompiler[dynamic.Interface, celproc.Input, *celproc.Result](nil)
+							processorSources, err := utils.GetExternalSourcesForMode(processorCompiler, nOpts, rOpts, apis.EvaluationModeEnvoyProcessor, externalPolicySources...)
+							if err != nil {
+								return err
+							}
+							processorSource = sdksources.NewComposite(processorSources...)
+						}
 					}
 					// probes server
 					if probesAddress != "" {
@@ -235,15 +256,24 @@ func Command() *cobra.Command {
 						defer cancel()
 						serverErr = authServer.Run(ctx)
 					})
+					if extprocAddress != "" {
+						processorServer := extprocserver.NewServer(grpcNetwork, extprocAddress, processorSource, dyn, extprocFailOpen)
+						group.StartWithContext(ctx, func(ctx context.Context) {
+							defer cancel()
+							processorErr = processorServer.Run(ctx)
+						})
+					}
 					return nil
 				}(ctx)
-				return multierr.Combine(err, probesErr, serverErr, mgrErr)
+				return multierr.Combine(err, probesErr, serverErr, processorErr, mgrErr)
 			})
 		},
 	}
 	command.Flags().StringVar(&probesAddress, "probes-address", "", "Address to listen on for health checks")
 	command.Flags().StringVar(&grpcAddress, "grpc-address", ":9081", "Address to listen on")
 	command.Flags().StringVar(&grpcNetwork, "grpc-network", "tcp", "Network to listen on")
+	command.Flags().StringVar(&extprocAddress, "extproc-address", "", "Enable Envoy External Processing gRPC on this address (for example :9083)")
+	command.Flags().BoolVar(&extprocFailOpen, "extproc-fail-open", false, "Continue unmodified when an ext_proc policy evaluation fails (default is fail closed)")
 	command.Flags().StringVar(&metricsAddress, "metrics-address", ":9082", "Address to listen on for metrics")
 	command.Flags().StringArrayVar(&externalPolicySources, "external-policy-source", nil, "External policy sources")
 	command.Flags().StringArrayVar(&imagePullSecrets, "image-pull-secret", nil, "Image pull secrets")

@@ -6,3 +6,4 @@ import (
 
 type EnvoySource = core.Source[EnvoyPolicy]
 type HTTPSource = core.Source[HTTPPolicy]
+type ProcessorSource = core.Source[ProcessorPolicy]

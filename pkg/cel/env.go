@@ -9,6 +9,7 @@ import (
 	"github.com/kyverno/kyverno-authz/apis"
 	impl "github.com/kyverno/kyverno-authz/pkg/cel/impl"
 	"github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/envoy"
+	"github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/extproc"
 	httpauth "github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/http"
 	jsoncel "github.com/kyverno/kyverno-authz/pkg/cel/libs/json"
 	"github.com/kyverno/kyverno-authz/pkg/cel/libs/jwt"
@@ -66,6 +67,8 @@ func NewEnv(evalMode vpol.EvaluationMode, d dynamic.Interface) (*cel.Env, error)
 		base, err = base.Extend(
 			httpauth.Lib(),
 		)
+	case apis.EvaluationModeEnvoyProcessor:
+		base, err = base.Extend(extproc.Lib())
 	default:
 		err = fmt.Errorf("invalid evaluation mode passed for env builder")
 	}

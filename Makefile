@@ -96,7 +96,6 @@ codegen-crds: $(REGISTER_GEN)
 	@rm $(CRDS_PATH)/policies.kyverno.io/policies.kyverno.io_generatingpolicies.yaml
 	@rm $(CRDS_PATH)/policies.kyverno.io/policies.kyverno.io_imagevalidatingpolicies.yaml
 	@rm $(CRDS_PATH)/policies.kyverno.io/policies.kyverno.io_mutatingpolicies.yaml
-	@rm $(CRDS_PATH)/policies.kyverno.io/policies.kyverno.io_policyexceptions.yaml
 	@rm $(CRDS_PATH)/policies.kyverno.io/policies.kyverno.io_namespaced*.yaml
 	@echo Copy generated CRDs to embed in the binary... >&2
 	@rm -rf pkg/data/crds && mkdir -p pkg/data/crds

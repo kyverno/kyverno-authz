@@ -2,7 +2,6 @@ package events
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -46,7 +45,7 @@ func (k *k8sEventSubscriber[Req]) eventLoop(ctx context.Context) {
 			k.logger.Info("k8s event handler exiting")
 			return
 		case ev := <-k.eventChan:
-			jsonReq, err := json.Marshal(ev.req)
+			jsonReq, err := marshalRequest(ev.req)
 			if err != nil {
 				k.logger.Error(err, "error marshalling request to json for event")
 				continue

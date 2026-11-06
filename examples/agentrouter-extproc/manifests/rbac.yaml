@@ -1,0 +1,182 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kyverno-authz
+  namespace: agentrouter-demo
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: agentrouter-demo-sar
+rules:
+  - apiGroups: [authorization.k8s.io]
+    resources: [subjectaccessreviews]
+    verbs: [create]
+  - apiGroups: [apiextensions.k8s.io]
+    resources: [customresourcedefinitions]
+    resourceNames: [reports.openreports.io]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: agentrouter-demo-sar
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: agentrouter-demo-sar
+subjects:
+  - kind: ServiceAccount
+    name: kyverno-authz
+    namespace: agentrouter-demo
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kube-tools
+  namespace: agentrouter-demo
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: checkout-reader
+  namespace: team-a-dev
+rules:
+  - apiGroups: [apps]
+    resources: [deployments]
+    resourceNames: [checkout]
+    verbs: [get]
+  - apiGroups: [""]
+    resources: [events, pods]
+    verbs: [list]
+  - apiGroups: [""]
+    resources: [pods/log]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: checkout-scaler
+  namespace: team-a-dev
+rules:
+  - apiGroups: [apps]
+    resources: [deployments/scale]
+    resourceNames: [checkout]
+    verbs: [get, update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: checkout-readers
+  namespace: team-a-dev
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: checkout-reader
+subjects:
+  - kind: User
+    name: alice
+    apiGroup: rbac.authorization.k8s.io
+  - kind: ServiceAccount
+    name: kube-tools
+    namespace: agentrouter-demo
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: checkout-tool-scaler
+  namespace: team-a-dev
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: checkout-scaler
+subjects:
+  - kind: ServiceAccount
+    name: kube-tools
+    namespace: agentrouter-demo
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: checkout-reader
+  namespace: team-b-dev
+rules:
+  - apiGroups: [apps]
+    resources: [deployments]
+    resourceNames: [checkout]
+    verbs: [get]
+  - apiGroups: [""]
+    resources: [events, pods]
+    verbs: [list]
+  - apiGroups: [""]
+    resources: [pods/log]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: checkout-scaler
+  namespace: team-b-dev
+rules:
+  - apiGroups: [apps]
+    resources: [deployments/scale]
+    resourceNames: [checkout]
+    verbs: [get, update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: checkout-readers
+  namespace: team-b-dev
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: checkout-reader
+subjects:
+  - kind: User
+    name: bob
+    apiGroup: rbac.authorization.k8s.io
+  - kind: ServiceAccount
+    name: kube-tools
+    namespace: agentrouter-demo
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: checkout-scalers
+  namespace: team-b-dev
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: checkout-scaler
+subjects:
+  - kind: User
+    name: bob
+    apiGroup: rbac.authorization.k8s.io
+  - kind: ServiceAccount
+    name: kube-tools
+    namespace: agentrouter-demo
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: authz-reports
+  namespace: agentrouter-demo
+rules:
+  - apiGroups: [openreports.io]
+    resources: [reports]
+    verbs: [create, get, update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: authz-reports
+  namespace: agentrouter-demo
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: authz-reports
+subjects:
+  - kind: ServiceAccount
+    name: kyverno-authz
+    namespace: agentrouter-demo
