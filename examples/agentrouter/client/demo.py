@@ -330,6 +330,8 @@ def request_guardrails(client):
 
 def run_demo(only=None):
     subprocess.run([str(DEMO_DIR / "scripts/reset.sh")], check=True)
+    kubectl("apply", "-f", str(DEMO_DIR / "manifests/alice-scale.yaml"))
+    wait_until("initial RBAC grant not observed", alice_can_scale)
     client = Client(token("alice", password()))
     client.initialize()
     if replicas("team-a-dev") != 0:

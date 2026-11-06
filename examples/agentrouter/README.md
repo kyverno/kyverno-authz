@@ -200,11 +200,11 @@ Do not install or upgrade it during the presentation.
 4. Select `kube-tools__scale_deployment`; fill `namespace=team-a-dev`,
    `name=checkout`, `replicas=2`. Also locate
    `kube-tools__get_workload_status` with the same namespace/name.
-5. In the demonstration terminal, export the context and remove Alice's grant:
+5. In the demonstration terminal, export the context. Reset has already removed
+   Alice's scale grant:
 
    ```bash
    export CONTEXT="${CONTEXT:-kind-${CLUSTER_NAME:-kyverno-agentrouter}}"
-   kubectl --context "$CONTEXT" -n team-a-dev delete rolebinding alice-scale --ignore-not-found
    ```
 
 Keep the Inspector connection open. Tokens last 24 hours for this local demo:
@@ -508,7 +508,8 @@ examples/agentrouter/scripts/run.sh --check
 examples/agentrouter/scripts/run.sh --scenario 1
 ```
 
-The full suite resets once, then checks live SAR, argument guardrails, model
+The full suite resets once, explicitly grants Alice scale access for its
+scenarios, then checks live SAR, argument guardrails, model
 governance, summaries, admission, and fail-closed behavior. `--scenario 1`
 through `6` selects those respective scenarios (each begins with a reset).
 `--check` verifies authentication, the unfiltered catalog, read authorization,
