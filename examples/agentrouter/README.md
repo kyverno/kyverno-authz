@@ -250,7 +250,12 @@ Keep this story to roughly three minutes. Model checks, reports, admission, and
 outage recovery are optional follow-ons, not prerequisites to the main point.
 This baseline does not filter discovery: scale may remain listed after
 revocation, but execution is denied. Enforcement applies to gateway traffic;
-the demo's backends are not isolated. The live story ends with the grant removed.
+the demo's backends are not isolated.
+
+The tool schema allows up to 100 replicas so Inspector can submit `50` and
+show Kyverno's stricter 1–3 policy limit. The backend also retains a 1–3 safety
+check, but the gateway policy blocks the request before it reaches that check.
+The live story ends with the grant removed.
 To restore the default state after the demo, apply
 `examples/agentrouter/manifests/alice-scale.yaml` using the grant command above.
 
