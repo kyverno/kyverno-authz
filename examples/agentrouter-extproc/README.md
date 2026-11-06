@@ -212,6 +212,10 @@ main story. Exceptions and reports are supplementary sections below. Discovery
 filtering is not a substitute for execution authorization, and the demo's
 unisolated backends remain reachable outside the gateway.
 
+The tool schema allows up to 100 replicas so Inspector can submit `50` and
+show Kyverno's stricter 1–3 policy limit. The backend also retains a 1–3 safety
+check, but the gateway policy blocks the request before it reaches that check.
+
 If Inspector reconnects, renews credentials, or cannot render the denial,
 do not claim an unchanged session. Use the tested raw runbook instead.
 

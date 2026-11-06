@@ -43,7 +43,7 @@ KUBE_TOOLS = [
     tool(
         "scale_deployment",
         "Set checkout replicas; authorization is enforced before execution.",
-        {**TARGET, "replicas": {"type": "integer", "minimum": 1, "maximum": 3}},
+        {**TARGET, "replicas": {"type": "integer", "minimum": 1, "maximum": 100}},
         [*TARGET, "replicas"],
     ),
 ]
