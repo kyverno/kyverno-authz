@@ -96,6 +96,82 @@ Do not run the suite while the manual port-forward is active.
 
 # Demo
 
+## Live demo: one call, one permission change
+
+Use [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector)
+for the audience-facing interaction. Keep the terminal for the two RBAC
+changes; keep authentication, JSON-RPC framing, and setup off screen.
+
+**Rehearsal prerequisite:** the raw-command walkthrough below is tested, but
+Inspector compatibility with this gateway has not been validated. Before using
+it live, test authentication, HTTP 403 display, and connection retention; pin
+the working Inspector version. Inspector requires a supported Node.js runtime.
+Do not install or upgrade it during the presentation.
+
+### Pre-stage before the audience arrives
+
+1. Run setup and `scripts/reset.sh`. Start the gateway port-forward from the
+   reproduction walkthrough below.
+2. Launch Inspector with `npx @modelcontextprotocol/inspector` and open the
+   authenticated local URL it prints. Use Streamable HTTP and
+   `http://127.0.0.1:18080/mcp`.
+3. Acquire Alice's token using `scripts/get-token.sh alice` through a private
+   capture, configure the connection's Authorization header privately, and
+   connect once. Never project the token, authentication settings, or network
+   header pane. Keep Inspector's own access-token protection enabled.
+4. Select `kube-tools__scale_deployment`; fill `namespace=team-a-dev`,
+   `name=checkout`, `replicas=2`. Also locate
+   `kube-tools__get_workload_status` with the same namespace/name.
+5. In the demonstration terminal, export the context and confirm Alice's grant:
+
+   ```bash
+   export CONTEXT="${CONTEXT:-kind-${CLUSTER_NAME:-kyverno-agentrouter}}"
+   kubectl --context "$CONTEXT" apply -f examples/agentrouter/manifests/alice-scale.yaml
+   ```
+
+Keep the Inspector connection open. Tokens last 30 minutes: authenticate shortly
+before presenting and rehearse the sequence without reconnecting or refreshing.
+
+### Show allowed → blocked → allowed
+
+| Action | Expected result | What to explain |
+|---|---|---|
+| In Inspector, click **Run Tool** for scale | Successful MCP result; desired replicas become 2 | A real MCP call reaches Kubernetes through Agent Router |
+| Delete Alice's grant with the command below | RoleBinding deleted | Change Kubernetes permissions, not the agent, token, or route |
+| Repeat the identical scale call | HTTP 403 / authorization denial | Kyverno Authz checks live RBAC through SubjectAccessReview |
+| Call workload status | Read succeeds; desired replicas remain 2 | Removing writes does not remove reads |
+| Restore the grant below; repeat scale | Success | The same connection can act again with current permissions |
+
+Revoke:
+
+```bash
+kubectl --context "$CONTEXT" -n team-a-dev delete rolebinding alice-scale
+```
+
+Restore:
+
+```bash
+kubectl --context "$CONTEXT" apply -f examples/agentrouter/manifests/alice-scale.yaml
+```
+
+Optionally show the actual desired state, rather than waiting for pod readiness:
+
+```bash
+kubectl --context "$CONTEXT" -n team-a-dev get deployment checkout \
+  -o jsonpath='{.spec.replicas}{" desired replicas\n"}'
+```
+
+**Takeaway:** “The tool, token, and route did not change. Agent Router routes
+the request; Kyverno Authz checks whether Alice may execute it now.”
+
+Keep this story to roughly three minutes. Model checks, reports, admission, and
+outage recovery are optional follow-ons, not prerequisites to the main point.
+This baseline does not filter discovery: scale may remain listed after
+revocation, but execution is denied. Enforcement applies to gateway traffic;
+the demo's backends are not isolated.
+
+## Reproduction runbook: raw commands and optional follow-ons
+
 Run setup once, then follow these numbered sections from the repository root.
 All Kubernetes commands explicitly select the demo context; no context switch
 is required. The examples use Bash, `curl`, and Python's standard library
