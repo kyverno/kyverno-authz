@@ -23,6 +23,7 @@ Stay in the repository root for every command below. Requirements: Docker,
 and free local ports **19080–19083**. No `jq` or Python packages are needed.
 
 ```bash
+export CONTEXT="${CONTEXT:-kind-kyverno-agentrouter-extproc}"
 ./examples/agentrouter-extproc/scripts/setup.sh
 ```
 
@@ -47,14 +48,17 @@ them between the permission changes.
 
 In **terminal A**, discover the generated gateway Service and leave this
 loopback-only port-forward running in the foreground:
+Set `CONTEXT` consistently in each terminal; environment exports are not shared
+between existing terminals. The default below selects only this demo cluster.
 
 ```bash
 # Terminal A
-GATEWAY_SERVICE=$(kubectl --context kind-kyverno-agentrouter-extproc \
+export CONTEXT="${CONTEXT:-kind-kyverno-agentrouter-extproc}"
+GATEWAY_SERVICE=$(kubectl --context "$CONTEXT" \
   -n envoy-gateway-system get service \
   -l gateway.envoyproxy.io/owning-gateway-name=agentrouter,gateway.envoyproxy.io/owning-gateway-namespace=agentrouter-demo \
   -o jsonpath='{.items[0].metadata.name}')
-kubectl --context kind-kyverno-agentrouter-extproc -n envoy-gateway-system \
+kubectl --context "$CONTEXT" -n envoy-gateway-system \
   port-forward --address=127.0.0.1 "service/$GATEWAY_SERVICE" 19080:8080
 ```
 
@@ -64,7 +68,8 @@ In **terminal B**, leave Keycloak's port-forward running:
 
 ```bash
 # Terminal B
-kubectl --context kind-kyverno-agentrouter-extproc -n agentrouter-demo \
+export CONTEXT="${CONTEXT:-kind-kyverno-agentrouter-extproc}"
+kubectl --context "$CONTEXT" -n agentrouter-demo \
   port-forward --address=127.0.0.1 service/keycloak 19081:8080
 ```
 
@@ -74,7 +79,7 @@ In the **main terminal**, initialize paths and reset only the demo workloads:
 set -euo pipefail
 set +x
 umask 077
-CONTEXT=kind-kyverno-agentrouter-extproc
+export CONTEXT="${CONTEXT:-kind-kyverno-agentrouter-extproc}"
 DEMO=examples/agentrouter-extproc
 MCP=http://127.0.0.1:19080/mcp
 TOKEN_URL=http://127.0.0.1:19081/realms/demo/protocol/openid-connect/token
@@ -497,7 +502,10 @@ Sources are mode-filtered so ext_authz never compiles processor policies.
 - Reporting redaction/attribution, exception source fixes, and embedded schemas
   are supporting changes useful independently, not inherent ext_proc dependencies.
 - The model-route guardrail restricts references to `llm-backend` in
-  `agentrouter-demo`, not changes to that backend or its endpoint. Agent Router's
+  `agentrouter-demo`, not changes to that backend or its endpoint. It checks the
+  protecting SecurityPolicy only when the AIGatewayRoute is **created or updated**;
+  it does not prevent later deletion or weakening of that SecurityPolicy. Separate
+  platform ownership/admission controls must preserve protection over time. Agent Router's
   native model processor derives `x-ai-eg-model` from the OpenAI body before
   routing; that is request routing, not Kyverno response processing.
 

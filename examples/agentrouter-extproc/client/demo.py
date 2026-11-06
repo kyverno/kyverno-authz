@@ -5,6 +5,7 @@ import base64
 from contextlib import ExitStack, contextmanager
 from datetime import datetime, timedelta, timezone
 import json
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -15,7 +16,7 @@ from urllib.request import Request, urlopen
 import uuid
 
 DEMO_DIR = Path(__file__).resolve().parent.parent
-CONTEXT = "kind-kyverno-agentrouter-extproc"
+CONTEXT = os.environ.get("CONTEXT", "kind-kyverno-agentrouter-extproc")
 NAMESPACE = "agentrouter-demo"
 GATEWAY = "http://127.0.0.1:19080/mcp"
 KEYCLOAK = "http://127.0.0.1:19081/realms/demo"

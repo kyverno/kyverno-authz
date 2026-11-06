@@ -9,11 +9,13 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"testing/fstest"
 	"time"
 
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
+	"github.com/google/cel-go/cel"
 	vpol "github.com/kyverno/api/api/policies.kyverno.io/v1"
 	"github.com/kyverno/kyverno-authz/apis"
 	celproc "github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/extproc"
@@ -353,5 +355,62 @@ func TestFileSourceLoadsPoliciesAndException(t *testing.T) {
 	}
 	if len(policies) != 3 || len(exceptions) != 1 {
 		t.Fatalf("file loader skipped documents: %d policies, %d exceptions", len(policies), len(exceptions))
+	}
+}
+
+func TestModelRouteProtectionRequiresHTTPRouteGroup(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "policies", "admission", "aigatewayroute-guardrails.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var policy vpol.ValidatingPolicy
+	if err := yaml.UnmarshalStrict(data, &policy); err != nil {
+		t.Fatal(err)
+	}
+	var expression string
+	for _, variable := range policy.Spec.Variables {
+		if variable.Name == "guards" {
+			expression = variable.Expression
+		}
+	}
+	expression = strings.ReplaceAll(expression,
+		`resource.List("gateway.envoyproxy.io/v1alpha1", "securitypolicies", object.metadata.namespace)`,
+		"policies")
+	env, err := cel.NewEnv(cel.OptionalTypes(), cel.Variable("object", cel.DynType), cel.Variable("policies", cel.DynType))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ast, issues := env.Compile(expression + ".size()")
+	if err := issues.Err(); err != nil {
+		t.Fatal(err)
+	}
+	program, err := env.Program(ast)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, group := range []string{"gateway.networking.k8s.io", "unrelated.example.io"} {
+		t.Run(group, func(t *testing.T) {
+			result, _, err := program.Eval(map[string]any{
+				"object": map[string]any{"metadata": map[string]any{"name": "models", "namespace": "agentrouter-demo"}},
+				"policies": map[string]any{"items": []any{map[string]any{"spec": map[string]any{
+					"targetRefs": []any{map[string]any{"group": group, "kind": "HTTPRoute", "name": "models"}},
+					"jwt":        map[string]any{},
+					"extAuth": map[string]any{
+						"grpc":          map[string]any{"backendRefs": []any{map[string]any{"name": "kyverno-authz"}}},
+						"bodyToExtAuth": map[string]any{"maxRequestBytes": 16384},
+					},
+				}}}},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := int64(0)
+			if group == "gateway.networking.k8s.io" {
+				want = 1
+			}
+			if result.Value() != want {
+				t.Fatalf("group %q matched %v protections, want %d", group, result.Value(), want)
+			}
+		})
 	}
 }

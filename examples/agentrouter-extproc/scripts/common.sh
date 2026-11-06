@@ -5,7 +5,7 @@ set -euo pipefail
 DEMO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export DEMO_DIR
 CLUSTER_NAME=kyverno-agentrouter-extproc
-CONTEXT="kind-$CLUSTER_NAME"
+export CONTEXT="${CONTEXT:-kind-$CLUSTER_NAME}"
 NAMESPACE=agentrouter-demo
 
 k() {
