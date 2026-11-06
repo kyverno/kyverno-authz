@@ -111,12 +111,32 @@ runtime before presenting.
    ```
 
    Keep the gateway port-forward from the reproduction runbook below running.
-2. Launch `npx @modelcontextprotocol/inspector`; open its printed authenticated
-   local URL and configure Streamable HTTP at `http://127.0.0.1:19080/mcp`.
-3. Use the authentication section below to acquire Alice's token privately.
-   Configure her Authorization header and connect before screen sharing.
-   Do not project bearer tokens, header panes, or authentication settings.
-   Do not disable Inspector's own access-token protection.
+2. Launch `npx @modelcontextprotocol/inspector` and open its printed authenticated
+   local URL. In **Add server**, enter a server ID such as `alice-sre`, select
+   **streamable-http**, and set **URL** to `http://127.0.0.1:19080/mcp`.
+   Click **Add**.
+3. Use the Keycloak port-forward in section 1 and the token capture commands in
+   section 2 below to set `ALICE_TOKEN` privately. You don't need to run the raw
+   MCP initialization commands: Inspector initializes its own connection.
+
+   Inspector v2 doesn't show authentication fields in **Add server**.
+   On the new server card, click **Settings**, expand **Custom Headers**,
+   and click **+ Add Header**. Set the header name to `Authorization`.
+   On macOS, copy the complete header value without printing it:
+
+   ```bash
+   set +x
+   test -n "$ALICE_TOKEN" && printf 'Bearer %s' "$ALICE_TOKEN" | pbcopy
+   ```
+
+   Paste into the header value field. The value must start with `Bearer`
+   followed by a space and Alice's token. Close settings, then connect.
+   On other systems, use a local clipboard tool to copy the value privately.
+   Don't configure the OAuth section for this manual-token flow.
+   Alice's token is not Inspector's **Proxy Session Token**; that separate
+   token protects Inspector itself. Keep Inspector's access-token protection
+   enabled. Don't project bearer tokens, header panes, or authentication settings.
+   After pasting, run `printf '' | pbcopy` on macOS to clear the clipboard.
 4. Fetch the catalog: Alice should see five tools. Prepare the scale tool
    `kube-tools__scale_deployment` with `team-a-dev / checkout / 2` and the
    workload-status tool with `team-a-dev / checkout`.
