@@ -144,6 +144,9 @@ func TestDiscoveryFiltersAndPreservesFields(t *testing.T) {
 				if err != nil || result == nil || result.Action != "respond" || result.Status != 500 {
 					t.Fatalf("unsupported SSE must fail closed for SAR allowed=%t: result=%+v, err=%v", allowed, result, err)
 				}
+				if result.Body != "Blocked by Kyverno policy agentrouter-tool-discovery: expected one identified SSE message" {
+					t.Fatalf("processor denial must identify the policy and reason: %+v", result)
+				}
 			}
 			result, err := compiled.Evaluate(context.Background(), nil, input)
 			if err != nil || result == nil {
@@ -332,6 +335,8 @@ func TestBreakGlassScope(t *testing.T) {
 				}
 			} else if result == nil || result.GetDeniedResponse() == nil {
 				t.Fatalf("outside exception must remain denied: %v", result)
+			} else if !strings.HasPrefix(result.GetDeniedResponse().GetBody(), "Blocked by Kyverno policy agentrouter-bounded-operations: ") {
+				t.Fatalf("denial must identify the policy: %v", result)
 			}
 		})
 	}

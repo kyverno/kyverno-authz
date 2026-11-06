@@ -26,22 +26,22 @@ spec:
       expression: 'object.kind == "ConfigMap" ? json.unmarshal(object.data["exception.json"]) : object'
   validations:
     - expression: size(object.metadata.?annotations.orValue({})[?"demo.kyverno.io/incident"].orValue("")) > 0
-      message: Envoy exceptions require a non-empty incident annotation.
+      message: "Blocked by Kyverno policy agentrouter-exception-guardrails: Envoy exceptions require a non-empty incident annotation."
     - expression: >-
         object.metadata.?labels.orValue({})[?"cleanup.kyverno.io/ttl"].orValue("").matches("^([1-9]|[1-5][0-9]|60)m$|^1h$|^([1-9][0-9]{0,2}|[12][0-9]{3}|3[0-5][0-9]{2}|3600)s$")
-      message: Envoy exceptions require a positive cleanup TTL no longer than 1h (seconds, minutes, or 1h).
+      message: "Blocked by Kyverno policy agentrouter-exception-guardrails: Envoy exceptions require a positive cleanup TTL no longer than 1h (seconds, minutes, or 1h)."
     - expression: >-
         size(variables.exception.spec.policyRefs) > 0 && variables.exception.spec.policyRefs.all(ref,
           ref.kind == "ValidatingPolicy" && ref.name in ["agentrouter-bounded-operations", "agentrouter-model-governance"])
-      message: Envoy exceptions may reference only known demo policies.
+      message: "Blocked by Kyverno policy agentrouter-exception-guardrails: Envoy exceptions may reference only known demo policies."
     - expression: size(variables.exception.spec.?matchConditions.orValue([])) > 0
-      message: Envoy exceptions require non-empty matchConditions; blanket exceptions are forbidden.
+      message: "Blocked by Kyverno policy agentrouter-exception-guardrails: Envoy exceptions require non-empty matchConditions; blanket exceptions are forbidden."
     - expression: >-
         object.kind != "ConfigMap" || variables.exception.spec.matchConditions.exists(condition,
           condition.name == "expires-at" && condition.expression.startsWith("object.attributes.request.time < timestamp("))
-      message: File-backed exceptions require a request-time expires-at condition.
+      message: "Blocked by Kyverno policy agentrouter-exception-guardrails: File-backed exceptions require a request-time expires-at condition."
     - expression: >-
         object.kind != "ConfigMap" || (size(object.data) == 1 && "exception.json" in object.data &&
           variables.exception.kind == "PolicyException" && variables.exception.apiVersion == "policies.kyverno.io/v1" &&
           variables.exception.spec.evaluationMode == "Envoy")
-      message: File carriers must contain only one Envoy PolicyException in exception.json.
+      message: "Blocked by Kyverno policy agentrouter-exception-guardrails: File carriers must contain only one Envoy PolicyException in exception.json."

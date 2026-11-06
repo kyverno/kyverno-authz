@@ -59,12 +59,12 @@ spec:
         object.response.events.size() != 1 ||
         object.response.events[0].event != "message" ||
         object.response.events[0].id == "" ?
-          extproc.Respond(500).WithBody("expected one identified SSE message") : null
+          extproc.Respond(500).WithBody("Blocked by Kyverno policy agentrouter-tool-discovery: expected one identified SSE message") : null
     - expression: >-
         !variables.token.Valid ||
         variables.token.Claims["iss"] != "http://keycloak.agentrouter-demo.svc.cluster.local:8080/realms/demo" ||
         !("agentrouter-demo" in variables.token.Claims["aud"]) || variables.home == "" ?
-          extproc.Respond(401).WithBody("identity rejected") : null
+          extproc.Respond(401).WithBody("Blocked by Kyverno policy agentrouter-tool-discovery: identity rejected") : null
     - expression: >-
         has(variables.sar.status) && has(variables.sar.status.allowed) && variables.sar.status.allowed ?
           extproc.Continue() :

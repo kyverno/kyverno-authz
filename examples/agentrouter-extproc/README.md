@@ -416,7 +416,9 @@ kubectl --context "$CONTEXT" -n team-a-dev get deployment checkout \
   -o jsonpath='{.spec.replicas}{"\n"}'
 ```
 
-Expected: **HTTP 403**, `Kubernetes SAR denied`, and **0** replicas.
+Expected: **HTTP 403**,
+`Blocked by Kyverno policy agentrouter-bounded-operations: Kubernetes SAR denied`,
+and **0** replicas.
 The independent ext_authz request policy prevented execution.
 
 ### 6. Bob is unaffected; restore Alice and execute
@@ -474,7 +476,8 @@ printf 'header = "Authorization: Bearer %s"\nheader = "Mcp-Session-Id: %s"\n' "$
     -w '\nHTTP %{http_code}\n'
 ```
 
-Expected: **403**, `namespace or workload boundary`.
+Expected: **403**,
+`Blocked by Kyverno policy agentrouter-bounded-operations: namespace or workload boundary`.
 
 Before restarting the authorizer, wait for the last request report to flush.
 The reporter is process-local; do not discard unflushed decisions:

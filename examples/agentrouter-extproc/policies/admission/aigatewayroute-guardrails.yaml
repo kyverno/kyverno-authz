@@ -33,15 +33,15 @@ spec:
             (ref.?namespace.orValue("") != "" || object.metadata.namespace == "agentrouter-demo") &&
             ref.?group.orValue("aigateway.envoyproxy.io") in ["", "aigateway.envoyproxy.io"] &&
             ref.?kind.orValue("AIServiceBackend") in ["", "AIServiceBackend"]))
-      message: Model routes must reference only the approved demo AIServiceBackend llm-backend in agentrouter-demo.
+      message: "Blocked by Kyverno policy agentrouter-model-route-guardrails: Model routes must reference only the approved demo AIServiceBackend llm-backend in agentrouter-demo."
     - expression: >-
         object.spec.rules.all(rule, size(rule.?matches.orValue([])) > 0 &&
           rule.matches.all(match, match.?headers.orValue([]).exists(h,
             h.name.lowerAscii() == "x-ai-eg-model" && h.?type.orValue("Exact") == "Exact" &&
             h.value in variables.catalog)))
       messageExpression: >-
-        "every rule must route an exact model from the approved catalog: " + variables.catalog.join(", ")
+        "Blocked by Kyverno policy agentrouter-model-route-guardrails: every rule must route an exact model from the approved catalog: " + variables.catalog.join(", ")
     - expression: size(variables.guards) > 0
       message: >-
-        Create a SecurityPolicy targeting this route's HTTPRoute with JWT and fail-closed Kyverno
+        Blocked by Kyverno policy agentrouter-model-route-guardrails: Create a SecurityPolicy targeting this route's HTTPRoute with JWT and fail-closed Kyverno
         authorization (with the request body) before creating the AIGatewayRoute.
