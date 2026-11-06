@@ -137,7 +137,15 @@ runtime before presenting.
    token protects Inspector itself. Keep Inspector's access-token protection
    enabled. Don't project bearer tokens, header panes, or authentication settings.
    After pasting, run `printf '' | pbcopy` on macOS to clear the clipboard.
-4. Fetch the catalog: Alice should see five tools. Prepare the scale tool
+4. Reset leaves Alice unable to scale, so a fresh list has four tools.
+   To stage the remembered-tool story, temporarily grant permission:
+
+   ```bash
+   export CONTEXT="${CONTEXT:-kind-kyverno-agentrouter-extproc}"
+   kubectl --context "$CONTEXT" apply -f examples/agentrouter-extproc/manifests/alice-scale.yaml
+   ```
+
+   Fetch the catalog: Alice should now see five tools. Prepare the scale tool
    `kube-tools__scale_deployment` with `team-a-dev / checkout / 2` and the
    workload-status tool with `team-a-dev / checkout`.
 5. Export the context in the demonstration terminal:
@@ -263,12 +271,14 @@ RUN_ID=native-$(python3 -c 'import uuid; print(uuid.uuid4().hex[:10])')
 mkdir -p "$DEMO/.state"
 chmod 700 "$DEMO/.state"
 ./examples/agentrouter-extproc/scripts/reset.sh
+kubectl --context "$CONTEXT" apply -f examples/agentrouter-extproc/manifests/alice-scale.yaml
 kubectl --context "$CONTEXT" -n team-a-dev get deployment checkout \
   -o jsonpath='{.spec.replicas}{"\n"}'
 ```
 
-Expected: `0` replicas in team A; Alice's scale grant is restored and no incident
-exception remains. This creates no OAuth token or MCP session.
+Expected: `0` replicas in team A and no incident exception. Reset removes
+Alice's scale grant; the explicit apply command restores it for this fuller
+runbook. This creates no OAuth token or MCP session.
 
 ### 2. Authenticate Alice and Bob, then initialize MCP once
 
@@ -632,7 +642,7 @@ rm -f "$DEMO/.state/alice.headers" "$DEMO/.state/bob.headers" \
 ./examples/agentrouter-extproc/scripts/reset.sh
 ```
 
-Expected: Alice's grant restored, team A **0** replicas, team B **1**, exception
+Expected: Alice's grant removed, team A **0** replicas, team B **1**, exception
 absent. Press **Ctrl-C** in terminals A/B to stop both foreground port-forwards.
 To remove only this demo's disposable cluster:
 

@@ -10,10 +10,10 @@ if k get configmap demo-exceptions -n "$NAMESPACE" >/dev/null 2>&1; then
   k delete configmap demo-exceptions -n "$NAMESPACE"
   k rollout restart deployment/kyverno-authz -n "$NAMESPACE"
 fi
-k apply -f "$DEMO_DIR/manifests/alice-scale.yaml"
+k delete rolebinding alice-scale -n team-a-dev --ignore-not-found
 k scale -n "$NAMESPACE" deployment/kyverno-authz --replicas=1
 k rollout status -n "$NAMESPACE" deployment/kyverno-authz --timeout=120s
 k scale -n team-a-dev deployment/checkout --replicas=0
 k scale -n team-b-dev deployment/checkout --replicas=1
 k rollout status -n team-b-dev deployment/checkout --timeout=120s
-printf 'Reset complete: Alice can scale; team A has 0 replicas; team B has 1.\n'
+printf 'Reset complete: Alice cannot scale; team A has 0 replicas; team B has 1.\n'

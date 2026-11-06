@@ -454,6 +454,8 @@ def run_demo(only=None):
         return only is None or only == number
 
     subprocess.run([str(DEMO_DIR / "scripts/reset.sh")], check=True)
+    kubectl("apply", "-f", str(DEMO_DIR / "manifests/alice-scale.yaml"))
+    wait_until("initial RBAC grant was not observed", alice_can_scale)
     REQUEST_IDS.clear()
     BREAK_GLASS_ID = None
     if replicas("team-a-dev") != 0:
@@ -463,7 +465,7 @@ def run_demo(only=None):
     bob = Client(token("bob", demo_password))
     for client in (alice, bob):
         client.initialize()
-    check_discovery(alice, "Alice after reset", True)
+    check_discovery(alice, "Alice after explicit grant", True)
     check_discovery(bob, "Bob (team-b-dev scaler)", True)
 
     own = {"namespace": "team-a-dev", "name": "checkout"}
