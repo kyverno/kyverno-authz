@@ -108,11 +108,12 @@ port-forward running in the foreground. Wait for `Forwarding from 127.0.0.1:1808
 Stop it with **Ctrl-C** when the walkthrough ends.
 
 ```bash
-GATEWAY_SERVICE=$(kubectl --context kind-kyverno-agentrouter \
+export CONTEXT="${CONTEXT:-kind-${CLUSTER_NAME:-kyverno-agentrouter}}"
+GATEWAY_SERVICE=$(kubectl --context "$CONTEXT" \
   -n envoy-gateway-system get services \
   -l 'gateway.envoyproxy.io/owning-gateway-name=agentrouter,gateway.envoyproxy.io/owning-gateway-namespace=agentrouter-demo' \
   -o jsonpath='{.items[0].metadata.name}')
-kubectl --context kind-kyverno-agentrouter -n envoy-gateway-system \
+kubectl --context "$CONTEXT" -n envoy-gateway-system \
   port-forward --address=127.0.0.1 "service/$GATEWAY_SERVICE" 18080:8080
 ```
 
@@ -122,9 +123,10 @@ command substitution captures its token instead of printing it.
 
 ```bash
 set +x
-kubectl --context kind-kyverno-agentrouter apply -f examples/agentrouter/manifests/alice-scale.yaml
-kubectl --context kind-kyverno-agentrouter -n team-a-dev scale deployment/checkout --replicas=0
-kubectl --context kind-kyverno-agentrouter -n team-a-dev get deployment checkout
+export CONTEXT="${CONTEXT:-kind-${CLUSTER_NAME:-kyverno-agentrouter}}"
+kubectl --context "$CONTEXT" apply -f examples/agentrouter/manifests/alice-scale.yaml
+kubectl --context "$CONTEXT" -n team-a-dev scale deployment/checkout --replicas=0
+kubectl --context "$CONTEXT" -n team-a-dev get deployment checkout
 ALICE_TOKEN=$(examples/agentrouter/scripts/get-token.sh alice)
 test -n "$ALICE_TOKEN" && printf 'Alice token acquired (not displayed).\n'
 ```
@@ -183,15 +185,15 @@ MCP responses may be SSE (`event: message`, `data: {...}`), not bare JSON.
 session.” Delete the RoleBinding and confirm the API says `no`:
 
 ```bash
-kubectl --context kind-kyverno-agentrouter -n team-a-dev delete rolebinding alice-scale
-kubectl --context kind-kyverno-agentrouter auth can-i update deployments/checkout \
+kubectl --context "$CONTEXT" -n team-a-dev delete rolebinding alice-scale
+kubectl --context "$CONTEXT" auth can-i update deployments/checkout \
   --subresource=scale -n team-a-dev --as=alice
 curl -sS --max-time 20 -w '\nHTTP %{http_code}\n' http://127.0.0.1:18080/mcp \
   -H "Authorization: Bearer $ALICE_TOKEN" -H "Mcp-Session-Id: $SESSION_ID" \
   -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
   -H 'MCP-Protocol-Version: 2025-06-18' \
   --data '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"kube-tools__scale_deployment","arguments":{"namespace":"team-a-dev","name":"checkout","replicas":2}}}'
-kubectl --context kind-kyverno-agentrouter -n team-a-dev get deployment checkout \
+kubectl --context "$CONTEXT" -n team-a-dev get deployment checkout \
   -o jsonpath='{.spec.replicas}{"\n"}'
 ```
 
@@ -204,16 +206,16 @@ the tool's presence does not grant permission.
 “No new JWT or MCP session: Kubernetes permission changed, so execution changes.”
 
 ```bash
-kubectl --context kind-kyverno-agentrouter apply -f examples/agentrouter/manifests/alice-scale.yaml
-kubectl --context kind-kyverno-agentrouter auth can-i update deployments/checkout \
+kubectl --context "$CONTEXT" apply -f examples/agentrouter/manifests/alice-scale.yaml
+kubectl --context "$CONTEXT" auth can-i update deployments/checkout \
   --subresource=scale -n team-a-dev --as=alice
 curl -sS --max-time 20 -w '\nHTTP %{http_code}\n' http://127.0.0.1:18080/mcp \
   -H "Authorization: Bearer $ALICE_TOKEN" -H "Mcp-Session-Id: $SESSION_ID" \
   -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
   -H 'MCP-Protocol-Version: 2025-06-18' \
   --data '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"kube-tools__scale_deployment","arguments":{"namespace":"team-a-dev","name":"checkout","replicas":2}}}'
-kubectl --context kind-kyverno-agentrouter -n team-a-dev rollout status deployment/checkout --timeout=120s
-kubectl --context kind-kyverno-agentrouter -n team-a-dev get deployment checkout
+kubectl --context "$CONTEXT" -n team-a-dev rollout status deployment/checkout --timeout=120s
+kubectl --context "$CONTEXT" -n team-a-dev get deployment checkout
 ```
 
 Expected: `yes`, HTTP 200, `isError: false`, then **2/2** ready replicas.
@@ -254,7 +256,7 @@ then print only safe summary fields:
 
 ```bash
 sleep 3
-kubectl --context kind-kyverno-agentrouter -n agentrouter-demo get reports.openreports.io \
+kubectl --context "$CONTEXT" -n agentrouter-demo get reports.openreports.io \
   -o 'custom-columns=NAME:.metadata.name,PASS:.summary.pass,FAIL:.summary.fail'
 ```
 
@@ -268,14 +270,21 @@ serialization through the positional log format described below.
 server dry-runs intentionally fail and do **not** replace the working routes:
 
 ```bash
-kubectl --context kind-kyverno-agentrouter apply --dry-run=server \
+kubectl --context "$CONTEXT" apply --dry-run=server \
   -f examples/agentrouter/policies/admission/cases/mcproute-fail-open.yaml
-kubectl --context kind-kyverno-agentrouter apply --dry-run=server \
+kubectl --context "$CONTEXT" apply --dry-run=server \
   -f examples/agentrouter/policies/admission/cases/aigatewayroute-unapproved-backend.yaml
 ```
 
 Expected: admission `denied the request`, respectively `fail closed` and
 `approved demo AIServiceBackend`. Both commands intentionally exit nonzero.
+
+The model-route guardrail evaluates only **AIGatewayRoute create/update**:
+it verifies a matching SecurityPolicy exists at that time, not its subsequent
+lifecycle. Deleting or weakening that SecurityPolicy later can remove JWT and
+ext_authz protection without re-evaluating the admitted route. Production must
+separately protect SecurityPolicy update/delete through platform ownership,
+RBAC, and admission controls; this demo does not enforce those controls.
 
 ## 8. Fail closed when the authorizer is unavailable
 
@@ -283,15 +292,15 @@ Expected: admission `denied the request`, respectively `fail closed` and
 down and wait until its pods are gone before attempting a call:
 
 ```bash
-kubectl --context kind-kyverno-agentrouter -n agentrouter-demo scale deployment/kyverno-authz --replicas=0
-kubectl --context kind-kyverno-agentrouter -n agentrouter-demo wait \
+kubectl --context "$CONTEXT" -n agentrouter-demo scale deployment/kyverno-authz --replicas=0
+kubectl --context "$CONTEXT" -n agentrouter-demo wait \
   --for=delete pod -l app=kyverno-authz --timeout=120s
 curl -sS --max-time 20 -w '\nHTTP %{http_code}\n' http://127.0.0.1:18080/mcp \
   -H "Authorization: Bearer $ALICE_TOKEN" -H "Mcp-Session-Id: $SESSION_ID" \
   -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
   -H 'MCP-Protocol-Version: 2025-06-18' \
   --data '{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"kube-tools__scale_deployment","arguments":{"namespace":"team-a-dev","name":"checkout","replicas":3}}}'
-kubectl --context kind-kyverno-agentrouter -n team-a-dev get deployment checkout \
+kubectl --context "$CONTEXT" -n team-a-dev get deployment checkout \
   -o jsonpath='{.spec.replicas}{"\n"}'
 ```
 
@@ -299,8 +308,8 @@ Expected: HTTP **500 or 503** (gateway-generated error), replicas still **2**,
 not 3. Always run the recovery commands, even if the demonstration is interrupted:
 
 ```bash
-kubectl --context kind-kyverno-agentrouter -n agentrouter-demo scale deployment/kyverno-authz --replicas=1
-kubectl --context kind-kyverno-agentrouter -n agentrouter-demo rollout status deployment/kyverno-authz --timeout=120s
+kubectl --context "$CONTEXT" -n agentrouter-demo scale deployment/kyverno-authz --replicas=1
+kubectl --context "$CONTEXT" -n agentrouter-demo rollout status deployment/kyverno-authz --timeout=120s
 sleep 3
 curl -sS --max-time 20 -w '\nHTTP %{http_code}\n' http://127.0.0.1:18080/mcp \
   -H "Authorization: Bearer $ALICE_TOKEN" -H "Mcp-Session-Id: $SESSION_ID" \

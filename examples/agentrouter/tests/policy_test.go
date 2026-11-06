@@ -12,6 +12,7 @@ import (
 	"testing/fstest"
 
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
+	"github.com/google/cel-go/cel"
 	vpol "github.com/kyverno/api/api/policies.kyverno.io/v1"
 	"github.com/kyverno/kyverno-authz/pkg/engine/compiler"
 	"github.com/kyverno/kyverno-authz/pkg/engine/sources"
@@ -44,6 +45,68 @@ func TestPoliciesCompile(t *testing.T) {
 			c := compiler.NewCompiler[dynamic.Interface, *authv3.CheckRequest, *authv3.CheckResponse](nil)
 			if _, errs := c.Compile(readPolicy(t, name), nil); len(errs) != 0 {
 				t.Fatal(errs.ToAggregate())
+			}
+		})
+	}
+}
+
+func TestModelGuardRequiresGatewayAPITargetGroup(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "policies", "admission", "aigatewayroute-guardrails.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var policy vpol.ValidatingPolicy
+	if err := yaml.UnmarshalStrict(data, &policy); err != nil {
+		t.Fatal(err)
+	}
+	var expression string
+	for _, variable := range policy.Spec.Variables {
+		if variable.Name == "guards" {
+			expression = variable.Expression
+		}
+	}
+	lookup := `resource.List("gateway.envoyproxy.io/v1alpha1", "securitypolicies", object.metadata.namespace)`
+	if !strings.Contains(expression, lookup) {
+		t.Fatal("expected SecurityPolicy list lookup")
+	}
+	env, err := cel.NewEnv(cel.OptionalTypes(), cel.Variable("policies", cel.DynType), cel.Variable("object", cel.DynType))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ast, issues := env.Compile(strings.ReplaceAll(expression, lookup, "policies"))
+	if issues.Err() != nil {
+		t.Fatal(issues.Err())
+	}
+	program, err := env.Program(ast)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, group := range []string{"gateway.networking.k8s.io", "other.example.io"} {
+		t.Run(group, func(t *testing.T) {
+			out, _, err := program.Eval(map[string]any{
+				"object": map[string]any{"metadata": map[string]any{"name": "models", "namespace": "agentrouter-demo"}},
+				"policies": map[string]any{"items": []any{map[string]any{"spec": map[string]any{
+					"targetRefs": []any{map[string]any{"group": group, "kind": "HTTPRoute", "name": "models"}},
+					"jwt":        map[string]any{},
+					"extAuth": map[string]any{
+						"grpc":          map[string]any{"backendRefs": []any{map[string]any{"name": "kyverno-authz"}}},
+						"bodyToExtAuth": map[string]any{"maxRequestBytes": 16384},
+					},
+				}}}},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			native, err := out.ConvertToNative(reflect.TypeOf([]any{}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := 0
+			if group == "gateway.networking.k8s.io" {
+				want = 1
+			}
+			if len(native.([]any)) != want {
+				t.Fatalf("group %s: guards=%v", group, out)
 			}
 		})
 	}

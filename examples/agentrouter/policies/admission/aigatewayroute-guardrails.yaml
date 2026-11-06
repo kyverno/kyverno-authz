@@ -18,7 +18,8 @@ spec:
     - name: guards
       expression: >-
         dyn(resource.List("gateway.envoyproxy.io/v1alpha1", "securitypolicies", object.metadata.namespace)).items.filter(p,
-          p.spec.?targetRefs.orValue([]).exists(t, t.kind == "HTTPRoute" && t.name == object.metadata.name) &&
+          p.spec.?targetRefs.orValue([]).exists(t,
+            t.group == "gateway.networking.k8s.io" && t.kind == "HTTPRoute" && t.name == object.metadata.name) &&
           has(p.spec.jwt) &&
           p.spec.?extAuth.?grpc.?backendRefs.orValue([]).exists(ref, ref.name == "kyverno-authz") &&
           !p.spec.?extAuth.?failOpen.orValue(false) &&
