@@ -1,12 +1,48 @@
-# Agent Router response governance with Kyverno ext_proc
+# Show the right tools with Agent Router and Kyverno Authz
 
-**A live Kubernetes permission change changes what an MCP client discovers,
-without replacing its token or session.** Kyverno's prototype response processor
-filters Alice's `tools/list`: revoke scale permission and she sees four tools;
-restore it and she sees five. Bob's list is unaffected.
+An AI assistant needs to know which tools it can use. Showing a tool that the
+person can't use can lead to failed calls and confusion.
 
-Hiding a tool is **not a security boundary**. The separate ext_authz request
-policy denies a direct call to the hidden tool. Claims apply to
+Agent Router connects your assistant to models and tools. **This Kyverno Authz
+prototype checks what the person may do and removes tools they can't use from
+the list sent back to the assistant.** It also checks each call, so the assistant
+can't bypass the rules by remembering a tool's name.
+
+## What you'll show
+
+Alice manages a small app. She starts with five tools, including one that changes
+how many copies of the app run.
+
+1. Alice uses that tool to run two copies. The call succeeds.
+2. You remove her permission to change the number of copies.
+3. Alice repeats the call. Kyverno Authz blocks it.
+4. You refresh her tool list. She now sees four tools, without the change tool.
+5. You restore her permission and refresh again. All five tools return, and
+   the call works.
+
+Alice stays signed in. Bob's tool list doesn't change because his permissions
+haven't changed. Alice can still use her read tools.
+
+## Why it matters
+
+**Block actions a person can't take, and help the assistant avoid those actions
+in the first place.** The same live Kubernetes permissions guide both checks.
+You don't need to keep a separate tool list for each person.
+
+The [request-only demo](https://github.com/kyverno/kyverno-authz/tree/agent-router-demo/examples/agentrouter) checks calls but leaves the
+tool list unchanged. This prototype also changes the response before the
+assistant receives it. It uses the Model Context Protocol (MCP), which lets an
+assistant find and call tools.
+
+## How the prototype works
+
+The request check uses Envoy's external authorization interface, `ext_authz`.
+The new response check uses its external processing interface, `ext_proc`, to
+filter the `tools/list` response. This demo requires the prototype implementation
+in this branch, not just the current Kyverno Authz release.
+
+**Hiding a tool doesn't secure it.** The separate request check blocks direct
+calls to a hidden tool. These checks protect
 **gateway-originated traffic only**: this disposable demo has no backend
 authentication or network isolation, so pods reaching the `kube-tools` ClusterIP
 can bypass the gateway and use its ServiceAccount. Production needs backend
@@ -67,7 +103,7 @@ runtime before presenting.
    export CONTEXT="${CONTEXT:-kind-kyverno-agentrouter-extproc}"
    ```
 
-Keep the same authenticated connection through the story. Tokens last 12 hours
+Keep the same authenticated connection through the story. Tokens last 24 hours
 for this local demo, with matching Keycloak session limits. This extended
 lifetime is not a production recommendation; live RBAC changes still take
 effect without replacing the token.
@@ -122,7 +158,7 @@ Run the story one command at a time, as in the
 Use Bash and keep the main terminal open: tokens and sessions live in shell
 variables, not a presenter-state file. Do not enable `set -x`, print tokens,
 record authentication commands with expanded credentials, or share `.state`.
-Tokens expire after **12 hours**; if they expire or Keycloak/the gateway
+Tokens expire after **24 hours**; if they expire or Keycloak/the gateway
 restarts, repeat authentication and initialization explicitly. Do not refresh
 them between the permission changes.
 
