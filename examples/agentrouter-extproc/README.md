@@ -67,8 +67,13 @@ runtime before presenting.
    export CONTEXT="${CONTEXT:-kind-kyverno-agentrouter-extproc}"
    ```
 
-Keep the same authenticated connection through the story. Tokens expire after
-30 minutes; acquire them shortly before presenting, not before a long session.
+Keep the same authenticated connection through the story. Tokens last 12 hours
+for this local demo, with matching Keycloak session limits. This extended
+lifetime is not a production recommendation; live RBAC changes still take
+effect without replacing the token.
+Setup preserves existing identity Secrets: older clusters retain their original
+realm settings unless updated or recreated. Existing JWTs keep their original
+expiry; acquire new tokens after changing realm settings.
 
 #### Show the execution boundary first
 
@@ -117,7 +122,7 @@ Run the story one command at a time, as in the
 Use Bash and keep the main terminal open: tokens and sessions live in shell
 variables, not a presenter-state file. Do not enable `set -x`, print tokens,
 record authentication commands with expanded credentials, or share `.state`.
-Tokens expire after **30 minutes**; if they expire or Keycloak/the gateway
+Tokens expire after **12 hours**; if they expire or Keycloak/the gateway
 restarts, repeat authentication and initialization explicitly. Do not refresh
 them between the permission changes.
 
