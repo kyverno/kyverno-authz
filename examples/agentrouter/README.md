@@ -430,6 +430,15 @@ kubectl --context "$CONTEXT" -n agentrouter-demo get reports.openreports.io \
 ```
 
 Expected: report rows with nonzero pass/fail counts (counts vary by prior runs).
+`fail` means a policy denied the request; `error` means policy evaluation failed.
+The MCP policy rejects POST bodies with a missing or non-string `method`, or
+malformed tool-call parameters, with HTTP 400 instead of a missing-key evaluation
+error. This request-only demo does not accept methodless JSON-RPC response
+messages. GET event streams and DELETE session requests do not need a JSON body.
+Malformed JSON still fails closed as an evaluation error.
+Older reports retain their recorded errors after a policy update.
+Empty `policy` and `source` fields are expected in this baseline reporter:
+it records overall decisions, not policy attribution.
 Do not project raw report descriptions; setup explicitly disables request
 serialization through the positional log format described below.
 

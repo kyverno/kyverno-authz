@@ -50,6 +50,56 @@ func TestPoliciesCompile(t *testing.T) {
 	}
 }
 
+func TestMCPMessageValidation(t *testing.T) {
+	for _, tc := range []struct {
+		name, method, body string
+		status             int32
+	}{
+		{"missing-method", "POST", `{}`, 400},
+		{"response-without-method", "POST", `{"jsonrpc":"2.0","id":1,"result":{}}`, 400},
+		{"non-string-method", "POST", `{"method":1}`, 400},
+		{"non-object-message", "POST", `[]`, 400},
+		{"missing-params", "POST", `{"method":"tools/call"}`, 400},
+		{"missing-arguments", "POST", `{"method":"tools/call","params":{"name":"kube-tools__scale_deployment"}}`, 400},
+		{"non-object-arguments", "POST", `{"method":"tools/call","params":{"name":"kube-tools__scale_deployment","arguments":[]}}`, 400},
+		{"unsupported-method", "POST", `{"method":"unknown"}`, 403},
+		{"ping", "POST", `{"method":"ping"}`, 0},
+		{"initialized", "POST", `{"method":"notifications/initialized"}`, 0},
+		{"event-stream", "GET", "", 0},
+		{"session-delete", "DELETE", "", 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			policy := readPolicy(t, "mcp-operations")
+			for i := range policy.Spec.Variables {
+				if policy.Spec.Variables[i].Name == "token" {
+					policy.Spec.Variables[i].Expression = `{"Valid": dyn(true), "Claims": dyn({"preferred_username": dyn("alice"), "iss": dyn("http://keycloak.agentrouter-demo.svc.cluster.local:8080/realms/demo"), "aud": dyn(["agentrouter-demo"])})}`
+				}
+			}
+			compiled, errs := compiler.NewCompiler[dynamic.Interface, *authv3.CheckRequest, *authv3.CheckResponse](nil).Compile(policy, nil)
+			if len(errs) != 0 {
+				t.Fatal(errs.ToAggregate())
+			}
+			request := &authv3.CheckRequest{Attributes: &authv3.AttributeContext{Request: &authv3.AttributeContext_Request{
+				Http: &authv3.AttributeContext_HttpRequest{
+					Method: tc.method, Path: "/mcp", Headers: map[string]string{"authorization": "Bearer test"}, Body: tc.body,
+				},
+			}}}
+			result, err := compiled.Evaluate(context.Background(), nil, request)
+			if err != nil || result == nil {
+				t.Fatalf("message must produce a decision, not an evaluation error: result=%v err=%v", result, err)
+			}
+			if tc.status == 0 {
+				if result.GetOkResponse() == nil {
+					t.Fatalf("valid transport or message denied: %v", result)
+				}
+			} else if int32(result.GetDeniedResponse().GetStatus().GetCode()) != tc.status ||
+				!strings.HasPrefix(result.GetDeniedResponse().GetBody(), "Blocked by Kyverno policy agentrouter-bounded-operations: ") {
+				t.Fatalf("expected attributed HTTP %d denial: %v", tc.status, result)
+			}
+		})
+	}
+}
+
 func TestModelGuardRequiresGatewayAPITargetGroup(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join("..", "policies", "admission", "aigatewayroute-guardrails.yaml"))
 	if err != nil {

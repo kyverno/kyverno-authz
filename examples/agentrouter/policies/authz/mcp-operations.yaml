@@ -82,8 +82,20 @@ spec:
           envoy.Denied(405).WithBody("Blocked by Kyverno policy agentrouter-bounded-operations: unsupported transport method").Response() : null
     - expression: >-
         variables.http.method == "POST" &&
+        !(type(variables.rpc) == map ?
+          (has(variables.rpc.method) ? type(variables.rpc.method) == string : false) : false) ?
+          envoy.Denied(400).WithBody("Blocked by Kyverno policy agentrouter-bounded-operations: MCP request must contain a string method").Response() : null
+    - expression: >-
+        variables.http.method == "POST" &&
         !(variables.rpc.method in ["initialize", "notifications/initialized", "ping", "tools/list", "tools/call"]) ?
           envoy.Denied(403).WithBody("Blocked by Kyverno policy agentrouter-bounded-operations: unsupported MCP method").Response() : null
+    - expression: >-
+        variables.isCall &&
+        !(has(variables.rpc.params) ?
+          (type(variables.rpc.params) == map ?
+            ((has(variables.rpc.params.name) ? type(variables.rpc.params.name) == string : false) &&
+             (has(variables.rpc.params.arguments) ? type(variables.rpc.params.arguments) == map : false)) : false) : false) ?
+          envoy.Denied(400).WithBody("Blocked by Kyverno policy agentrouter-bounded-operations: tools/call requires a string name and an arguments object").Response() : null
     - expression: >-
         variables.isCall &&
         !(variables.tool in ["kube-tools__get_workload_status", "kube-tools__get_events",
