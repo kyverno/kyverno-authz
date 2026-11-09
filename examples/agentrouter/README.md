@@ -50,10 +50,10 @@ This demo blocks the action; it doesn't hide the tool.
 
 ## Implementation and additional checks
 
-This demo uses **the current upstream/main Kyverno Authz implementation**.
-Setup builds the unchanged authorizer from this checkout with `ko`; it does not
-use a prototype or modify the authorizer. The latest published release, v0.4.0,
-predates upstream/main; release compatibility is not asserted here.
+Setup builds Kyverno Authz from **this checkout** with `ko`. This branch adds
+policy-attributed reports, allowlisted request details, and a report-results
+filter to the upstream authorizer. These reporting changes are not in the latest
+published release, v0.4.0; release compatibility is not asserted here.
 
 The full runbook also covers these checks:
 
@@ -68,15 +68,14 @@ The full runbook also covers these checks:
 * **Complementary Kyverno admission:** unsafe MCPRoutes and AIGatewayRoutes
   are rejected before installation, including model routes referencing a
   backend other than the approved demo AIServiceBackend. Admission is not runtime authorization.
-* **Existing OpenReports summaries:** accumulated pass/fail counts, without
-  attributed policy names or per-request correlation.
+* **OpenReports:** blocked requests with the selected policy, denial reason,
+  request ID, HTTP details, and relevant MCP tool arguments.
 * **Fail closed:** authorizer downtime must not reach the Kubernetes backend
   or change deployment replicas.
 
 `tools/list` remains the same five-tool catalog even after revocation:
 discovery is **not** permission-filtered; calls are authorized at execution.
-Policy exceptions, response filtering, and attributed/redacted reporting are
-not part of this demo.
+Policy exceptions and response filtering are not part of this demo.
 
 ### What acting on Alice's behalf means here
 
@@ -417,30 +416,54 @@ curl -sS --max-time 20 -w '\nHTTP %{http_code}\n' http://127.0.0.1:18080/v1/chat
 Expected: HTTP **200** with a deterministic `choices` response, then HTTP
 **403** with `model not allowed for alice`. No paid model API is involved.
 
-## 6. Persist summaries without serializing credentials
+## 6. Inspect blocked requests and their policies
 
-“Existing OpenReports show accumulated pass/fail counts, not policy
-attribution or per-request correlation.” Allow the two-second flush to settle,
-then print only safe summary fields:
+“Each blocked request records which policy stopped it and the relevant request
+details, without copying headers or the request body.” Allow the two-second
+flush to settle:
 
 ```bash
 sleep 3
 kubectl --context "$CONTEXT" -n agentrouter-demo get reports.openreports.io \
-  -o 'custom-columns=NAME:.metadata.name,PASS:.summary.pass,FAIL:.summary.fail'
+  -o 'custom-columns=NAME:.metadata.name,PASS:.summary.pass,FAIL:.summary.fail,ERROR:.summary.error'
+kubectl --context "$CONTEXT" -n agentrouter-demo get reports.openreports.io -o json |
+  jq '[.items[].results[]? | select(.source == "kyverno-authz" and .policy != "") |
+       {policy, source, result, message, properties}]'
 ```
 
-Expected: report rows with nonzero pass/fail counts (counts vary by prior runs).
+New reports default to blocked requests: `fail,error`, with zero passes.
+`policy` names the selected ValidatingPolicy and `source` is `kyverno-authz`.
+`properties` includes HTTP method, path without its query string, host, Envoy
+request ID (when present), authorization status, and denial reason. MCP tool calls
+also include method, tool, namespace, workload name, and replicas when supplied.
+Model requests include the model name. These are authorization decisions, not
+the upstream tool's final response status. No policy is invented for errors
+outside policy evaluation or unmatched default allows.
+
 `fail` means a policy denied the request; `error` means policy evaluation failed.
 The MCP policy rejects POST bodies with a missing or non-string `method`, or
 malformed tool-call parameters, with HTTP 400 instead of a missing-key evaluation
 error. This request-only demo does not accept methodless JSON-RPC response
 messages. GET event streams and DELETE session requests do not need a JSON body.
 Malformed JSON still fails closed as an evaluation error.
-Older reports retain their recorded errors after a policy update.
-Empty `policy` and `source` fields are expected in this baseline reporter:
-it records overall decisions, not policy attribution.
-Do not project raw report descriptions; setup explicitly disables request
-serialization through the positional log format described below.
+Older reports retain their original contents, including missing attribution and
+past passes/errors. A rollout starts a new report; it does not rewrite old ones.
+
+The Envoy authorizer's `--reports-filter` flag accepts a comma-separated list of
+`pass,fail,error,warn,skip`, similar to Kyverno's `--allowedResults`. Its default
+is `fail,error` so fail-closed evaluation errors remain visible. Use `fail` for
+policy denials only or `pass,fail,error,warn,skip` for all results. This filters
+report entries **and counters**, not authorization, logs, or metrics. This
+authorizer currently emits only pass, fail, and error.
+
+For example, to include allowed requests, change
+`--reports-filter=fail,error` to `--reports-filter=pass,fail,error` in
+`examples/agentrouter/manifests/workloads.yaml`, then apply it:
+
+```bash
+kubectl --context "$CONTEXT" apply -f examples/agentrouter/manifests/workloads.yaml
+kubectl --context "$CONTEXT" -n agentrouter-demo rollout status deployment/kyverno-authz
+```
 
 ## 7. Block unsafe routes at admission
 
@@ -539,8 +562,15 @@ do not use it on a projected terminal or log its output.
 
 ## Reporting and local-demo limitations
 
-The upstream default report description serializes the entire request,
-including bearer tokens. This deployment explicitly overrides it with:
+Reports copy only allowlisted metadata; they never serialize request headers,
+URL query strings, or the full body. Body inspection is limited to 16 KiB, and
+individual request properties are limited to 256 bytes. Missing or malformed
+body fields are omitted. Identity is not inferred from unverified JWT claims.
+Policy-provided denial reasons and evaluation errors are recorded, so policies
+must not put secrets in their messages.
+
+Log output uses a separate sink that can serialize requests. This deployment
+keeps request logging disabled with:
 
 ```text
 --log-msg-format=[%[1]s] decision: %[3]s
@@ -548,12 +578,15 @@ including bearer tokens. This deployment explicitly overrides it with:
 
 Go positional formatting skips argument 2 (the request), with no unused
 argument diagnostic. A focused Go test verifies this. Reporting checks also
-reject bearer strings and the current token in persisted reports. The demo
-prints **only summaries**, not report descriptions. This is configuration to
-omit request serialization, not a new redaction feature. Do not substitute
-the default format. Summaries are accumulated, not correlated to one run;
-there is no claim of attributed policy names or universal response/header
-redaction. Do not use real secrets in any requests.
+reject bearer strings and the current token in persisted reports. Do not
+substitute the default log format or use real secrets in any requests.
+
+Reports are Kubernetes objects stored in etcd, not log files. Each authorizer
+pod writes its own report, flushing every two seconds. It keeps the latest
+200 included results; summary counters cover that process's lifetime. There is
+no automatic TTL or deletion, and reset does not clear reports. Old pod reports
+remain after rollouts; arrange separate retention for anything beyond this
+disposable demo.
 
 This is disposable demo infrastructure: plaintext HTTP, Keycloak development
 mode, password grant, example users, single replicas, and synthetic credential
@@ -569,6 +602,7 @@ and admission controls in production.
 
 ```bash
 go test ./examples/agentrouter/tests -count=1
+go test -race ./pkg/events ./pkg/engine ./pkg/commands/serve/envoy/authz-server
 python3 -m unittest discover -s examples/agentrouter/tests -p 'test_*.py'
 shellcheck examples/agentrouter/scripts/*.sh
 ```
@@ -576,7 +610,11 @@ shellcheck examples/agentrouter/scripts/*.sh
 Validated on 2026-11-05 against upstream/main `fe9504b`: fresh setup, the
 automated suite and non-mutating checks, and the manual Demo commands above
 passed on Kind. The manual revoke/restore requests use the same shell-held
-JWT/session. This evidence applies to that checkout, not release v0.4.0.
+JWT/session. On 2026-11-09, reporting changes were rebuilt and tested on the
+existing Kind cluster: policy attribution, safe request properties, evaluation
+errors, default blocked-only reporting, and opt-in pass reporting. These checks
+preserved Alice's permissions and workload replica counts. This evidence applies
+to this branch, not release v0.4.0.
 
 ## Cleanup
 

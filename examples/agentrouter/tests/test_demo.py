@@ -105,11 +105,13 @@ class ReportingTests(unittest.TestCase):
         self.assertNotIn("x-ai-eg-model", send.call_args.args[2])
 
     def test_summaries_and_credential_rejection(self):
-        report = {"metadata": {"name": "sample"}, "summary": {"pass": 1, "fail": 1},
-                  "results": [{"result": "pass", "description": "[timestamp] decision: allowed"}]}
+        report = {"metadata": {"name": "sample"}, "summary": {"pass": 0, "fail": 1},
+                  "results": [{"result": "fail", "policy": "mcp-operations",
+                               "source": "kyverno-authz", "properties": {"status": "403", "path": "/mcp"},
+                               "message": "[timestamp] decision: Denied"}]}
         with patch.object(demo, "kubectl", return_value=json.dumps({"items": [report]})):
             demo.decision_reports(["secret-jwt"])
-        report["results"][0]["description"] += " Bearer " + "secret-jwt"
+        report["results"][0]["message"] += " Bearer " + "secret-jwt"
         with patch.object(demo, "kubectl", return_value=json.dumps({"items": [report]})):
             with self.assertRaisesRegex(AssertionError, "credential leaked"):
                 demo.decision_reports(["secret-jwt"])

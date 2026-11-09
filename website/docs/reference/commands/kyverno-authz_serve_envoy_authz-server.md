@@ -47,6 +47,7 @@ kyverno-authz serve envoy authz-server [flags]
       --openreports-enabled                  Enable reporting in the openreports format, if not running in k8s or the openreports CRD is not installed this flag won't take effect
       --probes-address string                Address to listen on for health checks
       --report-flush-interval string         how often do results get flushed into the openreports report (if active)
+      --reports-filter string                Comma-separated OpenReports results to store: pass,fail,error,warn,skip (does not filter logs or metrics) (default "fail,error")
       --result-buffer-size int               Event buffer size for openreports, note that if the total exceeded the 1MB etcd limit, report flushing will error (default 500)
 ```
 

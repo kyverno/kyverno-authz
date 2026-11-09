@@ -3,6 +3,7 @@ package events
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
@@ -29,15 +30,43 @@ type ResultAccessor interface {
 }
 
 type resultAccessorImpl struct {
-	result any
-	err    error
+	result     any
+	err        error
+	policyName string
 }
 
-func NewResultAccessor(res any, err error) *resultAccessorImpl {
-	return &resultAccessorImpl{
-		result: res,
-		err:    err,
+func NewResultAccessor(res any, err error, policyName ...string) *resultAccessorImpl {
+	name := ""
+	if len(policyName) != 0 {
+		name = policyName[0]
 	}
+	return &resultAccessorImpl{
+		result:     res,
+		err:        err,
+		policyName: name,
+	}
+}
+
+// ReportMetadata is optional so existing ResultAccessor implementations remain compatible.
+func (r *resultAccessorImpl) ReportMetadata() (string, map[string]string) {
+	properties := map[string]string{}
+	if r.policyName != "" {
+		properties["policy-kind"] = "ValidatingPolicy"
+	}
+	switch res := r.result.(type) {
+	case *authv3.CheckResponse:
+		if denied := res.GetDeniedResponse(); denied != nil {
+			properties["status"] = strconv.Itoa(int(denied.GetStatus().GetCode()))
+			properties["reason"] = denied.GetBody()
+		} else if res.GetOkResponse() != nil {
+			properties["status"] = "200"
+		}
+	case http.CheckResponse:
+		if res.Denied != nil {
+			properties["reason"] = res.Denied.Reason
+		}
+	}
+	return r.policyName, properties
 }
 
 func (r *resultAccessorImpl) MustGet() (string, error) {

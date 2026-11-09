@@ -79,6 +79,7 @@ spec:
             - --kube-policy-source=false
             - --external-policy-source=file:///policies
             - --openreports-enabled=true
+            - --reports-filter=fail,error
             - --report-flush-interval=2s
             - --result-buffer-size=200
             - "--log-msg-format=[%[1]s] decision: %[3]s"

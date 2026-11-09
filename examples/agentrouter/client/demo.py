@@ -293,15 +293,25 @@ def decision_reports(tokens):
             raise AssertionError("credential leaked into an OpenReport")
         return reports
 
-    wait_until("pass/fail summaries were not reported", lambda: (
-        sum(report.get("summary", {}).get("pass", 0) for report in summaries()) > 0 and
-        sum(report.get("summary", {}).get("fail", 0) for report in summaries()) > 0
-    ), timeout=45)
+    def attributed_blocks():
+        return [
+            result for report in summaries() for result in report.get("results", [])
+            if result.get("result") == "fail" and result.get("policy") and
+            result.get("source") == "kyverno-authz" and
+            result.get("properties", {}).get("status")
+        ]
+
+    wait_until("attributed blocked requests were not reported", attributed_blocks, timeout=45)
     for report in summaries():
         summary = report.get("summary", {})
         print(f"REPORT | {report['metadata']['name']} | pass={summary.get('pass', 0)}; "
               f"fail={summary.get('fail', 0)}", flush=True)
-    print("PASS | REPORT | accumulated summaries only; no policy attribution or per-request correlation", flush=True)
+    for result in attributed_blocks():
+        fields = {key: result["properties"][key] for key in
+                  ("request-id", "method", "path", "tool", "namespace", "workload", "replicas", "status")
+                  if key in result["properties"]}
+        print(f"BLOCKED | {result['policy']} | {json.dumps(fields, sort_keys=True)}", flush=True)
+    print("PASS | REPORT | attributed blocked requests; safe request details; no credentials", flush=True)
 
 
 def fail_closed(client):
