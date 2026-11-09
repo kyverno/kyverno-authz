@@ -448,8 +448,11 @@ outside policy evaluation or unmatched default allows.
 `fail` means a policy denied the request; `error` means policy evaluation failed.
 The MCP policy rejects POST bodies with a missing or non-string `method`, or
 malformed tool-call parameters, with HTTP 400 instead of a missing-key evaluation
-error. This request-only demo does not accept methodless JSON-RPC response
-messages. GET event streams and DELETE session requests do not need a JSON body.
+error. Authenticated, valid JSON-RPC response envelopes are allowed without a
+`method`: Agent Router sends heartbeat pings, and clients reply with `id` and
+`result` (or `error`). Responses must include `jsonrpc: "2.0"`, an ID, exactly
+one outcome, and no request fields. Tool calls still pass all normal checks.
+GET event streams and DELETE session requests do not need a JSON body.
 Malformed JSON still fails closed as an evaluation error.
 Older reports retain their original contents, including missing attribution and
 past passes/errors. A rollout starts a new report; it does not rewrite old ones.

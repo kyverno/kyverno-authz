@@ -56,7 +56,19 @@ func TestMCPMessageValidation(t *testing.T) {
 		status             int32
 	}{
 		{"missing-method", "POST", `{}`, 400},
-		{"response-without-method", "POST", `{"jsonrpc":"2.0","id":1,"result":{}}`, 400},
+		{"heartbeat-response", "POST", `{"jsonrpc":"2.0","id":"aigw-server-to-client-ping-test","result":{}}`, 0},
+		{"response-numeric-id", "POST", `{"jsonrpc":"2.0","id":1,"result":{}}`, 0},
+		{"error-response", "POST", `{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"method not found"}}`, 0},
+		{"response-without-version", "POST", `{"id":1,"result":{}}`, 400},
+		{"response-without-id", "POST", `{"jsonrpc":"2.0","result":{}}`, 400},
+		{"response-with-invalid-id", "POST", `{"jsonrpc":"2.0","id":{},"result":{}}`, 400},
+		{"response-without-outcome", "POST", `{"jsonrpc":"2.0","id":1}`, 400},
+		{"response-conflicting-outcomes", "POST", `{"jsonrpc":"2.0","id":1,"result":{},"error":{"code":-32601,"message":"failed"}}`, 400},
+		{"response-with-params", "POST", `{"jsonrpc":"2.0","id":1,"result":{},"params":{"name":"scale"}}`, 400},
+		{"invalid-error-response", "POST", `{"jsonrpc":"2.0","id":1,"error":{"code":"oops","message":"failed"}}`, 400},
+		{"missing-error-fields", "POST", `{"jsonrpc":"2.0","id":1,"error":{}}`, 400},
+		{"out-of-range-error-code", "POST", `{"jsonrpc":"2.0","id":1,"error":{"code":1e100,"message":"failed"}}`, 400},
+		{"request-cannot-use-response-bypass", "POST", `{"jsonrpc":"2.0","id":1,"result":{},"method":"tools/call","params":{"name":"kube-tools__scale_deployment","arguments":{"namespace":"team-a-dev","name":"checkout","replicas":50}}}`, 403},
 		{"non-string-method", "POST", `{"method":1}`, 400},
 		{"non-object-message", "POST", `[]`, 400},
 		{"missing-params", "POST", `{"method":"tools/call"}`, 400},
@@ -97,6 +109,31 @@ func TestMCPMessageValidation(t *testing.T) {
 				t.Fatalf("expected attributed HTTP %d denial: %v", tc.status, result)
 			}
 		})
+	}
+}
+
+func TestMCPResponsesRequireIdentity(t *testing.T) {
+	policy := readPolicy(t, "mcp-operations")
+	for i := range policy.Spec.Variables {
+		if policy.Spec.Variables[i].Name == "token" {
+			policy.Spec.Variables[i].Expression = `{"Valid": dyn(false)}`
+		}
+	}
+	compiled, errs := compiler.NewCompiler[dynamic.Interface, *authv3.CheckRequest, *authv3.CheckResponse](nil).Compile(policy, nil)
+	if len(errs) != 0 {
+		t.Fatal(errs.ToAggregate())
+	}
+	for _, headers := range []map[string]string{nil, {"authorization": "Bearer rejected"}} {
+		request := &authv3.CheckRequest{Attributes: &authv3.AttributeContext{Request: &authv3.AttributeContext_Request{
+			Http: &authv3.AttributeContext_HttpRequest{
+				Method: "POST", Path: "/mcp", Headers: headers,
+				Body: `{"jsonrpc":"2.0","id":"aigw-server-to-client-ping-test","result":{}}`,
+			},
+		}}}
+		result, err := compiled.Evaluate(context.Background(), nil, request)
+		if err != nil || result.GetDeniedResponse().GetStatus().GetCode() != 401 {
+			t.Fatalf("response must not bypass authentication: result=%v err=%v", result, err)
+		}
 	}
 }
 
