@@ -427,8 +427,13 @@ sleep 3
 kubectl --context "$CONTEXT" -n agentrouter-demo get reports.openreports.io \
   -o 'custom-columns=NAME:.metadata.name,PASS:.summary.pass,FAIL:.summary.fail,ERROR:.summary.error'
 kubectl --context "$CONTEXT" -n agentrouter-demo get reports.openreports.io -o json |
-  jq '[.items[].results[]? | select(.source == "kyverno-authz" and .policy != "") |
-       {policy, source, result, message, properties}]'
+  python3 -c 'import json, sys
+print(json.dumps([
+    {key: result.get(key) for key in ("policy", "source", "result", "message", "properties")}
+    for report in json.load(sys.stdin)["items"]
+    for result in report.get("results", [])
+    if result.get("source") == "kyverno-authz" and result.get("policy")
+], indent=2))'
 ```
 
 New reports default to blocked requests: `fail,error`, with zero passes.
