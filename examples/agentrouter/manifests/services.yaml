@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: agentrouter-demo
+spec:
+  selector:
+    app: keycloak
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kyverno-authz
+  namespace: agentrouter-demo
+spec:
+  selector:
+    app: kyverno-authz
+  ports:
+    - name: grpc
+      port: 9081
+      targetPort: 9081
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kube-tools
+  namespace: agentrouter-demo
+spec:
+  # Demo-only: no backend authentication or network isolation. Runtime
+  # authorization claims apply to requests through the Agent Router gateway.
+  selector:
+    app: kube-tools
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: runbooks
+  namespace: agentrouter-demo
+spec:
+  selector:
+    app: runbooks
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: llm-backend
+  namespace: agentrouter-demo
+spec:
+  selector:
+    app: llm-backend
+  ports:
+    - port: 8080
+      targetPort: 8080

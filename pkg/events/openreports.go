@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -26,6 +27,8 @@ type openreportsEventSubscriber[Req any] struct {
 	logger        logr.Logger
 	flushInterval *time.Duration
 	eventChan     chan event[Req]
+	filter        ReportsFilter
+	mu            sync.Mutex
 }
 
 // pass a context to the constructor to make it the context used to cancel the event loop
@@ -33,16 +36,18 @@ func NewOpenreportsSubscriber[Req any](ctx context.Context, bufferSize int,
 	orClient openreportsclient.OpenreportsV1alpha1Interface,
 	flushInterval *time.Duration,
 	logger logr.Logger,
-	reportName, ns, msgFormat string) EventIface[Req] {
+	reportName, ns, msgFormat string, filters ...ReportsFilter) EventIface[Req] {
 	o := &openreportsEventSubscriber[Req]{
-		client: orClient,
-		// we don't need the ring buffer to contain a mutex because in all cases we process events serially
+		client:     orClient,
 		results:    NewRingBuffer[openreportsv1alpha1.ReportResult](bufferSize),
 		namespace:  ns,
 		reportName: reportName,
 		msgFormat:  msgFormat,
 		logger:     logger,
 		eventChan:  make(chan event[Req], 50), // we can buffer up to 50 events
+	}
+	if len(filters) != 0 {
+		o.filter = filters[0]
 	}
 
 	if flushInterval != nil {
@@ -63,13 +68,16 @@ func (o *openreportsEventSubscriber[Req]) eventLoop(ctx context.Context) {
 			o.logger.Info("openreports event handler exiting")
 			return
 		case ev := <-o.eventChan:
+			o.mu.Lock()
 			reportResult, err := o.newReportResult(ev.t, ev.req, ev.res)
 			if err != nil {
+				o.mu.Unlock()
 				o.logger.Error(err, "error building report result")
 				continue
 			}
 
 			o.results.Push(*reportResult)
+			o.mu.Unlock()
 			// no need to do anything further if we are gonna be pushing on an interval
 			if o.flushInterval != nil {
 				continue
@@ -80,8 +88,11 @@ func (o *openreportsEventSubscriber[Req]) eventLoop(ctx context.Context) {
 	}
 }
 
-// ammar: should we also convey the policy that caused the decision ?
 func (o *openreportsEventSubscriber[Req]) Push(ctx context.Context, t time.Time, req Req, res ResultAccessor) {
+	decision, _ := res.MustGet()
+	if !o.filter.allows(decision) {
+		return
+	}
 	event := event[Req]{
 		t:   t,
 		req: req,
@@ -96,9 +107,19 @@ func (o *openreportsEventSubscriber[Req]) Push(ctx context.Context, t time.Time,
 }
 
 func (o *openreportsEventSubscriber[Req]) newReportResult(t time.Time, r Req, resultAccessor ResultAccessor) (*openreportsv1alpha1.ReportResult, error) {
-	reportResult := &openreportsv1alpha1.ReportResult{}
-	// ammar: is there a constant provided in the openreports package ?
-	// ammar: we should also have request skipped if it didn't match the conditions
+	reportResult := &openreportsv1alpha1.ReportResult{
+		Source:     "kyverno-authz",
+		Properties: requestProperties(r),
+	}
+	if metadata, ok := resultAccessor.(interface {
+		ReportMetadata() (string, map[string]string)
+	}); ok {
+		name, properties := metadata.ReportMetadata()
+		reportResult.Policy = name
+		for key, value := range properties {
+			reportResult.Properties[key] = value
+		}
+	}
 	res, resultErr := resultAccessor.MustGet()
 	switch res {
 	case RequestAllowed:
@@ -115,7 +136,7 @@ func (o *openreportsEventSubscriber[Req]) newReportResult(t time.Time, r Req, re
 		Seconds: t.Unix(),
 		Nanos:   int32(t.Nanosecond()),
 	}
-	jsonStr, err := json.Marshal(r)
+	jsonStr, err := json.Marshal(reportResult.Properties)
 	if err != nil {
 		return nil, err
 	}
@@ -137,6 +158,8 @@ func (o *openreportsEventSubscriber[Req]) newReportResult(t time.Time, r Req, re
 
 //lint:ignore SA5008 reason
 func (o *openreportsEventSubscriber[Req]) newReport() *openreportsv1alpha1.Report {
+	o.mu.Lock()
+	defer o.mu.Unlock()
 	return &openreportsv1alpha1.Report{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      o.reportName,
@@ -152,11 +175,15 @@ func (o *openreportsEventSubscriber[Req]) newReport() *openreportsv1alpha1.Repor
 }
 
 func (o *openreportsEventSubscriber[Req]) pushReport(ctx context.Context) {
+	snapshot := o.newReport()
+	if len(snapshot.Results) == 0 {
+		return
+	}
 	rep, err := o.client.Reports(o.namespace).Get(ctx, o.reportName, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// create it
-			rep = o.newReport()
+			rep = snapshot
 			_, err := o.client.Reports(o.namespace).Create(ctx, rep, metav1.CreateOptions{})
 			if err != nil {
 				o.logger.Error(err, "error creating report")
@@ -171,12 +198,8 @@ func (o *openreportsEventSubscriber[Req]) pushReport(ctx context.Context) {
 
 	// its already there, update it
 	// update the results in the report to be whats in the ring buffer
-	rep.Results = o.results.Values()
-
-	// update the report summary
-	rep.Summary.Error = int(o.errored.Load())
-	rep.Summary.Pass = int(o.allowed.Load())
-	rep.Summary.Fail = int(o.denied.Load())
+	rep.Results = snapshot.Results
+	rep.Summary = snapshot.Summary
 
 	_, err = o.client.Reports(o.namespace).Update(ctx, rep, metav1.UpdateOptions{})
 	if err != nil {

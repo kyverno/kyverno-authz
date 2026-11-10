@@ -1,0 +1,348 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: agentrouter-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:26.3.3
+          args: [start-dev, --import-realm]
+          env:
+            - name: KC_HOSTNAME
+              value: http://keycloak.agentrouter-demo.svc.cluster.local:8080
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+          ports:
+            - containerPort: 8080
+            - containerPort: 9000
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 9000
+            initialDelaySeconds: 15
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
+          volumeMounts:
+            - name: realm
+              mountPath: /opt/keycloak/data/import
+              readOnly: true
+      volumes:
+        - name: realm
+          secret:
+            secretName: demo-identity
+            items:
+              - key: realm.json
+                path: demo-realm.json
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kyverno-authz
+  namespace: agentrouter-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kyverno-authz
+  template:
+    metadata:
+      labels:
+        app: kyverno-authz
+    spec:
+      serviceAccountName: kyverno-authz
+      containers:
+        - name: authz
+          image: ko.local/github.com/kyverno/kyverno-authz:agentrouter-demo
+          imagePullPolicy: Never
+          args:
+            - serve
+            - envoy
+            - authz-server
+            - --grpc-address=:9081
+            - --probes-address=:9080
+            - --kube-policy-source=false
+            - --external-policy-source=file:///policies
+            - --openreports-enabled=true
+            - --reports-filter=fail,error
+            - --report-flush-interval=2s
+            - --result-buffer-size=200
+            - "--log-msg-format=[%[1]s] decision: %[3]s"
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          ports:
+            - containerPort: 9081
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 9080
+          securityContext:
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: policies
+              mountPath: /policies
+              readOnly: true
+      volumes:
+        - name: policies
+          projected:
+            sources:
+              - configMap:
+                  name: demo-policies
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kube-tools
+  namespace: agentrouter-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kube-tools
+  template:
+    metadata:
+      labels:
+        app: kube-tools
+    spec:
+      serviceAccountName: kube-tools
+      containers:
+        - name: mcp
+          image: python:3.13.7-alpine3.22
+          command: [python3, -u, /app/server.py]
+          env:
+            - name: MCP_BACKEND
+              value: kubernetes
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          volumeMounts:
+            - name: server
+              mountPath: /app
+              readOnly: true
+      volumes:
+        - name: server
+          configMap:
+            name: mcp-server
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: runbooks
+  namespace: agentrouter-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: runbooks
+  template:
+    metadata:
+      labels:
+        app: runbooks
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: mcp
+          image: python:3.13.7-alpine3.22
+          command: [python3, -u, /app/server.py]
+          env:
+            - name: MCP_BACKEND
+              value: runbooks
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          volumeMounts:
+            - name: server
+              mountPath: /app
+              readOnly: true
+      volumes:
+        - name: server
+          configMap:
+            name: mcp-server
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llm-backend
+  namespace: agentrouter-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: llm-backend
+  template:
+    metadata:
+      labels:
+        app: llm-backend
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: llm
+          image: python:3.13.7-alpine3.22
+          command: [python3, -u, /app/server.py]
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          volumeMounts:
+            - name: server
+              mountPath: /app
+              readOnly: true
+      volumes:
+        - name: server
+          configMap:
+            name: llm-backend
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: checkout
+  namespace: team-a-dev
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: checkout
+  template:
+    metadata:
+      labels:
+        app: checkout
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: checkout
+          image: python:3.13.7-alpine3.22
+          command: [python3, -u, -m, http.server, "8080"]
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 25m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: checkout
+  namespace: team-b-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: checkout
+  template:
+    metadata:
+      labels:
+        app: checkout
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: checkout
+          image: python:3.13.7-alpine3.22
+          command: [python3, -u, -m, http.server, "8080"]
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 25m
+              memory: 16Mi
+            limits:
+              memory: 64Mi

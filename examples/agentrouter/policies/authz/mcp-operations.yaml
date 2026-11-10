@@ -1,0 +1,147 @@
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: agentrouter-bounded-operations
+spec:
+  failurePolicy: Fail
+  evaluation:
+    mode: Envoy
+  # Exactly one demo policy matches each request. Requests that match no
+  # policy are allowed by default, so the two path conditions are complements.
+  matchConditions:
+    - name: not-model-api
+      expression: '!object.attributes.request.http.path.startsWith("/v1/")'
+  variables:
+    - name: http
+      expression: object.attributes.request.http
+    - name: token
+      expression: >-
+        jwt.Decode(variables.http.headers["authorization"].substring(7),
+          jwks.Fetch("http://keycloak.agentrouter-demo.svc.cluster.local:8080/realms/demo/protocol/openid-connect/certs"))
+    - name: user
+      expression: variables.token.Claims["preferred_username"]
+    - name: home
+      expression: 'variables.user == "alice" ? "team-a-dev" : variables.user == "bob" ? "team-b-dev" : ""'
+    - name: rpc
+      expression: json.Unmarshal(variables.http.body)
+    - name: isResponse
+      expression: >-
+        type(variables.rpc) == map ?
+          (!has(variables.rpc.method) &&
+           has(variables.rpc.jsonrpc) && variables.rpc.jsonrpc == "2.0" &&
+           has(variables.rpc.id) &&
+           (type(variables.rpc.id) == string || type(variables.rpc.id) == double || variables.rpc.id == null) &&
+           variables.rpc.all(key, key in ["jsonrpc", "id", "result", "error"]) &&
+           (has(variables.rpc.result) ?
+             !has(variables.rpc.error) :
+             (has(variables.rpc.error) && type(variables.rpc.error) == map &&
+              has(variables.rpc.error.code) && type(variables.rpc.error.code) == double &&
+              variables.rpc.error.code >= -2147483648.0 && variables.rpc.error.code <= 2147483647.0 &&
+              variables.rpc.error.code == double(int(variables.rpc.error.code)) &&
+              has(variables.rpc.error.message) && type(variables.rpc.error.message) == string))) : false
+    - name: isCall
+      expression: variables.http.method == "POST" && variables.rpc.method == "tools/call"
+    - name: tool
+      expression: variables.rpc.params.name
+    - name: args
+      expression: variables.rpc.params.arguments
+    - name: isKube
+      expression: variables.tool.startsWith("kube-tools__")
+    - name: isScale
+      expression: variables.tool == "kube-tools__scale_deployment"
+    - name: sar
+      expression: >-
+        resource.Post("authorization.k8s.io/v1", "subjectaccessreviews", {
+          "apiVersion": dyn("authorization.k8s.io/v1"),
+          "kind": dyn("SubjectAccessReview"),
+          "spec": dyn({
+            "user": variables.user,
+            "resourceAttributes": dyn({
+              "namespace": variables.args.namespace,
+              "group": dyn(variables.tool in ["kube-tools__get_workload_status", "kube-tools__scale_deployment"] ? "apps" : ""),
+              "resource": dyn(variables.tool == "kube-tools__get_events" ? "events" : variables.tool == "kube-tools__get_logs" ? "pods" : "deployments"),
+              "subresource": dyn(variables.isScale ? "scale" : variables.tool == "kube-tools__get_logs" ? "log" : ""),
+              "name": dyn(variables.tool in ["kube-tools__get_workload_status", "kube-tools__scale_deployment"] ? "checkout" : ""),
+              "verb": dyn(variables.isScale ? "update" : variables.tool == "kube-tools__get_events" ? "list" : "get")
+            })
+          })
+        })
+    - name: podListSar
+      expression: >-
+        resource.Post("authorization.k8s.io/v1", "subjectaccessreviews", {
+          "apiVersion": dyn("authorization.k8s.io/v1"),
+          "kind": dyn("SubjectAccessReview"),
+          "spec": dyn({
+            "user": variables.user,
+            "resourceAttributes": dyn({
+              "namespace": variables.args.namespace,
+              "group": dyn(""),
+              "resource": dyn("pods"),
+              "verb": dyn("list")
+            })
+          })
+        })
+  validations:
+    - expression: >-
+        !("authorization" in variables.http.headers) ||
+        !variables.http.headers["authorization"].startsWith("Bearer ") ?
+          envoy.Denied(401).WithBody("Blocked by Kyverno policy agentrouter-bounded-operations: bearer token required").Response() : null
+    - expression: >-
+        !variables.token.Valid ||
+        variables.token.Claims["iss"] != "http://keycloak.agentrouter-demo.svc.cluster.local:8080/realms/demo" ||
+        !("agentrouter-demo" in variables.token.Claims["aud"]) ||
+        variables.home == "" ?
+          envoy.Denied(401).WithBody("Blocked by Kyverno policy agentrouter-bounded-operations: identity rejected").Response() : null
+    - expression: >-
+        !(variables.http.method in ["POST", "GET", "DELETE"]) ?
+          envoy.Denied(405).WithBody("Blocked by Kyverno policy agentrouter-bounded-operations: unsupported transport method").Response() : null
+    - expression: >-
+        variables.http.method == "POST" && variables.isResponse ?
+          envoy.Allowed().Response() : null
+    - expression: >-
+        variables.http.method == "POST" &&
+        !(type(variables.rpc) == map ?
+          (has(variables.rpc.method) ? type(variables.rpc.method) == string : false) : false) ?
+          envoy.Denied(400).WithBody("Blocked by Kyverno policy agentrouter-bounded-operations: MCP request must contain a string method").Response() : null
+    - expression: >-
+        variables.http.method == "POST" &&
+        !(variables.rpc.method in ["initialize", "notifications/initialized", "ping", "tools/list", "tools/call"]) ?
+          envoy.Denied(403).WithBody("Blocked by Kyverno policy agentrouter-bounded-operations: unsupported MCP method").Response() : null
+    - expression: >-
+        variables.isCall &&
+        !(has(variables.rpc.params) ?
+          (type(variables.rpc.params) == map ?
+            ((has(variables.rpc.params.name) ? type(variables.rpc.params.name) == string : false) &&
+             (has(variables.rpc.params.arguments) ? type(variables.rpc.params.arguments) == map : false)) : false) : false) ?
+          envoy.Denied(400).WithBody("Blocked by Kyverno policy agentrouter-bounded-operations: tools/call requires a string name and an arguments object").Response() : null
+    - expression: >-
+        variables.isCall &&
+        !(variables.tool in ["kube-tools__get_workload_status", "kube-tools__get_events",
+          "kube-tools__get_logs", "kube-tools__scale_deployment", "runbooks__get_runbook"]) ?
+          envoy.Denied(403).WithBody("Blocked by Kyverno policy agentrouter-bounded-operations: tool not allowed").Response() : null
+    - expression: >-
+        variables.isCall && variables.isKube &&
+        (!("namespace" in variables.args) || variables.args.namespace != variables.home ||
+          !("name" in variables.args) || variables.args.name != "checkout") ?
+          envoy.Denied(403).WithBody("Blocked by Kyverno policy agentrouter-bounded-operations: namespace or workload boundary").Response() : null
+    - expression: >-
+        variables.isCall &&
+        (variables.isKube ?
+          !variables.args.all(key, key in (variables.isScale ? ["namespace", "name", "replicas"] : ["namespace", "name"])) :
+          size(variables.args) != 0) ?
+          envoy.Denied(403).WithBody("Blocked by Kyverno policy agentrouter-bounded-operations: unexpected tool arguments").Response() : null
+    - expression: >-
+        variables.isCall && variables.isScale &&
+        (!("replicas" in variables.args) || type(variables.args.replicas) != double ||
+          variables.args.replicas < 1.0 || variables.args.replicas > 3.0 ||
+          variables.args.replicas != double(int(variables.args.replicas))) ?
+          envoy.Denied(403).WithBody("Blocked by Kyverno policy agentrouter-bounded-operations: replicas must be an integer from 1 through 3").Response() : null
+    - expression: >-
+        variables.isCall && variables.isKube &&
+        (!has(variables.sar.status) || !variables.sar.status.allowed) ?
+          envoy.Denied(403).WithBody("Blocked by Kyverno policy agentrouter-bounded-operations: Kubernetes SAR denied").Response() : null
+    - expression: >-
+        variables.isCall && variables.tool == "kube-tools__get_logs" &&
+        (!has(variables.podListSar.status) || !variables.podListSar.status.allowed) ?
+          envoy.Denied(403).WithBody("Blocked by Kyverno policy agentrouter-bounded-operations: Kubernetes pod-list SAR denied").Response() : null
+    - expression: envoy.Allowed().Response()

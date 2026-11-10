@@ -1,0 +1,28 @@
+apiVersion: aigateway.envoyproxy.io/v1beta1
+kind: MCPRoute
+metadata:
+  namespace: agentrouter-demo
+  name: mcproute-no-oauth
+  annotations:
+    demo.kyverno.io/expected-denial: securityPolicy.oauth
+spec:
+  parentRefs:
+  - name: agentrouter
+  path: /unsafe-mcp
+  securityPolicy:
+    extAuth:
+      grpc:
+        backendRefs:
+        - name: kyverno-authz
+          port: 9081
+      headersToExtAuth:
+      - authorization
+      bodyToExtAuth:
+        maxRequestBytes: 16384
+      failOpen: false
+  backendRefs:
+  - name: kube-tools
+    port: 8080
+    toolSelector:
+      include:
+      - get_workload_status
