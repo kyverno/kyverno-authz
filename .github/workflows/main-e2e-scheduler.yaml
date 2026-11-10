@@ -1,0 +1,58 @@
+name: Main E2E scheduler
+run-name: Main E2E scheduler (${{ inputs.mode || 'scheduled reconcile' }})
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Reconcile the durable queue or initialize it at a reviewed boundary
+        type: choice
+        required: true
+        default: reconcile
+        options:
+          - reconcile
+          - bootstrap
+      base_sha:
+        description: Required reviewed main first-parent SHA for one-time bootstrap only
+        type: string
+        required: false
+
+permissions: {}
+
+concurrency:
+  group: main-e2e-controller
+  cancel-in-progress: false
+
+jobs:
+  schedule:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: write
+      contents: write
+    steps:
+      - name: Checkout trusted workflow revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Setup GitHub CLI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh --version
+      - name: Reconcile queue or explicitly bootstrap
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MODE: ${{ inputs.mode || 'reconcile' }}
+          BASE_SHA: ${{ inputs.base_sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$MODE" == bootstrap ]]; then
+            python3 .github/scripts/main_e2e_controller.py schedule \
+              --mode bootstrap --base-sha "$BASE_SHA"
+          else
+            python3 .github/scripts/main_e2e_controller.py schedule --mode reconcile
+          fi

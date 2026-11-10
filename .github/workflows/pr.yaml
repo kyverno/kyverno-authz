@@ -2,7 +2,8 @@
 
 name: PR
 
-permissions: {}
+permissions:
+  contents: read
 
 on:
   pull_request:
@@ -10,12 +11,24 @@ on:
       - '*'
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
+  ci-controller-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Test E2E scheduling and main-health policy
+        run: python3 -m unittest discover -s .github/scripts/tests -p 'test*.py'
+      - name: Check pipeline shell syntax
+        run: bash -n .github/scripts/run-e2e-suite.sh .github/scripts/configure-main-health-rule.sh
+
   check-actions:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -29,6 +42,7 @@ jobs:
 
   verify-codegen:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -36,6 +50,14 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
+      - name: Cache codegen tools and Python downloads
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            .tools/controller-gen
+            .tools/genref
+            ~/.cache/pip
+          key: codegen-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod', 'go.sum', 'Makefile', 'requirements.txt') }}
       - name: Verify codegen
         run: |
           set -e
@@ -43,7 +65,9 @@ jobs:
 
   scan-trivy:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
+      contents: read
       security-events: write
     steps:
       - name: Checkout
@@ -71,6 +95,7 @@ jobs:
 
   golangci-lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -82,11 +107,14 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
-          skip-cache: true
+          skip-cache: false
           args: --timeout 5m
 
   semantics-pr:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
     steps:
       - name: Validate pull request
         uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
@@ -145,396 +173,23 @@ jobs:
           # title matches a single commit to avoid confusion.
           validateSingleCommitMatchesPrTitle: true
 
-  prepare-images:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Setup go
-        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
-        with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
-      - name: Save image archive
-        shell: bash
-        run: |
-          set -e
-          make ko-build
-          make docker-save-image
-      - name: Upload image archive
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: image.tar
-          path: image.tar
-          retention-days: 1
-          if-no-files-found: error
-
-  e2e-authz-server-envoy:
-    runs-on: ubuntu-latest
-    needs: [ prepare-images ]
-    strategy:
-      fail-fast: false
-      matrix:
-        k8s-version: [v1.32.11, v1.33.7, v1.34.3, v1.35.0]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Setup go
-        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
-        with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
-      - name: Install helm
-        id: helm
-        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
-      - name: Install cosign
-        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-      - name: Install chainsaw
-        uses: kyverno/action-install-chainsaw@1223ef75bedeb59c4e7b5455463d4316e76dff01 # v0.2.15
-        with:
-          verify: true
-      - name: Download image archive
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: image.tar
-      - name: Create kind cluster
-        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
-        with:
-          node_image: kindest/node:${{ matrix.k8s-version }}
-          cluster_name: kind
-      - name: Load image archive
-        run: |
-          set -e
-          make kind-load-archive
-      - name: Setup istio
-        run: |
-          set -e
-          export HELM=${{ steps.helm.outputs.helm-path }}
-          KYVERNO_AUTHZ_SERVICE=kyverno-authz-server.kyverno.svc.cluster.local make install-istio
-      - name: Setup cert-manager
-        run: |
-          set -e
-          export HELM=${{ steps.helm.outputs.helm-path }}
-          make install-cert-manager install-cluster-issuer
-      - name: Install VPOL and polex
-        run: |
-          set -e
-          make install-vpol
-          make install-polex
-      - name: Install chart
-        run: |
-          set -e
-          export HELM=${{ steps.helm.outputs.helm-path }}
-          make deploy-kyverno-envoy-server
-      - name: Install sample app
-        run: |
-          set -e
-          kubectl create ns app
-          kubectl label namespace app istio-injection=enabled
-          kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.24/samples/httpbin/httpbin.yaml -n app
-      - name: Run Chainsaw Tests
-        run:  |
-          set -e
-          chainsaw test tests/e2e/authz-server/envoy
-      - name: Dump authz server logs
-        if: failure()
-        run: |
-          kubectl logs -n kyverno deployment/kyverno-authz-server --all-containers --tail=-1
-
-  e2e-authz-server-http:
-    runs-on: ubuntu-latest
-    needs: [ prepare-images ]
-    strategy:
-      fail-fast: false
-      matrix:
-        k8s-version: [v1.32.11, v1.33.7, v1.34.3, v1.35.0]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Setup go
-        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
-        with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
-      - name: Install helm
-        id: helm
-        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
-      - name: Install cosign
-        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-      - name: Install chainsaw
-        uses: kyverno/action-install-chainsaw@1223ef75bedeb59c4e7b5455463d4316e76dff01 # v0.2.15
-        with:
-          verify: true
-      - name: Download image archive
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: image.tar
-      - name: Create kind cluster
-        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
-        with:
-          node_image: kindest/node:${{ matrix.k8s-version }}
-          cluster_name: kind
-      - name: Load image archive
-        run: |
-          set -e
-          make kind-load-archive
-      - name: Setup cert-manager
-        run: |
-          set -e
-          export HELM=${{ steps.helm.outputs.helm-path }}
-          make install-cert-manager install-cluster-issuer
-      - name: Install VPOL and polex
-        run: |
-          set -e
-          make install-vpol
-          make install-polex
-      - name: Install chart
-        run: |
-          set -e
-          export HELM=${{ steps.helm.outputs.helm-path }}
-          make deploy-kyverno-http-server
-      - name: Install sample app
-        run: |
-          set -e
-          kubectl create ns app
-          kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.24/samples/httpbin/httpbin.yaml -n app
-      - name: Run Chainsaw Tests
-        run:  |
-          set -e
-          chainsaw test tests/e2e/authz-server/http
-      - name: Dump authz server logs
-        if: failure()
-        run: |
-          kubectl logs -n kyverno deployment/kyverno-authz-server --all-containers --tail=-1
-
-  e2e-sidecar-injector:
-    runs-on: ubuntu-latest
-    needs: [ prepare-images ]
-    strategy:
-      fail-fast: false
-      matrix:
-        k8s-version: [v1.32.11, v1.33.7, v1.34.3, v1.35.0]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Setup go
-        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
-        with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
-      - name: Install helm
-        id: helm
-        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
-      - name: Install cosign
-        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-      - name: Install chainsaw
-        uses: kyverno/action-install-chainsaw@1223ef75bedeb59c4e7b5455463d4316e76dff01 # v0.2.15
-        with:
-          verify: true
-      - name: Download image archive
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: image.tar
-      - name: Create kind cluster
-        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
-        with:
-          node_image: kindest/node:${{ matrix.k8s-version }}
-          cluster_name: kind
-      - name: Load image archive
-        run: |
-          set -e
-          make kind-load-archive
-      - name: Setup istio
-        run: |
-          set -e
-          export HELM=${{ steps.helm.outputs.helm-path }}
-          KYVERNO_AUTHZ_SERVICE=kyverno-authz-server.local make install-istio install-service-entry
-      - name: Install VPOL and polex
-        run: |
-          set -e
-          make install-vpol
-          make install-polex
-      - name: Install chart
-        run: |
-          set -e
-          export HELM=${{ steps.helm.outputs.helm-path }}
-          make deploy-kyverno-sidecar-injector
-      - name: Install sample app
-        run: |
-          set -e
-          kubectl create ns app
-          kubectl label namespace app istio-injection=enabled
-          kubectl label namespace app kyverno-injection=enabled
-          kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.24/samples/httpbin/httpbin.yaml -n app
-      - name: Run Chainsaw Tests
-        run: chainsaw test tests/e2e/sidecar-injector
-
-  e2e-validation-wehook-envoy:
-    runs-on: ubuntu-latest
-    needs: [ prepare-images ]
-    strategy:
-      fail-fast: false
-      matrix:
-        k8s-version: [v1.32.11, v1.33.7, v1.34.3, v1.35.0]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Setup go
-        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
-        with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
-      - name: Install helm
-        id: helm
-        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
-      - name: Install cosign
-        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-      - name: Install chainsaw
-        uses: kyverno/action-install-chainsaw@1223ef75bedeb59c4e7b5455463d4316e76dff01 # v0.2.15
-        with:
-          verify: true
-      - name: Download image archive
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: image.tar
-      - name: Create kind cluster
-        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
-        with:
-          node_image: kindest/node:${{ matrix.k8s-version }}
-          cluster_name: kind
-      - name: Load image archive
-        run: |
-          set -e
-          make kind-load-archive
-      - name: Setup cert-manager
-        run: |
-          set -e
-          export HELM=${{ steps.helm.outputs.helm-path }}
-          make install-cert-manager install-cluster-issuer
-      - name: Install VPOL and polex
-        run: |
-          set -e
-          make install-vpol
-          make install-polex
-      - name: Install chart
-        run: |
-          set -e
-          export HELM=${{ steps.helm.outputs.helm-path }}
-          make deploy-kyverno-envoy-server
-      - name: Wait for validation webhook readiness
-        run: |
-          set -e
-          kubectl rollout status deployment/kyverno-authz-server-validation -n kyverno --timeout=180s
-          for i in $(seq 1 36); do
-            if kubectl create --dry-run=server --request-timeout=5s -f tests/e2e/validation-webhook/envoy/validation/valid/policy.yaml; then
-              exit 0
-            fi
-            echo "validation webhook admission attempt $i failed; retrying" >&2
-            sleep 5
-          done
-          echo "validation webhook did not accept a server-side dry-run" >&2
-          kubectl get pods,svc,endpoints -n kyverno >&2 || true
-          exit 1
-      - name: Run Chainsaw Tests
-        run:  |
-          set -e
-          chainsaw test tests/e2e/validation-webhook/envoy
-      - name: Dump validation webhook diagnostics
-        if: failure()
-        run: |
-          kubectl get pods,svc,endpoints -n kyverno
-          kubectl describe deployment/kyverno-authz-server-validation -n kyverno
-          kubectl logs -n kyverno deployment/kyverno-authz-server-validation --all-containers --tail=-1
-
-  e2e-validation-wehook-http:
-    runs-on: ubuntu-latest
-    needs: [ prepare-images ]
-    strategy:
-      fail-fast: false
-      matrix:
-        k8s-version: [v1.32.11, v1.33.7, v1.34.3, v1.35.0]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Setup go
-        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
-        with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
-      - name: Install helm
-        id: helm
-        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
-      - name: Install cosign
-        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-      - name: Install chainsaw
-        uses: kyverno/action-install-chainsaw@1223ef75bedeb59c4e7b5455463d4316e76dff01 # v0.2.15
-        with:
-          verify: true
-      - name: Download image archive
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: image.tar
-      - name: Create kind cluster
-        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
-        with:
-          node_image: kindest/node:${{ matrix.k8s-version }}
-          cluster_name: kind
-      - name: Load image archive
-        run: |
-          set -e
-          make kind-load-archive
-      - name: Setup cert-manager
-        run: |
-          set -e
-          export HELM=${{ steps.helm.outputs.helm-path }}
-          make install-cert-manager install-cluster-issuer
-      - name: Install VPOL and polex
-        run: |
-          set -e
-          make install-vpol
-          make install-polex
-      - name: Install chart
-        run: |
-          set -e
-          export HELM=${{ steps.helm.outputs.helm-path }}
-          make deploy-kyverno-http-server
-      - name: Wait for validation webhook readiness
-        run: |
-          set -e
-          kubectl rollout status deployment/kyverno-authz-server-validation -n kyverno --timeout=180s
-          for i in $(seq 1 36); do
-            if kubectl create --dry-run=server --request-timeout=5s -f tests/e2e/validation-webhook/http/validation/valid/policy.yaml; then
-              exit 0
-            fi
-            echo "validation webhook admission attempt $i failed; retrying" >&2
-            sleep 5
-          done
-          echo "validation webhook did not accept a server-side dry-run" >&2
-          kubectl get pods,svc,endpoints -n kyverno >&2 || true
-          exit 1
-      - name: Run Chainsaw Tests
-        run:  |
-          set -e
-          chainsaw test tests/e2e/validation-webhook/http
-      - name: Dump validation webhook diagnostics
-        if: failure()
-        run: |
-          kubectl get pods,svc,endpoints -n kyverno
-          kubectl describe deployment/kyverno-authz-server-validation -n kyverno
-          kubectl logs -n kyverno deployment/kyverno-authz-server-validation --all-containers --tail=-1
-
   required:
+    if: ${{ always() }}
     needs:
+      - ci-controller-tests
       - check-actions
-      - e2e-authz-server-envoy
-      - e2e-authz-server-http
-      - e2e-sidecar-injector
-      - e2e-validation-wehook-envoy
-      - e2e-validation-wehook-http
       - golangci-lint
-      - prepare-images
+      - scan-trivy
       - semantics-pr
       - verify-codegen
     runs-on: ubuntu-latest
+    timeout-minutes: 2
     steps:
-      - run: echo "Required jobs success!"
+      - name: Require successful quality checks
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          if ! jq -e 'all(.[]; .result == "success")' <<< "$NEEDS"; then
+            echo "Every required job must succeed; failures, skips, and cancellations block merging." >&2
+            exit 1
+          fi

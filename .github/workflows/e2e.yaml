@@ -1,0 +1,138 @@
+name: Main E2E
+run-name: Main E2E ${{ inputs.commit_sha }} claim ${{ inputs.claim_id }} attempt ${{ inputs.attempt }} suite ${{ inputs.suite_fingerprint }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: Immutable main commit SHA selected by the trusted scheduler
+        required: true
+        type: string
+      claim_id:
+        description: Durable queue claim identity
+        required: true
+        type: string
+      suite_fingerprint:
+        description: Hash of the trusted test suite definition
+        required: true
+        type: string
+      attempt:
+        description: Durable full-matrix attempt number
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: main-e2e-runner
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      commit_sha: ${{ steps.validate.outputs.commit_sha }}
+      claim_id: ${{ steps.validate.outputs.claim_id }}
+      suite_fingerprint: ${{ steps.validate.outputs.suite_fingerprint }}
+      attempt: ${{ steps.validate.outputs.attempt }}
+      trusted_sha: ${{ steps.validate.outputs.trusted_sha }}
+    steps:
+      - name: Checkout trusted dispatch revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate immutable run metadata and main ancestry
+        id: validate
+        env:
+          COMMIT_SHA: ${{ inputs.commit_sha }}
+          CLAIM_ID: ${{ inputs.claim_id }}
+          SUITE_FINGERPRINT: ${{ inputs.suite_fingerprint }}
+          ATTEMPT: ${{ inputs.attempt }}
+          TRUSTED_SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == "refs/heads/main" ]]
+          [[ "$COMMIT_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$CLAIM_ID" =~ ^[0-9a-f]{32}$ ]]
+          [[ "$SUITE_FINGERPRINT" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$ATTEMPT" == 1 || "$ATTEMPT" == 2 ]]
+          git rev-list --first-parent HEAD | grep -Fx "$COMMIT_SHA" > /dev/null
+          calculated="$(python3 .github/scripts/suite_fingerprint.py .)"
+          [[ "$calculated" == "$SUITE_FINGERPRINT" ]]
+          python3 .github/scripts/main_e2e_controller.py start-run \
+            --commit-sha "$COMMIT_SHA" --claim-id "$CLAIM_ID" \
+            --suite-fingerprint "$SUITE_FINGERPRINT" --attempt "$ATTEMPT"
+          {
+            echo "commit_sha=$COMMIT_SHA"
+            echo "claim_id=$CLAIM_ID"
+            echo "suite_fingerprint=$SUITE_FINGERPRINT"
+            echo "attempt=$ATTEMPT"
+            echo "trusted_sha=$TRUSTED_SHA"
+          } >> "$GITHUB_OUTPUT"
+
+  attempt:
+    name: E2E full-matrix attempt
+    needs: validate
+    uses: ./.github/workflows/e2e-attempt.yaml
+    with:
+      commit_sha: ${{ needs.validate.outputs.commit_sha }}
+      claim_id: ${{ needs.validate.outputs.claim_id }}
+      suite_fingerprint: ${{ needs.validate.outputs.suite_fingerprint }}
+      trusted_sha: ${{ needs.validate.outputs.trusted_sha }}
+      attempt: ${{ needs.validate.outputs.attempt }}
+    permissions:
+      contents: read
+
+  final:
+    name: E2E terminal outcome
+    if: always() && !cancelled()
+    needs: [validate, attempt]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Enforce exact full-matrix attempt outcome
+        env:
+          VALIDATION_RESULT: ${{ needs.validate.result }}
+          ATTEMPT_RESULT: ${{ needs.attempt.result }}
+          ATTEMPT_FAILED: ${{ needs.attempt.outputs.failed }}
+        run: |
+          set -euo pipefail
+          [[ "$VALIDATION_RESULT" == success ]]
+          [[ "$ATTEMPT_RESULT" == success ]]
+          [[ "$ATTEMPT_FAILED" == false ]]
+      - name: Write trusted terminal metadata
+        env:
+          COMMIT_SHA: ${{ needs.validate.outputs.commit_sha }}
+          CLAIM_ID: ${{ needs.validate.outputs.claim_id }}
+          SUITE_FINGERPRINT: ${{ needs.validate.outputs.suite_fingerprint }}
+          ATTEMPT: ${{ needs.validate.outputs.attempt }}
+          TRUSTED_SHA: ${{ needs.validate.outputs.trusted_sha }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          with open("terminal.json", "w", encoding="utf-8") as marker:
+              json.dump({
+                  "commit_sha": os.environ["COMMIT_SHA"],
+                  "claim_id": os.environ["CLAIM_ID"],
+                  "suite_fingerprint": os.environ["SUITE_FINGERPRINT"],
+                  "attempt": os.environ["ATTEMPT"],
+                  "trusted_sha": os.environ["TRUSTED_SHA"],
+                  "result": "success",
+                  "full_matrix_success": True,
+              }, marker)
+          PY
+      - name: Upload trusted terminal metadata
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-terminal-${{ needs.validate.outputs.attempt }}-${{ needs.validate.outputs.claim_id }}
+          path: terminal.json
+          retention-days: 1
+          if-no-files-found: error
