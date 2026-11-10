@@ -1,0 +1,45 @@
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: agentrouter-mcproute-guardrails
+spec:
+  validationActions: [Deny]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [aigateway.envoyproxy.io]
+        apiVersions: ["*"]
+        operations: [CREATE, UPDATE]
+        resources: [mcproutes]
+  variables:
+    - name: security
+      expression: object.spec.?securityPolicy.orValue({})
+    - name: extAuth
+      expression: variables.security.?extAuth.orValue({})
+    - name: backends
+      expression: object.spec.backendRefs
+  validations:
+    - expression: has(variables.security.oauth)
+      message: "Blocked by Kyverno policy agentrouter-mcproute-guardrails: MCPRoutes must authenticate callers with securityPolicy.oauth."
+    - expression: >-
+        has(variables.extAuth.grpc) && size(variables.extAuth.grpc.backendRefs) > 0 &&
+        variables.extAuth.grpc.backendRefs.all(ref,
+          ref.name == "kyverno-authz" &&
+          ref.?namespace.orValue(object.metadata.namespace) == "agentrouter-demo")
+      message: "Blocked by Kyverno policy agentrouter-mcproute-guardrails: MCPRoutes must delegate authorization to the Kyverno authorizer in agentrouter-demo."
+    - expression: "!variables.extAuth.?failOpen.orValue(false)"
+      message: "Blocked by Kyverno policy agentrouter-mcproute-guardrails: MCPRoute authorization must fail closed; set extAuth.failOpen to false."
+    - expression: >-
+        variables.extAuth.?bodyToExtAuth.?maxRequestBytes.orValue(0) > 0 &&
+        variables.extAuth.headersToExtAuth.exists(h, h.lowerAscii() == "authorization")
+      message: "Blocked by Kyverno policy agentrouter-mcproute-guardrails: MCPRoute authorization must receive the bearer token and the JSON-RPC body."
+    - expression: >-
+        variables.backends.all(b,
+          size(b.?toolSelector.?include.orValue([])) > 0 && !has(b.toolSelector.includeRegex))
+      message: "Blocked by Kyverno policy agentrouter-mcproute-guardrails: Every MCP backend must expose an explicit toolSelector.include list; regex selectors are not allowed."
+    - expression: >-
+        variables.backends.all(b, b.?forwardHeaders.orValue([]).all(h,
+          !(h.name.lowerAscii() in ["authorization", "cookie", "proxy-authorization"])))
+      message: "Blocked by Kyverno policy agentrouter-mcproute-guardrails: MCP backends must not receive the caller's credentials."
+    - expression: >-
+        variables.backends.all(b, !has(b.?securityPolicy.?apiKey.orValue({}).inline))
+      message: "Blocked by Kyverno policy agentrouter-mcproute-guardrails: MCP backend API keys must come from a Secret, not an inline value."

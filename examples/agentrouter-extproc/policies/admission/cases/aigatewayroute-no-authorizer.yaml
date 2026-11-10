@@ -1,0 +1,20 @@
+apiVersion: aigateway.envoyproxy.io/v1beta1
+kind: AIGatewayRoute
+metadata:
+  name: unguarded-models
+  namespace: agentrouter-demo
+  annotations:
+    demo.kyverno.io/expected-denial: Create a SecurityPolicy
+spec:
+  parentRefs:
+  - name: agentrouter
+    kind: Gateway
+    group: gateway.networking.k8s.io
+  rules:
+  - matches:
+    - headers:
+      - type: Exact
+        name: x-ai-eg-model
+        value: demo-mini
+    backendRefs:
+    - name: llm-backend

@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: agentrouter-demo
+spec:
+  selector:
+    app: keycloak
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kyverno-authz
+  namespace: agentrouter-demo
+spec:
+  selector:
+    app: kyverno-authz
+  ports:
+    - name: grpc
+      port: 9081
+      targetPort: 9081
+    - name: grpc-extproc
+      port: 9083
+      targetPort: 9083
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kube-tools
+  namespace: agentrouter-demo
+spec:
+  # Demo-only backend: JWT/SAR authorization applies to gateway-originated traffic,
+  # not direct ClusterIP access. Production requires authentication or isolation.
+  selector:
+    app: kube-tools
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: runbooks
+  namespace: agentrouter-demo
+spec:
+  selector:
+    app: runbooks
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: llm-backend
+  namespace: agentrouter-demo
+spec:
+  selector:
+    app: llm-backend
+  ports:
+    - port: 8080
+      targetPort: 8080

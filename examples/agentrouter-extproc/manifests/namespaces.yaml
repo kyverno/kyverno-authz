@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: agentrouter-demo
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: team-a-dev
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: team-b-dev

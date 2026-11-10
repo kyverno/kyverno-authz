@@ -1,0 +1,9 @@
+# Admission enforces platform guardrails; cleanup expires exception ConfigMaps.
+admissionController:
+  replicas: 1
+backgroundController:
+  enabled: false
+cleanupController:
+  enabled: true
+reportsController:
+  enabled: false

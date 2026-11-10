@@ -1,0 +1,29 @@
+apiVersion: policies.kyverno.io/v1
+kind: PolicyException
+metadata:
+  name: break-glass-inc-1234
+  labels:
+    cleanup.kyverno.io/ttl: 15m
+  annotations:
+    demo.kyverno.io/incident: INC-1234
+spec:
+  evaluationMode: Envoy
+  policyRefs:
+    - name: agentrouter-bounded-operations
+      kind: ValidatingPolicy
+  # All conditions must match: this skips the entire policy, including SAR.
+  matchConditions:
+    - name: incident-remediation-only
+      expression: >-
+        variables.http.method == "POST" && variables.isCall &&
+        variables.token.Valid &&
+        variables.token.Claims["iss"] == "http://keycloak.agentrouter-demo.svc.cluster.local:8080/realms/demo" &&
+        "agentrouter-demo" in variables.token.Claims["aud"] &&
+        variables.user == "bob" && variables.tool == "kube-tools__scale_deployment" &&
+        "x-incident-id" in variables.http.headers &&
+        variables.http.headers["x-incident-id"] == "INC-1234" &&
+        variables.args.namespace == "team-a-dev" && variables.args.name == "checkout" &&
+        variables.args.all(key, key in ["namespace", "name", "replicas"]) &&
+        "replicas" in variables.args && type(variables.args.replicas) == double &&
+        variables.args.replicas >= 1.0 && variables.args.replicas <= 3.0 &&
+        variables.args.replicas == double(int(variables.args.replicas))

@@ -1,0 +1,76 @@
+# The SecurityPolicy comes first: Kyverno admission rejects an AIGatewayRoute
+# until a fail-closed Kyverno authorization policy protects its HTTPRoute.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: models
+  namespace: agentrouter-demo
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: models # Agent Router creates an HTTPRoute named after the AIGatewayRoute.
+  jwt:
+    providers:
+      - name: keycloak
+        issuer: http://keycloak.agentrouter-demo.svc.cluster.local:8080/realms/demo
+        audiences: [agentrouter-demo]
+        remoteJWKS:
+          uri: http://keycloak.agentrouter-demo.svc.cluster.local:8080/realms/demo/protocol/openid-connect/certs
+  extAuth:
+    grpc:
+      backendRefs:
+        - name: kyverno-authz
+          port: 9081
+    headersToExtAuth: [authorization, x-demo-id]
+    bodyToExtAuth:
+      maxRequestBytes: 16384
+    failOpen: false
+    timeout: 5s
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: Backend
+metadata:
+  name: llm-backend
+  namespace: agentrouter-demo
+spec:
+  endpoints:
+    - fqdn:
+        hostname: llm-backend.agentrouter-demo.svc.cluster.local
+        port: 8080
+---
+apiVersion: aigateway.envoyproxy.io/v1beta1
+kind: AIServiceBackend
+metadata:
+  name: llm-backend
+  namespace: agentrouter-demo
+spec:
+  schema:
+    name: OpenAI
+  backendRef:
+    name: llm-backend
+    kind: Backend
+    group: gateway.envoyproxy.io
+---
+apiVersion: aigateway.envoyproxy.io/v1beta1
+kind: AIGatewayRoute
+metadata:
+  name: models
+  namespace: agentrouter-demo
+spec:
+  parentRefs:
+    - name: agentrouter
+      kind: Gateway
+      group: gateway.networking.k8s.io
+  rules:
+    - matches:
+        - headers:
+            - type: Exact
+              name: x-ai-eg-model
+              value: demo-mini
+        - headers:
+            - type: Exact
+              name: x-ai-eg-model
+              value: demo-pro
+      backendRefs:
+        - name: llm-backend

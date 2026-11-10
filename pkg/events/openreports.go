@@ -2,7 +2,6 @@ package events
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sync/atomic"
 	"time"
@@ -80,7 +79,6 @@ func (o *openreportsEventSubscriber[Req]) eventLoop(ctx context.Context) {
 	}
 }
 
-// ammar: should we also convey the policy that caused the decision ?
 func (o *openreportsEventSubscriber[Req]) Push(ctx context.Context, t time.Time, req Req, res ResultAccessor) {
 	event := event[Req]{
 		t:   t,
@@ -96,7 +94,19 @@ func (o *openreportsEventSubscriber[Req]) Push(ctx context.Context, t time.Time,
 }
 
 func (o *openreportsEventSubscriber[Req]) newReportResult(t time.Time, r Req, resultAccessor ResultAccessor) (*openreportsv1alpha1.ReportResult, error) {
-	reportResult := &openreportsv1alpha1.ReportResult{}
+	reportResult := &openreportsv1alpha1.ReportResult{
+		Source:     "kyverno-authz",
+		Properties: requestProperties(r),
+	}
+	if metadata, ok := resultAccessor.(interface {
+		ReportMetadata() (string, map[string]string)
+	}); ok {
+		name, properties := metadata.ReportMetadata()
+		reportResult.Policy = name
+		for key, value := range properties {
+			reportResult.Properties[key] = value
+		}
+	}
 	// ammar: is there a constant provided in the openreports package ?
 	// ammar: we should also have request skipped if it didn't match the conditions
 	res, resultErr := resultAccessor.MustGet()
@@ -115,7 +125,7 @@ func (o *openreportsEventSubscriber[Req]) newReportResult(t time.Time, r Req, re
 		Seconds: t.Unix(),
 		Nanos:   int32(t.Nanosecond()),
 	}
-	jsonStr, err := json.Marshal(r)
+	jsonStr, err := marshalRequest(r)
 	if err != nil {
 		return nil, err
 	}

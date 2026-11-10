@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demo-exceptions
+  namespace: agentrouter-demo
+  labels:
+    cleanup.kyverno.io/ttl: "15m"
+  annotations:
+    demo.kyverno.io/expected-denial: "blanket exceptions"
+    demo.kyverno.io/incident: "INC-1234"
+data:
+  exception.json: |
+    {
+      "apiVersion": "policies.kyverno.io/v1",
+      "kind": "PolicyException",
+      "metadata": {
+        "annotations": {
+          "demo.kyverno.io/expected-denial": "blanket exceptions",
+          "demo.kyverno.io/incident": "INC-1234"
+        },
+        "labels": {
+          "cleanup.kyverno.io/ttl": "15m"
+        },
+        "name": "exception-blanket",
+        "namespace": "default"
+      },
+      "spec": {
+        "evaluationMode": "Envoy",
+        "matchConditions": [],
+        "policyRefs": [
+          {
+            "kind": "ValidatingPolicy",
+            "name": "agentrouter-bounded-operations"
+          }
+        ]
+      }
+    }

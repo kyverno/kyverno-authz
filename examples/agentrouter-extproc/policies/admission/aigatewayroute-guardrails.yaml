@@ -1,0 +1,47 @@
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: agentrouter-model-route-guardrails
+spec:
+  validationActions: [Deny]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [aigateway.envoyproxy.io]
+        apiVersions: ["*"]
+        operations: [CREATE, UPDATE]
+        resources: [aigatewayroutes]
+  variables:
+    - name: catalog
+      expression: >-
+        string(dyn(resource.Get("v1", "configmaps", "agentrouter-demo", "approved-models")).data.models).split(",")
+    # Agent Router creates an HTTPRoute with the same name as the AIGatewayRoute.
+    - name: guards
+      expression: >-
+        dyn(resource.List("gateway.envoyproxy.io/v1alpha1", "securitypolicies", object.metadata.namespace)).items.filter(p,
+          p.spec.?targetRefs.orValue([]).exists(t,
+            t.group == "gateway.networking.k8s.io" && t.kind == "HTTPRoute" && t.name == object.metadata.name) &&
+          has(p.spec.jwt) &&
+          p.spec.?extAuth.?grpc.?backendRefs.orValue([]).exists(ref, ref.name == "kyverno-authz") &&
+          !p.spec.?extAuth.?failOpen.orValue(false) &&
+          p.spec.?extAuth.?bodyToExtAuth.?maxRequestBytes.orValue(0) > 0)
+  validations:
+    - expression: >-
+        object.spec.rules.all(rule, size(rule.?backendRefs.orValue([])) > 0 &&
+          rule.backendRefs.all(ref,
+            ref.name == "llm-backend" &&
+            ref.?namespace.orValue(object.metadata.namespace) in ["", "agentrouter-demo"] &&
+            (ref.?namespace.orValue("") != "" || object.metadata.namespace == "agentrouter-demo") &&
+            ref.?group.orValue("aigateway.envoyproxy.io") in ["", "aigateway.envoyproxy.io"] &&
+            ref.?kind.orValue("AIServiceBackend") in ["", "AIServiceBackend"]))
+      message: "Blocked by Kyverno policy agentrouter-model-route-guardrails: Model routes must reference only the approved demo AIServiceBackend llm-backend in agentrouter-demo."
+    - expression: >-
+        object.spec.rules.all(rule, size(rule.?matches.orValue([])) > 0 &&
+          rule.matches.all(match, match.?headers.orValue([]).exists(h,
+            h.name.lowerAscii() == "x-ai-eg-model" && h.?type.orValue("Exact") == "Exact" &&
+            h.value in variables.catalog)))
+      messageExpression: >-
+        "Blocked by Kyverno policy agentrouter-model-route-guardrails: every rule must route an exact model from the approved catalog: " + variables.catalog.join(", ")
+    - expression: size(variables.guards) > 0
+      message: >-
+        Blocked by Kyverno policy agentrouter-model-route-guardrails: Create a SecurityPolicy targeting this route's HTTPRoute with JWT and fail-closed Kyverno
+        authorization (with the request body) before creating the AIGatewayRoute.
