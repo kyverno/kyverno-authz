@@ -15,6 +15,8 @@ const (
 	DecisionDeny    = "deny"
 	DecisionError   = "error"
 	DecisionNoMatch = "no_match"
+	// DecisionUnavailable means the server rejected the request because it is not ready.
+	DecisionUnavailable = "unavailable"
 )
 
 var (

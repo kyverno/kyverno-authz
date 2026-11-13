@@ -11,15 +11,18 @@ import (
 	"github.com/kyverno/kyverno-authz/apis"
 	"github.com/kyverno/kyverno-authz/pkg/authz/http"
 	httplib "github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/http"
+	"github.com/kyverno/kyverno-authz/pkg/commands/serve/options"
 	"github.com/kyverno/kyverno-authz/pkg/engine"
 	vpolcompiler "github.com/kyverno/kyverno-authz/pkg/engine/compiler"
+	"github.com/kyverno/kyverno-authz/pkg/engine/snapshot"
 	"github.com/kyverno/kyverno-authz/pkg/engine/sources"
 	"github.com/kyverno/kyverno-authz/pkg/events"
 	"github.com/kyverno/kyverno-authz/pkg/probes"
 	"github.com/kyverno/kyverno-authz/pkg/signals"
+	"github.com/kyverno/kyverno-authz/pkg/state"
 	"github.com/kyverno/kyverno-authz/pkg/utils"
 	"github.com/kyverno/kyverno-authz/pkg/utils/ocifs"
-	sdksources "github.com/kyverno/sdk/core/sources"
+	"github.com/kyverno/sdk/core"
 	openreportsclient "github.com/openreports/reports-api/pkg/client/clientset/versioned/typed/openreports.io/v1alpha1"
 	"github.com/spf13/cobra"
 	"go.uber.org/multierr"
@@ -56,18 +59,23 @@ func Command() *cobra.Command {
 		openreportsEnabled    bool
 		reportFlushInterval   string
 		resultBufSize         int
+		lifecycle             options.Lifecycle
 	)
 
 	command := &cobra.Command{
 		Use:   "authz-server",
 		Short: "Start the Kyverno Authz Server",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			defaultDecision, err := lifecycle.Validate()
+			if err != nil {
+				return err
+			}
 			// setup signals aware context
-			return signals.Do(context.Background(), func(ctx context.Context) error {
+			return signals.Do(context.Background(), func(signalCtx context.Context) error {
 				// track errors
-				var probesErr, serverErr, mgrErr error
-				err := func(ctx context.Context) error {
-					logger := ctrl.LoggerFrom(ctx)
+				var probesErr, serverErr, mgrErr, syncErr error
+				err := func(signalCtx context.Context) error {
+					logger := ctrl.LoggerFrom(signalCtx)
 					kubeOk := true
 					// create a rest config
 					kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
@@ -79,14 +87,28 @@ func Command() *cobra.Command {
 						logger.Info("Warning, no kubernetes cluster configuration found, some features will be disabled")
 						kubeOk = false
 					}
-					// create a cancellable context
-					ctx, cancel := context.WithCancel(ctx)
+					// create a cancellable context, it outlives the termination signal so that the server can drain
+					ctx, cancel := context.WithCancel(context.WithoutCancel(signalCtx))
 					// cancel context at the end
 					defer cancel()
 					// create a wait group
 					var group wait.Group
 					// wait all tasks in the group are over
 					defer group.Wait()
+					// track the server lifecycle
+					tracker := state.NewTracker()
+					// on termination signal, fail readiness, wait for the drain delay, then stop
+					group.StartWithContext(ctx, func(ctx context.Context) {
+						tracker.DrainOnSignal(signalCtx, ctx, lifecycle.DrainDelay, cancel)
+					})
+					// probes server, started first so that probes report startup progress
+					if probesAddress != "" {
+						probesServer := probes.NewServer(probesAddress, tracker.Serving)
+						group.StartWithContext(ctx, func(ctx context.Context) {
+							defer cancel()
+							probesErr = probesServer.Run(ctx)
+						})
+					}
 
 					httpEventHandlers := []events.EventIface[httplib.CheckRequest]{}
 					httpEventHandlers = append(httpEventHandlers, events.NewWriterEventSubscriber[httplib.CheckRequest](
@@ -97,6 +119,15 @@ func Command() *cobra.Command {
 
 					// load sources
 					var source engine.HTTPSource
+					var mgr ctrl.Manager
+					var kubeSource *sources.Kube[engine.HTTPPolicy]
+					// requests evaluate against an immutable snapshot of the policy sources
+					snap := snapshot.New(core.MakeSourceFunc(func(ctx context.Context) ([]engine.HTTPPolicy, error) {
+						return source.Load(ctx)
+					}), tracker, snapshot.Options{
+						MinPolicies: lifecycle.MinPolicies,
+						Strict:      lifecycle.Strict,
+					})
 					var dyn dynamic.Interface
 					if kubeOk {
 						// Create kubernetes client
@@ -173,7 +204,7 @@ func Command() *cobra.Command {
 						if err != nil {
 							return err
 						}
-						source = sdksources.NewComposite(extSources...)
+						source = sources.NewComposite(extSources...)
 						// if kube policy source is enabled
 						if kubePolicySource {
 							// create a controller manager
@@ -181,7 +212,7 @@ func Command() *cobra.Command {
 							if err := vpol.Install(scheme); err != nil {
 								return err
 							}
-							mgr, err := ctrl.NewManager(config, ctrl.Options{
+							mgr, err = ctrl.NewManager(config, ctrl.Options{
 								Scheme: scheme,
 								Metrics: metricsserver.Options{
 									BindAddress: metricsAddress,
@@ -197,21 +228,17 @@ func Command() *cobra.Command {
 							if err != nil {
 								return fmt.Errorf("failed to construct manager: %w", err)
 							}
-							kubeSource, err := sources.NewKube("http", mgr, compiler)
+							kubeSource, err = sources.NewKube("http", mgr, compiler, snap.Trigger)
 							if err != nil {
 								return fmt.Errorf("failed to create http source: %w", err)
 							}
-							source = sdksources.NewComposite(kubeSource, source)
+							source = sources.NewComposite(kubeSource, source)
 							// start manager
 							group.StartWithContext(ctx, func(ctx context.Context) {
 								// cancel context at the end
 								defer cancel()
 								mgrErr = mgr.Start(ctx)
 							})
-							if !mgr.GetCache().WaitForCacheSync(ctx) {
-								defer cancel()
-								return fmt.Errorf("failed to wait for http cache sync")
-							}
 						}
 					} else {
 						compiler := vpolcompiler.NewCompiler[dynamic.Interface, *httplib.CheckRequest, *httplib.CheckResponse](nil)
@@ -223,16 +250,27 @@ func Command() *cobra.Command {
 						if err != nil {
 							return err
 						}
-						source = sdksources.NewComposite(extSources...)
+						source = sources.NewComposite(extSources...)
 					}
-					// probes server
-					if probesAddress != "" {
-						probesServer := probes.NewServer(probesAddress)
-						group.StartWithContext(ctx, func(ctx context.Context) {
-							defer cancel()
-							probesErr = probesServer.Run(ctx)
-						})
-					}
+					// load policies in the background, the server is not ready until the first snapshot is published
+					group.StartWithContext(ctx, func(ctx context.Context) {
+						tracker.Syncing()
+						if mgr != nil {
+							if !mgr.GetCache().WaitForCacheSync(ctx) {
+								if ctx.Err() == nil {
+									syncErr = fmt.Errorf("failed to wait for http cache sync")
+									cancel()
+								}
+								return
+							}
+							if err := kubeSource.Sync(ctx); err != nil {
+								syncErr = err
+								cancel()
+								return
+							}
+						}
+						snap.Run(ctx)
+					})
 					// auth server
 					nestedRequest = true
 					httpConfig := http.Config{
@@ -242,17 +280,20 @@ func Command() *cobra.Command {
 						KeyFile:          keyFile,
 						InputExpression:  inputExpression,
 						OutputExpression: outputExpression,
+						DefaultDecision:  defaultDecision,
+						Ready:            tracker.Serving,
+						ShutdownTimeout:  lifecycle.ShutdownTimeout,
 					}
 
 					ev := events.NewComposite(httpEventHandlers...)
-					authServer := http.NewServer(httpConfig, source, dyn, ev)
+					authServer := http.NewServer(httpConfig, snap, dyn, ev)
 					group.StartWithContext(ctx, func(ctx context.Context) {
 						defer cancel()
 						serverErr = authServer.Run(ctx)
 					})
 					return nil
-				}(ctx)
-				return multierr.Combine(err, probesErr, serverErr, mgrErr)
+				}(signalCtx)
+				return multierr.Combine(err, probesErr, serverErr, mgrErr, syncErr)
 			})
 		},
 	}
@@ -273,6 +314,7 @@ func Command() *cobra.Command {
 	command.Flags().BoolVar(&openreportsEnabled, "openreports-enabled", false, "Enable reporting in the openreports format, if not running in k8s or the openreports CRD is not installed this flag won't take effect")
 	command.Flags().StringVar(&reportFlushInterval, "report-flush-interval", "", "how often do results get flushed into the openreports report (if active)")
 	command.Flags().IntVar(&resultBufSize, "result-buffer-size", 500, "Event buffer size for openreports, note that if the total exceeded the 1MB etcd limit, report flushing will error")
+	lifecycle.AddFlags(command.Flags())
 	clientcmd.BindOverrideFlags(&kubeConfigOverrides, command.Flags(), clientcmd.RecommendedConfigOverrideFlags("kube-"))
 	return command
 }

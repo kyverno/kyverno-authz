@@ -60,7 +60,10 @@ func (s *compositeStore) handlePolicy(policyKey string, policy *v1.ValidatingPol
 	// works with cluster scoped policies anyway
 	s.Lock()
 	defer s.Unlock()
+	s.handlePolicyLocked(policyKey, policy, isDelete)
+}
 
+func (s *compositeStore) handlePolicyLocked(policyKey string, policy *v1.ValidatingPolicy, isDelete bool) {
 	policyKey = strings.TrimPrefix(policyKey, "/")
 	if isDelete {
 		delete(s.policies, policyKey)
@@ -96,7 +99,10 @@ func (s *compositeStore) handlePolicy(policyKey string, policy *v1.ValidatingPol
 func (s *compositeStore) handlePolex(excKey string, exc *v1.PolicyException, isDelete bool) {
 	s.Lock()
 	defer s.Unlock()
+	s.handlePolexLocked(excKey, exc, isDelete)
+}
 
+func (s *compositeStore) handlePolexLocked(excKey string, exc *v1.PolicyException, isDelete bool) {
 	// Unlink the previous references first, including references removed by an update.
 	if previous, ok := s.exceptions[excKey]; ok {
 		for _, polState := range previous.references {
@@ -124,6 +130,24 @@ func (s *compositeStore) handlePolex(excKey string, exc *v1.PolicyException, isD
 			polState.exceptionEventCounter++
 			excState.references[polRef.Name] = polState
 		}
+	}
+}
+
+// seedPolicy adds a policy only if no event has stored it yet.
+func (s *compositeStore) seedPolicy(policyKey string, policy *v1.ValidatingPolicy) {
+	s.Lock()
+	defer s.Unlock()
+	if _, exists := s.policies[strings.TrimPrefix(policyKey, "/")]; !exists {
+		s.handlePolicyLocked(policyKey, policy, false)
+	}
+}
+
+// seedPolex adds an exception only if no event has stored it yet.
+func (s *compositeStore) seedPolex(excKey string, exc *v1.PolicyException) {
+	s.Lock()
+	defer s.Unlock()
+	if _, exists := s.exceptions[excKey]; !exists {
+		s.handlePolexLocked(excKey, exc, false)
 	}
 }
 

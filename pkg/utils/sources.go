@@ -14,16 +14,22 @@ import (
 	"github.com/kyverno/kyverno-authz/pkg/utils/ocifs"
 	"github.com/kyverno/sdk/core"
 	sdksources "github.com/kyverno/sdk/core/sources"
+	"go.uber.org/multierr"
 )
 
+type staticEntry struct {
+	policy     *vpolv1.ValidatingPolicy
+	exceptions []*vpolv1.PolicyException
+}
+
 type staticSource[POLICY any] struct {
-	compiler  engine.Compiler[POLICY]
-	policyMap map[*vpolv1.ValidatingPolicy][]*vpolv1.PolicyException
+	compiler engine.Compiler[POLICY]
+	entries  []staticEntry
 }
 
 // we do exception matching during initialization to avoid latency in the http evaluation path
 func newStatic[POLICY any](compiler engine.Compiler[POLICY], policies []*vpolv1.ValidatingPolicy, policyExceptions []*vpolv1.PolicyException) *staticSource[POLICY] {
-	policyMap := make(map[*vpolv1.ValidatingPolicy][]*vpolv1.PolicyException, len(policies))
+	entries := make([]staticEntry, 0, len(policies))
 	for _, p := range policies {
 		matchedExceptions := []*vpolv1.PolicyException{}
 		for _, ex := range policyExceptions {
@@ -42,26 +48,30 @@ func newStatic[POLICY any](compiler engine.Compiler[POLICY], policies []*vpolv1.
 				matchedExceptions = append(matchedExceptions, ex)
 			}
 		}
-		policyMap[p] = matchedExceptions
+		entries = append(entries, staticEntry{policy: p, exceptions: matchedExceptions})
 	}
 
 	return &staticSource[POLICY]{
-		compiler:  compiler,
-		policyMap: policyMap,
+		compiler: compiler,
+		entries:  entries,
 	}
 }
 
+// Load compiles every policy, in the order they were loaded. A policy that
+// fails to compile is excluded and reported as an engine.CompileError; the
+// other policies are still returned.
 func (s *staticSource[POLICY]) Load(_ context.Context) ([]POLICY, error) {
 	policies := []POLICY{}
-	for p, polexs := range s.policyMap {
-		policy, err := s.compiler.Compile(p, polexs)
-		if err != nil {
-			return nil, err.ToAggregate()
+	var errs error
+	for _, entry := range s.entries {
+		policy, err := s.compiler.Compile(entry.policy, entry.exceptions)
+		if len(err) > 0 {
+			errs = multierr.Append(errs, &engine.CompileError{Policy: entry.policy.Name, Err: err.ToAggregate()})
+			continue
 		}
 		policies = append(policies, policy)
 	}
-
-	return policies, nil
+	return policies, errs
 }
 
 func GetExternalSources[POLICY any](vpolCompiler engine.Compiler[POLICY], nOpts []name.Option, rOpts []remote.Option, urls ...string) ([]core.Source[POLICY], error) {
