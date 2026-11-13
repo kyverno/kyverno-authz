@@ -91,6 +91,9 @@ spec:
           {{- tpl (toYaml .) $ | nindent 10 }}
         {{- end }}
       serviceAccountName: {{ template "kyverno-authz-server.service-account.name" $ }}
+      {{- with .pod.terminationGracePeriodSeconds }}
+      terminationGracePeriodSeconds: {{ . }}
+      {{- end }}
       containers:
         {{- with .container }}
         - name: server
@@ -150,6 +153,11 @@ spec:
           - {{ . | quote }}
           {{- end }}
           {{- end }}
+          - --default-decision={{ $.Values.config.defaultDecision }}
+          - --min-policies={{ $.Values.config.minPolicies }}
+          - --strict={{ $.Values.config.strict }}
+          - --drain-delay={{ $.Values.config.drainDelay }}
+          - --shutdown-timeout={{ $.Values.config.shutdownTimeout }}
           - --allow-insecure-registry={{ $.Values.config.allowInsecureRegistry }}
           {{- range $.Values.config.imagePullSecrets }}
           - {{ printf "--image-pull-secret=%s" (tpl (toYaml .) $) }}

@@ -27,6 +27,7 @@ nav:
     - server/http/configuration.md
     - server/http/programmability.md
     - server/http/example.md
+  - Lifecycle: server/lifecycle.md
   - Sidecar Injector: server/sidecar-injector.md
 - Policies:
   - policies/index.md

@@ -19,6 +19,8 @@ REGISTRY                           ?= ghcr.io
 REPO                               ?= kyverno
 IMAGE                              ?= kyverno-authz
 KO_REGISTRY                        ?= ko.local
+# The E2E suite expects requests that match no policy to be allowed
+E2E_DEFAULT_DECISION               ?= allow
 KO_TAGS                            ?= $(GIT_SHA)
 KO_PLATFORMS                       ?= all
 
@@ -394,6 +396,7 @@ deploy-kyverno-envoy-server: $(HELM)
 	@echo Install kyverno-authz-server chart... >&2
 	@$(HELM) upgrade --install kyverno-authz-server --namespace kyverno --create-namespace --wait ./charts/kyverno-authz-server \
 		--set config.type=envoy \
+		--set config.defaultDecision=$(E2E_DEFAULT_DECISION) \
 		--set authzServer.container.image.registry=$(KO_REGISTRY) \
 		--set authzServer.container.image.repository=$(PACKAGE) \
 		--set authzServer.container.image.tag=$(GIT_SHA) \
@@ -417,6 +420,7 @@ deploy-kyverno-http-server: $(HELM)
 	@echo Install kyverno-authz-server chart... >&2
 	@$(HELM) upgrade --install kyverno-authz-server --namespace kyverno --create-namespace --wait ./charts/kyverno-authz-server \
 		--set config.type=http \
+		--set config.defaultDecision=$(E2E_DEFAULT_DECISION) \
 		--set authzServer.container.image.registry=$(KO_REGISTRY) \
 		--set authzServer.container.image.repository=$(PACKAGE) \
 		--set authzServer.container.image.tag=$(GIT_SHA) \
