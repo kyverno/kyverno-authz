@@ -56,12 +56,17 @@ func Command() *cobra.Command {
 		openreportsEnabled    bool
 		reportFlushInterval   string
 		resultBufSize         int
+		reportsFilter         string
 	)
 
 	command := &cobra.Command{
 		Use:   "authz-server",
 		Short: "Start the Kyverno Authz Server",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			filter, err := events.ParseReportsFilter(reportsFilter)
+			if err != nil {
+				return err
+			}
 			// setup signals aware context
 			return signals.Do(context.Background(), func(ctx context.Context) error {
 				// track errors
@@ -160,7 +165,7 @@ func Command() *cobra.Command {
 									httpEventHandlers = append(httpEventHandlers, events.NewOpenreportsSubscriber[httplib.CheckRequest](
 										ctx, resultBufSize,
 										orClient, intervalPtr, logger,
-										reportName, namespace, msgFormat))
+										reportName, namespace, msgFormat, filter))
 								}
 							}
 						}
@@ -272,6 +277,7 @@ func Command() *cobra.Command {
 	command.Flags().BoolVar(&eventsEnabled, "events-enabled", false, "Enable k8s events on authz, if not running in k8s this flag won't take effect")
 	command.Flags().BoolVar(&openreportsEnabled, "openreports-enabled", false, "Enable reporting in the openreports format, if not running in k8s or the openreports CRD is not installed this flag won't take effect")
 	command.Flags().StringVar(&reportFlushInterval, "report-flush-interval", "", "how often do results get flushed into the openreports report (if active)")
+	command.Flags().StringVar(&reportsFilter, "reports-filter", "fail,error", "Comma-separated OpenReports results to store: pass,fail,error,warn,skip (does not filter logs or metrics)")
 	command.Flags().IntVar(&resultBufSize, "result-buffer-size", 500, "Event buffer size for openreports, note that if the total exceeded the 1MB etcd limit, report flushing will error")
 	clientcmd.BindOverrideFlags(&kubeConfigOverrides, command.Flags(), clientcmd.RecommendedConfigOverrideFlags("kube-"))
 	return command

@@ -29,6 +29,7 @@ type openreportsEventSubscriber[Req any] struct {
 	logger        logr.Logger
 	flushInterval *time.Duration
 	eventChan     chan event[Req]
+	filter        ReportsFilter
 }
 
 // pass a context to the constructor to make it the context used to cancel the event loop
@@ -36,7 +37,7 @@ func NewOpenreportsSubscriber[Req any](ctx context.Context, bufferSize int,
 	orClient openreportsclient.OpenreportsV1alpha1Interface,
 	flushInterval *time.Duration,
 	logger logr.Logger,
-	reportName, ns, msgFormat string) EventIface[Req] {
+	reportName, ns, msgFormat string, filters ...ReportsFilter) EventIface[Req] {
 	o := &openreportsEventSubscriber[Req]{
 		client:     orClient,
 		results:    NewRingBuffer[openreportsv1alpha1.ReportResult](bufferSize),
@@ -45,6 +46,9 @@ func NewOpenreportsSubscriber[Req any](ctx context.Context, bufferSize int,
 		msgFormat:  msgFormat,
 		logger:     logger,
 		eventChan:  make(chan event[Req], 50), // we can buffer up to 50 events
+	}
+	if len(filters) != 0 {
+		o.filter = filters[0]
 	}
 
 	if flushInterval != nil {
@@ -84,8 +88,10 @@ func (o *openreportsEventSubscriber[Req]) eventLoop(ctx context.Context) {
 	}
 }
 
-// ammar: should we also convey the policy that caused the decision ?
 func (o *openreportsEventSubscriber[Req]) Push(ctx context.Context, t time.Time, req Req, res ResultAccessor) {
+	if decision, _ := res.MustGet(); !o.filter.allows(decision) {
+		return
+	}
 	event := event[Req]{
 		t:   t,
 		req: req,
@@ -100,7 +106,10 @@ func (o *openreportsEventSubscriber[Req]) Push(ctx context.Context, t time.Time,
 }
 
 func (o *openreportsEventSubscriber[Req]) newReportResult(t time.Time, r Req, resultAccessor ResultAccessor) (*openreportsv1alpha1.ReportResult, error) {
-	reportResult := &openreportsv1alpha1.ReportResult{}
+	reportResult := &openreportsv1alpha1.ReportResult{Source: "kyverno-authz"}
+	if namer, ok := resultAccessor.(PolicyNamer); ok {
+		reportResult.Policy = namer.PolicyName()
+	}
 	// ammar: is there a constant provided in the openreports package ?
 	// ammar: we should also have request skipped if it didn't match the conditions
 	res, resultErr := resultAccessor.MustGet()
@@ -160,6 +169,10 @@ func (o *openreportsEventSubscriber[Req]) newReport() *openreportsv1alpha1.Repor
 func (o *openreportsEventSubscriber[Req]) pushReport(ctx context.Context) {
 	// snapshot the results and summary under the lock before any API calls
 	snapshot := o.newReport()
+	// don't create or update a report until it has results, for example when the filter excludes every decision
+	if len(snapshot.Results) == 0 {
+		return
+	}
 	rep, err := o.client.Reports(o.namespace).Get(ctx, o.reportName, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
