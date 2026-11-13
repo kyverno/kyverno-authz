@@ -10,6 +10,8 @@ kyverno-authz serve http authz-server [flags]
 ```
       --allow-insecure-registry              Allow insecure registry
       --cert-file string                     File containing tls certificate
+      --default-decision string              Decision for requests that match no policy (allow or deny) (default "allow")
+      --drain-delay duration                 Time to keep serving after a termination signal while readiness fails, so that load balancers stop sending traffic
       --events-enabled                       Enable k8s events on authz, if not running in k8s this flag won't take effect
       --external-policy-source stringArray   External policy sources
   -h, --help                                 help for authz-server
@@ -38,6 +40,7 @@ kyverno-authz serve http authz-server [flags]
       --kube-username string                 Username for basic authentication to the API server
       --log-msg-format string                The format in which request logs would be shown in stdout (default "[%s] http: request %s, response: %s\n")
       --metrics-address string               Address to listen on for metrics (default ":9082")
+      --min-policies int                     Minimum number of policies that must load before the server becomes ready
       --nested-request                       Expect the requests to validate to be in the body of the original request
       --openreports-enabled                  Enable reporting in the openreports format, if not running in k8s or the openreports CRD is not installed this flag won't take effect
       --output-expression string             CEL expression for transforming responses before being sent to clients
@@ -45,5 +48,7 @@ kyverno-authz serve http authz-server [flags]
       --report-flush-interval string         how often do results get flushed into the openreports report (if active)
       --result-buffer-size int               Event buffer size for openreports, note that if the total exceeded the 1MB etcd limit, report flushing will error (default 500)
       --server-address string                Address to serve the http authorization server on (default ":9081")
+      --shutdown-timeout duration            Maximum time to wait for in-flight requests during a graceful shutdown (default 10s)
+      --strict                               Stay not ready, or keep the last known good policies, when any policy fails to compile, instead of excluding the failing policies
 ```
 

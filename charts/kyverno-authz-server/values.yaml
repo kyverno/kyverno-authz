@@ -55,6 +55,26 @@ config:
     external: []
     # - file:///data/kyverno-authz-server
 
+  # -- Decision for requests that match no policy (`allow` or `deny`).
+  # The chart defaults to `deny` so that an empty or partially loaded policy set fails closed.
+  # Set it to `allow` to restore the behavior of chart versions before this setting existed.
+  defaultDecision: deny
+
+  # -- Minimum number of policies that must load before the server becomes ready.
+  # Keep `0` when you install policies after the server (for example, with `helm install --wait`),
+  # because a higher value keeps the server from becoming ready until the policies exist.
+  minPolicies: 0
+
+  # -- When a policy fails to compile, keep the server not ready (or keep the last known good policies)
+  # instead of excluding the failing policy and serving the others.
+  strict: false
+
+  # -- Time to keep serving after a termination signal while readiness fails, so that load balancers stop sending traffic.
+  drainDelay: 5s
+
+  # -- Maximum time to wait for in-flight requests during a graceful shutdown.
+  shutdownTimeout: 10s
+
   # -- Allow insecure registry for pulling policy images
   allowInsecureRegistry: false
 
@@ -109,6 +129,9 @@ authzServer:
 
     # -- Optional priority class
     priorityClassName: ""
+
+    # -- Time the pod has to shut down gracefully. It must exceed `config.drainDelay` plus `config.shutdownTimeout`.
+    terminationGracePeriodSeconds: 30
 
     # -- Change `hostNetwork` to `true` when you want the pod to share its host's network namespace.
     # Useful for situations like when you end up dealing with a custom CNI over Amazon EKS.
@@ -206,6 +229,7 @@ authzServer:
       successThreshold: 1
 
     # -- Readiness Probe.
+    # The server reports ready only after every policy source has loaded, and stops reporting ready when it starts draining.
     # The block is directly forwarded into the deployment, so you can use whatever readinessProbe configuration you want.
     # ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/
     # @default -- See [values.yaml](values.yaml)
@@ -214,10 +238,10 @@ authzServer:
         path: /readyz
         port: 9080
         scheme: HTTP
-      initialDelaySeconds: 5
-      periodSeconds: 10
+      initialDelaySeconds: 2
+      periodSeconds: 5
       timeoutSeconds: 5
-      failureThreshold: 6
+      failureThreshold: 2
       successThreshold: 1
 
     # -- Container ports.

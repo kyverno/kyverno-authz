@@ -11,15 +11,18 @@ import (
 	vpol "github.com/kyverno/api/api/policies.kyverno.io/v1"
 	"github.com/kyverno/kyverno-authz/apis"
 	"github.com/kyverno/kyverno-authz/pkg/authz/envoy"
+	"github.com/kyverno/kyverno-authz/pkg/commands/serve/options"
 	"github.com/kyverno/kyverno-authz/pkg/engine"
 	vpolcompiler "github.com/kyverno/kyverno-authz/pkg/engine/compiler"
+	"github.com/kyverno/kyverno-authz/pkg/engine/snapshot"
 	"github.com/kyverno/kyverno-authz/pkg/engine/sources"
 	"github.com/kyverno/kyverno-authz/pkg/events"
 	"github.com/kyverno/kyverno-authz/pkg/probes"
 	"github.com/kyverno/kyverno-authz/pkg/signals"
+	"github.com/kyverno/kyverno-authz/pkg/state"
 	"github.com/kyverno/kyverno-authz/pkg/utils"
 	"github.com/kyverno/kyverno-authz/pkg/utils/ocifs"
-	sdksources "github.com/kyverno/sdk/core/sources"
+	"github.com/kyverno/sdk/core"
 	openreportsclient "github.com/openreports/reports-api/pkg/client/clientset/versioned/typed/openreports.io/v1alpha1"
 	"github.com/spf13/cobra"
 	"go.uber.org/multierr"
@@ -51,17 +54,22 @@ func Command() *cobra.Command {
 		openreportsEnabled    bool
 		reportFlushInterval   string
 		resultBufSize         int
+		lifecycle             options.Lifecycle
 	)
 	command := &cobra.Command{
 		Use:   "authz-server",
 		Short: "Start the Kyverno Authz Server",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			defaultDecision, err := lifecycle.Validate()
+			if err != nil {
+				return err
+			}
 			// setup signals aware context
-			return signals.Do(context.Background(), func(ctx context.Context) error {
+			return signals.Do(context.Background(), func(signalCtx context.Context) error {
 				// track errors
-				var probesErr, serverErr, mgrErr error
-				err := func(ctx context.Context) error {
-					logger := ctrl.LoggerFrom(ctx)
+				var probesErr, serverErr, mgrErr, syncErr error
+				err := func(signalCtx context.Context) error {
+					logger := ctrl.LoggerFrom(signalCtx)
 					kubeOk := true
 					// create a rest config
 					kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
@@ -73,16 +81,39 @@ func Command() *cobra.Command {
 						logger.Info("Warning, no kubernetes cluster configuration found, some features will be disabled")
 						kubeOk = false
 					}
-					// create a cancellable context
-					ctx, cancel := context.WithCancel(ctx)
+					// create a cancellable context, it outlives the termination signal so that the server can drain
+					ctx, cancel := context.WithCancel(context.WithoutCancel(signalCtx))
 					// cancel context at the end
 					defer cancel()
 					// create a wait group
 					var group wait.Group
 					// wait all tasks in the group are over
 					defer group.Wait()
+					// track the server lifecycle
+					tracker := state.NewTracker()
+					// on termination signal, fail readiness, wait for the drain delay, then stop
+					group.StartWithContext(ctx, func(ctx context.Context) {
+						tracker.DrainOnSignal(signalCtx, ctx, lifecycle.DrainDelay, cancel)
+					})
+					// probes server, started first so that probes report startup progress
+					if probesAddress != "" {
+						probesServer := probes.NewServer(probesAddress, tracker.Serving)
+						group.StartWithContext(ctx, func(ctx context.Context) {
+							defer cancel()
+							probesErr = probesServer.Run(ctx)
+						})
+					}
 					// load sources
 					var source engine.EnvoySource
+					var mgr ctrl.Manager
+					var kubeSource *sources.Kube[engine.EnvoyPolicy]
+					// requests evaluate against an immutable snapshot of the policy sources
+					snap := snapshot.New(core.MakeSourceFunc(func(ctx context.Context) ([]engine.EnvoyPolicy, error) {
+						return source.Load(ctx)
+					}), tracker, snapshot.Options{
+						MinPolicies: lifecycle.MinPolicies,
+						Strict:      lifecycle.Strict,
+					})
 					var dyn dynamic.Interface
 
 					// envoy type generics need to be pointers due to the fact that they are protos and contain mutexes
@@ -165,7 +196,7 @@ func Command() *cobra.Command {
 						if err != nil {
 							return err
 						}
-						source = sdksources.NewComposite(extSources...)
+						source = sources.NewComposite(extSources...)
 						// if kube policy source is enabled
 						if kubePolicySource {
 							// create a controller manager
@@ -173,7 +204,7 @@ func Command() *cobra.Command {
 							if err := vpol.Install(scheme); err != nil {
 								return err
 							}
-							mgr, err := ctrl.NewManager(config, ctrl.Options{
+							mgr, err = ctrl.NewManager(config, ctrl.Options{
 								Scheme: scheme,
 								Metrics: metricsserver.Options{
 									BindAddress: metricsAddress,
@@ -189,21 +220,17 @@ func Command() *cobra.Command {
 							if err != nil {
 								return fmt.Errorf("failed to construct manager: %w", err)
 							}
-							kubeSource, err := sources.NewKube("envoy", mgr, compiler)
+							kubeSource, err = sources.NewKube("envoy", mgr, compiler, snap.Trigger)
 							if err != nil {
 								return fmt.Errorf("failed to create envoy source: %w", err)
 							}
-							source = sdksources.NewComposite(kubeSource, source)
+							source = sources.NewComposite(kubeSource, source)
 							// start manager
 							group.StartWithContext(ctx, func(ctx context.Context) {
 								// cancel context at the end
 								defer cancel()
 								mgrErr = mgr.Start(ctx)
 							})
-							if !mgr.GetCache().WaitForCacheSync(ctx) {
-								defer cancel()
-								return fmt.Errorf("failed to wait for envoy cache sync")
-							}
 						}
 					} else {
 						rOpts, nOpts, err := ocifs.RegistryOpts(nil, allowInsecureRegistry)
@@ -216,28 +243,43 @@ func Command() *cobra.Command {
 						if err != nil {
 							return err
 						}
-						source = sdksources.NewComposite(extSources...)
+						source = sources.NewComposite(extSources...)
 					}
-					// probes server
-					if probesAddress != "" {
-						probesServer := probes.NewServer(probesAddress)
-						group.StartWithContext(ctx, func(ctx context.Context) {
-							defer cancel()
-							probesErr = probesServer.Run(ctx)
-						})
-					}
+					// load policies in the background, the server is not ready until the first snapshot is published
+					group.StartWithContext(ctx, func(ctx context.Context) {
+						tracker.Syncing()
+						if mgr != nil {
+							if !mgr.GetCache().WaitForCacheSync(ctx) {
+								if ctx.Err() == nil {
+									syncErr = fmt.Errorf("failed to wait for envoy cache sync")
+									cancel()
+								}
+								return
+							}
+							if err := kubeSource.Sync(ctx); err != nil {
+								syncErr = err
+								cancel()
+								return
+							}
+						}
+						snap.Run(ctx)
+					})
 
 					ev := events.NewComposite(envoyEventHandlers...)
 					// auth server
-					authServer := envoy.NewServer(grpcNetwork, grpcAddress, source, dyn, ev)
+					authServer := envoy.NewServer(grpcNetwork, grpcAddress, snap, dyn, ev, envoy.Options{
+						DefaultDecision: defaultDecision,
+						Tracker:         tracker,
+						ShutdownTimeout: lifecycle.ShutdownTimeout,
+					})
 					group.StartWithContext(ctx, func(ctx context.Context) {
 						// grpc auth server
 						defer cancel()
 						serverErr = authServer.Run(ctx)
 					})
 					return nil
-				}(ctx)
-				return multierr.Combine(err, probesErr, serverErr, mgrErr)
+				}(signalCtx)
+				return multierr.Combine(err, probesErr, serverErr, mgrErr, syncErr)
 			})
 		},
 	}
@@ -254,6 +296,7 @@ func Command() *cobra.Command {
 	command.Flags().StringVar(&reportFlushInterval, "report-flush-interval", "", "how often do results get flushed into the openreports report (if active)")
 	command.Flags().StringVar(&msgFormat, "log-msg-format", "[%s] envoy: request %s, response: %s\n", "The format in which request logs would be shown in stdout")
 	command.Flags().IntVar(&resultBufSize, "result-buffer-size", 500, "Event buffer size for openreports, note that if the total exceeded the 1MB etcd limit, report flushing will error")
+	lifecycle.AddFlags(command.Flags())
 	clientcmd.BindOverrideFlags(&kubeConfigOverrides, command.Flags(), clientcmd.RecommendedConfigOverrideFlags("kube-"))
 	return command
 }

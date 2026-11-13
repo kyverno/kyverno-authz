@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/google/cel-go/cel"
+	"github.com/kyverno/kyverno-authz/pkg/authz"
 	httpcel "github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/http"
 	httpserver "github.com/kyverno/kyverno-authz/pkg/cel/libs/httpserver"
 	"github.com/kyverno/kyverno-authz/pkg/cel/utils"
@@ -27,6 +28,10 @@ type authorizer struct {
 	outputProgram cel.Program
 	nestedRequest bool
 	eventHandler  events.EventIface[httpcel.CheckRequest]
+	// defaultDecision applies to requests that match no policy
+	defaultDecision authz.DefaultDecision
+	// ready reports whether policies are loaded
+	ready func() bool
 }
 
 func NewAuthorizer(
@@ -43,6 +48,7 @@ func NewAuthorizer(
 		outputProgram: outputProg,
 		nestedRequest: nestedRequest,
 		eventHandler:  eventIface,
+		ready:         func() bool { return true },
 	}
 }
 
@@ -55,6 +61,13 @@ func (a *authorizer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}()
 	logger := ctrl.LoggerFrom(r.Context()).WithValues("from", r.RemoteAddr)
 	logger.Info("received request")
+	// reject requests until policies are loaded, so that the gateway's failure mode applies
+	if !a.ready() {
+		decision = metrics.DecisionUnavailable
+		w.Header().Set("Retry-After", "1")
+		http.Error(w, authz.NotReadyReason, http.StatusServiceUnavailable)
+		return
+	}
 	if a.nestedRequest {
 		reader := bufio.NewReader(r.Body)
 		req, err := http.ReadRequest(reader)
@@ -94,11 +107,18 @@ func (a *authorizer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	result := response.Result
 	if result == nil {
-		result = &httpcel.CheckResponse{
-			Ok: &httpcel.CheckResponseOk{},
-		}
-		decision = metrics.DecisionAllow
 		source = metrics.SourceDefault
+		if a.defaultDecision == authz.DefaultDecisionDeny {
+			result = &httpcel.CheckResponse{
+				Denied: &httpcel.CheckResponseDenied{Reason: authz.NoMatchReason},
+			}
+			decision = metrics.DecisionDeny
+		} else {
+			result = &httpcel.CheckResponse{
+				Ok: &httpcel.CheckResponseOk{},
+			}
+			decision = metrics.DecisionAllow
+		}
 	} else if result.Denied != nil {
 		decision = metrics.DecisionDeny
 		source = metrics.SourcePolicy

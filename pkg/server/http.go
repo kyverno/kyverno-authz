@@ -11,7 +11,19 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
+// DefaultShutdownTimeout bounds how long a graceful HTTP shutdown waits for in-flight requests.
+const DefaultShutdownTimeout = 10 * time.Second
+
 func RunHttp(ctx context.Context, server *http.Server, certFile, keyFile string) error {
+	return RunHttpWithTimeout(ctx, server, certFile, keyFile, DefaultShutdownTimeout)
+}
+
+// RunHttpWithTimeout serves until ctx is done, then shuts down gracefully and
+// waits at most shutdownTimeout for in-flight requests.
+func RunHttpWithTimeout(ctx context.Context, server *http.Server, certFile, keyFile string, shutdownTimeout time.Duration) error {
+	if shutdownTimeout <= 0 {
+		shutdownTimeout = DefaultShutdownTimeout
+	}
 	logger := ctrl.LoggerFrom(ctx).
 		WithValues("address", server.Addr).
 		WithValues("cert", certFile).
@@ -35,7 +47,7 @@ func RunHttp(ctx context.Context, server *http.Server, certFile, keyFile string)
 			<-ctx.Done()
 			logger.Info("HTTP Server shutting down...")
 			// create a context with timeout
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 			defer cancel()
 			// gracefully shutdown server
 			shutdownErr = server.Shutdown(ctx)

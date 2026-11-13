@@ -42,6 +42,11 @@ helm install kyverno-authz-server --namespace kyverno --create-namespace kyverno
 | config.http.outputExpression | string | `""` | CEL: expression applied to outgoing responses |
 | config.sources.kube | bool | `true` | Enable in-cluster kubernetes policy source |
 | config.sources.external | list | `[]` | External policy sources |
+| config.defaultDecision | string | `"deny"` | Decision for requests that match no policy (`allow` or `deny`). The chart defaults to `deny` so that an empty or partially loaded policy set fails closed. Set it to `allow` to restore the behavior of chart versions before this setting existed. |
+| config.minPolicies | int | `0` | Minimum number of policies that must load before the server becomes ready. Keep `0` when you install policies after the server (for example, with `helm install --wait`), because a higher value keeps the server from becoming ready until the policies exist. |
+| config.strict | bool | `false` | When a policy fails to compile, keep the server not ready (or keep the last known good policies) instead of excluding the failing policy and serving the others. |
+| config.drainDelay | string | `"5s"` | Time to keep serving after a termination signal while readiness fails, so that load balancers stop sending traffic. |
+| config.shutdownTimeout | string | `"10s"` | Maximum time to wait for in-flight requests during a graceful shutdown. |
 | config.allowInsecureRegistry | bool | `false` | Allow insecure registry for pulling policy images |
 | config.imagePullSecrets | list | `[]` | Image pull secrets for fetching policies from OCI registries |
 | authzServer.deployment.replicas | int | `nil` | Desired number of pods |
@@ -56,6 +61,7 @@ helm install kyverno-authz-server --namespace kyverno --create-namespace kyverno
 | authzServer.pod.tolerations | list | `[]` | List of node taints to tolerate |
 | authzServer.pod.topologySpreadConstraints | list | `[]` | Topology spread constraints. |
 | authzServer.pod.priorityClassName | string | `""` | Optional priority class |
+| authzServer.pod.terminationGracePeriodSeconds | int | `30` | Time the pod has to shut down gracefully. It must exceed `config.drainDelay` plus `config.shutdownTimeout`. |
 | authzServer.pod.hostNetwork | bool | `false` | Change `hostNetwork` to `true` when you want the pod to share its host's network namespace. Useful for situations like when you end up dealing with a custom CNI over Amazon EKS. Update the `dnsPolicy` accordingly as well to suit the host network mode. |
 | authzServer.pod.dnsPolicy | string | `"ClusterFirst"` | `dnsPolicy` determines the manner in which DNS resolution happens in the cluster. In case of `hostNetwork: true`, usually, the `dnsPolicy` is suitable to be `ClusterFirstWithHostNet`. For further reference: https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy. |
 | authzServer.pod.antiAffinity | object | See [values.yaml](values.yaml) | Pod anti affinity constraints. |
@@ -70,7 +76,7 @@ helm install kyverno-authz-server --namespace kyverno --create-namespace kyverno
 | authzServer.container.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"privileged":false,"readOnlyRootFilesystem":true,"runAsNonRoot":true,"seccompProfile":{"type":"RuntimeDefault"}}` | Container security context |
 | authzServer.container.startupProbe | object | See [values.yaml](values.yaml) | Startup probe. The block is directly forwarded into the deployment, so you can use whatever startupProbes configuration you want. ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/ |
 | authzServer.container.livenessProbe | object | See [values.yaml](values.yaml) | Liveness probe. The block is directly forwarded into the deployment, so you can use whatever livenessProbe configuration you want. ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/ |
-| authzServer.container.readinessProbe | object | See [values.yaml](values.yaml) | Readiness Probe. The block is directly forwarded into the deployment, so you can use whatever readinessProbe configuration you want. ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/ |
+| authzServer.container.readinessProbe | object | See [values.yaml](values.yaml) | Readiness Probe. The server reports ready only after every policy source has loaded, and stops reporting ready when it starts draining. The block is directly forwarded into the deployment, so you can use whatever readinessProbe configuration you want. ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/ |
 | authzServer.container.ports | list | `[{"containerPort":9080,"name":"probes","protocol":"TCP"},{"containerPort":9081,"name":"authz","protocol":"TCP"},{"containerPort":9082,"name":"metrics","protocol":"TCP"}]` | Container ports. |
 | authzServer.service.annotations | object | `{}` | Service annotations. |
 | authzServer.service.type | string | `"ClusterIP"` | Service type. |

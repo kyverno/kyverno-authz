@@ -8,7 +8,7 @@ func Ready(f func() bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		code := http.StatusOK
 		if !f() {
-			code = http.StatusInternalServerError
+			code = http.StatusServiceUnavailable
 		}
 		w.WriteHeader(code)
 	}

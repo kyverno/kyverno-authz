@@ -117,7 +117,7 @@ func Command() *cobra.Command {
 						mgrErr = mgr.Start(ctx)
 					})
 					// create http and grpc servers
-					http := probes.NewServer(probesAddress)
+					http := probes.NewServer(probesAddress, probes.True)
 					// run servers
 					group.StartWithContext(ctx, func(ctx context.Context) {
 						// cancel context at the end

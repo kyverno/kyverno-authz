@@ -118,6 +118,10 @@ has(object.ok)
 		)
 		// register service
 		a := NewAuthorizer(engine, dyn, inputProgram, outputProgram, config.NestedRequest, eventIface)
+		a.defaultDecision = config.DefaultDecision
+		if config.Ready != nil {
+			a.ready = config.Ready
+		}
 		mux.Handle("POST /{$}", a)
 		// create server
 		s := &http.Server{
@@ -140,6 +144,6 @@ has(object.ok)
 			}
 		}
 		// run server
-		return server.RunHttp(ctx, s, config.CertFile, config.KeyFile)
+		return server.RunHttpWithTimeout(ctx, s, config.CertFile, config.KeyFile, config.ShutdownTimeout)
 	}
 }
