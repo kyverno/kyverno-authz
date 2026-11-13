@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -15,6 +16,8 @@ import (
 )
 
 type openreportsEventSubscriber[Req any] struct {
+	// mu guards results, which the event loop writes while the flush worker reads it.
+	mu            sync.Mutex
 	results       *ringBuffer[openreportsv1alpha1.ReportResult]
 	client        openreportsclient.OpenreportsV1alpha1Interface
 	allowed       atomic.Int64
@@ -35,8 +38,7 @@ func NewOpenreportsSubscriber[Req any](ctx context.Context, bufferSize int,
 	logger logr.Logger,
 	reportName, ns, msgFormat string) EventIface[Req] {
 	o := &openreportsEventSubscriber[Req]{
-		client: orClient,
-		// we don't need the ring buffer to contain a mutex because in all cases we process events serially
+		client:     orClient,
 		results:    NewRingBuffer[openreportsv1alpha1.ReportResult](bufferSize),
 		namespace:  ns,
 		reportName: reportName,
@@ -69,7 +71,9 @@ func (o *openreportsEventSubscriber[Req]) eventLoop(ctx context.Context) {
 				continue
 			}
 
+			o.mu.Lock()
 			o.results.Push(*reportResult)
+			o.mu.Unlock()
 			// no need to do anything further if we are gonna be pushing on an interval
 			if o.flushInterval != nil {
 				continue
@@ -137,6 +141,8 @@ func (o *openreportsEventSubscriber[Req]) newReportResult(t time.Time, r Req, re
 
 //lint:ignore SA5008 reason
 func (o *openreportsEventSubscriber[Req]) newReport() *openreportsv1alpha1.Report {
+	o.mu.Lock()
+	defer o.mu.Unlock()
 	return &openreportsv1alpha1.Report{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      o.reportName,
@@ -152,11 +158,13 @@ func (o *openreportsEventSubscriber[Req]) newReport() *openreportsv1alpha1.Repor
 }
 
 func (o *openreportsEventSubscriber[Req]) pushReport(ctx context.Context) {
+	// snapshot the results and summary under the lock before any API calls
+	snapshot := o.newReport()
 	rep, err := o.client.Reports(o.namespace).Get(ctx, o.reportName, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// create it
-			rep = o.newReport()
+			rep = snapshot
 			_, err := o.client.Reports(o.namespace).Create(ctx, rep, metav1.CreateOptions{})
 			if err != nil {
 				o.logger.Error(err, "error creating report")
@@ -171,12 +179,12 @@ func (o *openreportsEventSubscriber[Req]) pushReport(ctx context.Context) {
 
 	// its already there, update it
 	// update the results in the report to be whats in the ring buffer
-	rep.Results = o.results.Values()
+	rep.Results = snapshot.Results
 
 	// update the report summary
-	rep.Summary.Error = int(o.errored.Load())
-	rep.Summary.Pass = int(o.allowed.Load())
-	rep.Summary.Fail = int(o.denied.Load())
+	rep.Summary.Error = snapshot.Summary.Error
+	rep.Summary.Pass = snapshot.Summary.Pass
+	rep.Summary.Fail = snapshot.Summary.Fail
 
 	_, err = o.client.Reports(o.namespace).Update(ctx, rep, metav1.UpdateOptions{})
 	if err != nil {
