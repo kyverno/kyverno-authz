@@ -5,7 +5,7 @@ import (
 	"io"
 
 	"github.com/awslabs/amazon-ecr-credential-helper/ecr-login"
-	"github.com/chrismellard/docker-credential-acr-env/pkg/credhelper"
+	acr "github.com/osscontainertools/docker-credential-acr/pkg/credhelper"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/authn/github"
 	kauth "github.com/google/go-containerregistry/pkg/authn/kubernetes"
@@ -28,7 +28,7 @@ func RegistryOpts(lister k8scorev1.SecretInterface,
 	keychains := make([]authn.Keychain, 0)
 
 	keychains = append(keychains,
-		authn.NewKeychainFromHelper(credhelper.NewACRCredentialsHelper()),
+		authn.NewKeychainFromHelper(acr.NewACRCredentialsHelper()),
 		google.Keychain,
 		authn.DefaultKeychain,
 		github.Keychain,
