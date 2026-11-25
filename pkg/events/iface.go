@@ -28,16 +28,33 @@ type ResultAccessor interface {
 	MustGet() (string, error)
 }
 
-type resultAccessorImpl struct {
-	result any
-	err    error
+// PolicyNamer is an optional interface that a ResultAccessor implements to
+// expose the name of the policy that produced the decision.
+type PolicyNamer interface {
+	PolicyName() string
 }
 
-func NewResultAccessor(res any, err error) *resultAccessorImpl {
-	return &resultAccessorImpl{
+type resultAccessorImpl struct {
+	result     any
+	err        error
+	policyName string
+}
+
+// NewResultAccessor returns a ResultAccessor. The optional policyName names the
+// policy that produced the decision.
+func NewResultAccessor(res any, err error, policyName ...string) *resultAccessorImpl {
+	r := &resultAccessorImpl{
 		result: res,
 		err:    err,
 	}
+	if len(policyName) != 0 {
+		r.policyName = policyName[0]
+	}
+	return r
+}
+
+func (r *resultAccessorImpl) PolicyName() string {
+	return r.policyName
 }
 
 func (r *resultAccessorImpl) MustGet() (string, error) {

@@ -51,11 +51,22 @@ func Command() *cobra.Command {
 		openreportsEnabled    bool
 		reportFlushInterval   string
 		resultBufSize         int
+		reportsFilter         string
+		decisionLogsEnabled   bool
+		reportHeaders         []string
 	)
 	command := &cobra.Command{
 		Use:   "authz-server",
 		Short: "Start the Kyverno Authz Server",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			filter, err := events.ParseReportsFilter(reportsFilter)
+			if err != nil {
+				return err
+			}
+			redactor, err := events.NewRequestRedactor(reportHeaders)
+			if err != nil {
+				return err
+			}
 			// setup signals aware context
 			return signals.Do(context.Background(), func(ctx context.Context) error {
 				// track errors
@@ -87,11 +98,14 @@ func Command() *cobra.Command {
 
 					// envoy type generics need to be pointers due to the fact that they are protos and contain mutexes
 					envoyEventHandlers := []events.EventIface[*authv3.CheckRequest]{}
-					envoyEventHandlers = append(envoyEventHandlers, events.NewWriterEventSubscriber[*authv3.CheckRequest](
-						os.Stdout,
-						logger,
-						msgFormat,
-					))
+					if decisionLogsEnabled {
+						envoyEventHandlers = append(envoyEventHandlers, events.NewWriterEventSubscriber[*authv3.CheckRequest](
+							os.Stdout,
+							logger,
+							msgFormat,
+							redactor,
+						))
+					}
 
 					if kubeOk {
 						// Create kubernetes client
@@ -120,7 +134,7 @@ func Command() *cobra.Command {
 							envoyEventHandlers = append(envoyEventHandlers,
 								events.NewK8sEventSubscriber[*authv3.CheckRequest](
 									ctx, kubeclient, namespace,
-									logger, msgFormat))
+									logger, msgFormat, redactor))
 						}
 
 						// add the openreports event handler
@@ -152,7 +166,7 @@ func Command() *cobra.Command {
 									envoyEventHandlers = append(envoyEventHandlers, events.NewOpenreportsSubscriber[*authv3.CheckRequest](
 										ctx, resultBufSize,
 										orClient, intervalPtr, logger,
-										reportName, namespace, msgFormat))
+										reportName, namespace, msgFormat, redactor, filter))
 								}
 							}
 						}
@@ -252,8 +266,11 @@ func Command() *cobra.Command {
 	command.Flags().BoolVar(&eventsEnabled, "events-enabled", false, "Enable k8s events on authz, if not running in k8s this flag won't take effect")
 	command.Flags().BoolVar(&openreportsEnabled, "openreports-enabled", false, "Enable reporting in the openreports format, if not running in k8s or the openreports CRD is not installed this flag won't take effect")
 	command.Flags().StringVar(&reportFlushInterval, "report-flush-interval", "", "how often do results get flushed into the openreports report (if active)")
+	command.Flags().StringVar(&reportsFilter, "reports-filter", "fail,error", "Comma-separated OpenReports results to store: pass,fail,error,warn,skip (does not filter logs or metrics)")
 	command.Flags().StringVar(&msgFormat, "log-msg-format", "[%s] envoy: request %s, response: %s\n", "The format in which request logs would be shown in stdout")
 	command.Flags().IntVar(&resultBufSize, "result-buffer-size", 500, "Event buffer size for openreports, note that if the total exceeded the 1MB etcd limit, report flushing will error")
+	command.Flags().BoolVar(&decisionLogsEnabled, "decision-logs-enabled", false, "Write a log line for every authorization decision to stdout")
+	command.Flags().StringSliceVar(&reportHeaders, "report-headers", events.DefaultReportHeaders, "Request headers to include in decision logs, Kubernetes Events, and OpenReports results (the server rejects credential headers such as authorization, cookie, proxy-authorization, and x-api-key)")
 	clientcmd.BindOverrideFlags(&kubeConfigOverrides, command.Flags(), clientcmd.RecommendedConfigOverrideFlags("kube-"))
 	return command
 }

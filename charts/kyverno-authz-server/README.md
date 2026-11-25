@@ -44,6 +44,8 @@ helm install kyverno-authz-server --namespace kyverno --create-namespace kyverno
 | config.sources.external | list | `[]` | External policy sources |
 | config.allowInsecureRegistry | bool | `false` | Allow insecure registry for pulling policy images |
 | config.imagePullSecrets | list | `[]` | Image pull secrets for fetching policies from OCI registries |
+| config.decisionLogs.enabled | bool | `false` | Write a log line for every authorization decision to stdout |
+| config.reportHeaders | list | `["user-agent","x-request-id"]` | Request headers to include in decision logs, Kubernetes Events, and OpenReports results. The server rejects credential headers such as `authorization`, `cookie`, `proxy-authorization`, and `x-api-key`. |
 | authzServer.deployment.replicas | int | `nil` | Desired number of pods |
 | authzServer.deployment.revisionHistoryLimit | int | `10` | The number of revisions to keep |
 | authzServer.deployment.annotations | object | `{}` | Deployment annotations. |

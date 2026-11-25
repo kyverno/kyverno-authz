@@ -151,6 +151,8 @@ spec:
           {{- end }}
           {{- end }}
           - --allow-insecure-registry={{ $.Values.config.allowInsecureRegistry }}
+          - --decision-logs-enabled={{ $.Values.config.decisionLogs.enabled }}
+          - --report-headers={{ join "," $.Values.config.reportHeaders }}
           {{- range $.Values.config.imagePullSecrets }}
           - {{ printf "--image-pull-secret=%s" (tpl (toYaml .) $) }}
           {{- end }}

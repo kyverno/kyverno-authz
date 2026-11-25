@@ -17,7 +17,6 @@ import (
 	"github.com/kyverno/sdk/core"
 	"github.com/kyverno/sdk/core/dispatchers"
 	"github.com/kyverno/sdk/core/handlers"
-	"github.com/kyverno/sdk/core/resulters"
 	"github.com/kyverno/sdk/extensions/policy"
 	"k8s.io/client-go/dynamic"
 )
@@ -109,8 +108,8 @@ has(object.ok)
 						})
 					},
 				),
-				func(ctx context.Context, fc core.FactoryContext[engine.HTTPPolicy, dynamic.Interface, *httpcel.CheckRequest]) core.Resulter[engine.HTTPPolicy, *httpcel.CheckRequest, policy.Evaluation[*httpcel.CheckResponse], policy.Evaluation[*httpcel.CheckResponse]] {
-					return resulters.NewFirst[engine.HTTPPolicy, *httpcel.CheckRequest](func(out policy.Evaluation[*httpcel.CheckResponse]) bool {
+				func(ctx context.Context, fc core.FactoryContext[engine.HTTPPolicy, dynamic.Interface, *httpcel.CheckRequest]) core.Resulter[engine.HTTPPolicy, *httpcel.CheckRequest, policy.Evaluation[*httpcel.CheckResponse], engine.Evaluation[*httpcel.CheckResponse]] {
+					return engine.NewPolicyResulter[engine.HTTPPolicy, *httpcel.CheckRequest](func(out policy.Evaluation[*httpcel.CheckResponse]) bool {
 						return out.Result != nil || out.Error != nil
 					})
 				},

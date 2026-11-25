@@ -12,16 +12,16 @@ import (
 	httpcel "github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/http"
 	httpserver "github.com/kyverno/kyverno-authz/pkg/cel/libs/httpserver"
 	"github.com/kyverno/kyverno-authz/pkg/cel/utils"
+	"github.com/kyverno/kyverno-authz/pkg/engine"
 	"github.com/kyverno/kyverno-authz/pkg/events"
 	"github.com/kyverno/kyverno-authz/pkg/metrics"
 	"github.com/kyverno/sdk/core"
-	"github.com/kyverno/sdk/extensions/policy"
 	"k8s.io/client-go/dynamic"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 type authorizer struct {
-	engine        core.Engine[dynamic.Interface, *httpcel.CheckRequest, policy.Evaluation[*httpcel.CheckResponse]]
+	engine        core.Engine[dynamic.Interface, *httpcel.CheckRequest, engine.Evaluation[*httpcel.CheckResponse]]
 	dyn           dynamic.Interface
 	inputProgram  cel.Program
 	outputProgram cel.Program
@@ -30,7 +30,7 @@ type authorizer struct {
 }
 
 func NewAuthorizer(
-	e core.Engine[dynamic.Interface, *httpcel.CheckRequest, policy.Evaluation[*httpcel.CheckResponse]],
+	e core.Engine[dynamic.Interface, *httpcel.CheckRequest, engine.Evaluation[*httpcel.CheckResponse]],
 	dyn dynamic.Interface,
 	inputProg cel.Program,
 	outputProg cel.Program,
@@ -88,7 +88,7 @@ func (a *authorizer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if response.Error != nil {
 		source = metrics.SourceEngine
 		metrics.RecordHTTPRequestError(r.Context(), httpReq, response.Error)
-		a.eventHandler.Push(context.Background(), time.Now(), httpReq, events.NewResultAccessor(nil, response.Error))
+		a.eventHandler.Push(context.Background(), time.Now(), httpReq, events.NewResultAccessor(nil, response.Error, response.PolicyName))
 		writeErrResp(logger, w, response.Error)
 		return
 	}
@@ -108,7 +108,7 @@ func (a *authorizer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// result will never be nil here because we set it in the block above
-	a.eventHandler.Push(context.Background(), time.Now(), httpReq, events.NewResultAccessor(*result, nil))
+	a.eventHandler.Push(context.Background(), time.Now(), httpReq, events.NewResultAccessor(*result, nil, response.PolicyName))
 	defer metrics.RecordHTTPRequest(r.Context(), start, httpReq, result)
 	out, _, err := a.outputProgram.Eval(map[string]any{
 		"object": result,
