@@ -57,13 +57,16 @@ spec:
                 secret:
                   secretName: curl-secret
                   optional: true
-  - wait:
-      apiVersion: v1
-      kind: Pod
+  # Assert on the Deployment instead of waiting on Pods: the Pod may not exist yet,
+  # and `kubectl wait --all` fails immediately when no Pods match.
+  - assert:
       timeout: 1m
-      for:
-        condition:
-          name: Ready
-          value: 'true'
+      resource:
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: curl
+        status:
+          readyReplicas: 1
   - sleep:
       duration: 10s
