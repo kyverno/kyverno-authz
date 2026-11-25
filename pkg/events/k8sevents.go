@@ -2,7 +2,6 @@ package events
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -23,10 +22,11 @@ type k8sEventSubscriber[Req any] struct {
 	logger    logr.Logger
 	msgFormat string
 	eventChan chan event[Req]
+	redactor  *RequestRedactor
 }
 
 // pass a context to the constructor to make it the context used to cancel the event loop
-func NewK8sEventSubscriber[Req any](ctx context.Context, client kubernetes.Interface, ns string, logger logr.Logger, msgFormat string) EventIface[Req] {
+func NewK8sEventSubscriber[Req any](ctx context.Context, client kubernetes.Interface, ns string, logger logr.Logger, msgFormat string, redactor *RequestRedactor) EventIface[Req] {
 	eventChan := make(chan event[Req], 50)
 	k := &k8sEventSubscriber[Req]{
 		client:    client,
@@ -34,6 +34,7 @@ func NewK8sEventSubscriber[Req any](ctx context.Context, client kubernetes.Inter
 		logger:    logger,
 		msgFormat: msgFormat,
 		eventChan: eventChan,
+		redactor:  redactor,
 	}
 	go k.eventLoop(ctx)
 	return k
@@ -46,11 +47,6 @@ func (k *k8sEventSubscriber[Req]) eventLoop(ctx context.Context) {
 			k.logger.Info("k8s event handler exiting")
 			return
 		case ev := <-k.eventChan:
-			jsonReq, err := json.Marshal(ev.req)
-			if err != nil {
-				k.logger.Error(err, "error marshalling request to json for event")
-				continue
-			}
 
 			result, resultErr := ev.res.MustGet()
 
@@ -63,7 +59,7 @@ func (k *k8sEventSubscriber[Req]) eventLoop(ctx context.Context) {
 
 			eventMsg := fmt.Sprintf(k.msgFormat,
 				ev.t.Format(time.RFC3339),
-				string(jsonReq),
+				k.redactor.JSON(ev.req),
 				resultStr,
 			)
 
@@ -91,7 +87,7 @@ func (k *k8sEventSubscriber[Req]) eventLoop(ctx context.Context) {
 				ReportingInstance:   "kyverno-authz-server",
 			}
 
-			_, err = k.client.CoreV1().Events(k.namespace).Create(
+			_, err := k.client.CoreV1().Events(k.namespace).Create(
 				ctx,
 				event,
 				metav1.CreateOptions{},

@@ -20,7 +20,7 @@ func TestOpenreportsConcurrentPushAndFlush(t *testing.T) {
 	defer cancel()
 	client := fake.NewSimpleClientset()
 	interval := time.Microsecond
-	handler := NewOpenreportsSubscriber[string](ctx, 8, client.OpenreportsV1alpha1(), &interval, logr.Discard(), "report", "default", "[%s] request %s: %s")
+	handler := NewOpenreportsSubscriber[string](ctx, 8, client.OpenreportsV1alpha1(), &interval, logr.Discard(), "report", "default", "[%s] request %s: %s", nil)
 	const events = 200
 	for i := 0; i < events; i++ {
 		// retry when the event channel is full so every event is recorded
@@ -99,7 +99,7 @@ func TestFilteredReportsSkipExcludedResults(t *testing.T) {
 	filter, err := ParseReportsFilter("fail,error")
 	require.NoError(t, err)
 	interval := time.Millisecond
-	handler := NewOpenreportsSubscriber[string](ctx, 2, client.OpenreportsV1alpha1(), &interval, logr.Discard(), "report", "default", "%[3]s", filter)
+	handler := NewOpenreportsSubscriber[string](ctx, 2, client.OpenreportsV1alpha1(), &interval, logr.Discard(), "report", "default", "%[3]s", nil, filter)
 	for i := 0; i < 10; i++ {
 		handler.Push(ctx, time.Now(), "request", NewResultAccessor(&authv3.CheckResponse{}, nil))
 	}

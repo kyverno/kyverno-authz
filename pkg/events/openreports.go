@@ -2,7 +2,6 @@ package events
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -30,6 +29,7 @@ type openreportsEventSubscriber[Req any] struct {
 	flushInterval *time.Duration
 	eventChan     chan event[Req]
 	filter        ReportsFilter
+	redactor      *RequestRedactor
 }
 
 // pass a context to the constructor to make it the context used to cancel the event loop
@@ -37,13 +37,14 @@ func NewOpenreportsSubscriber[Req any](ctx context.Context, bufferSize int,
 	orClient openreportsclient.OpenreportsV1alpha1Interface,
 	flushInterval *time.Duration,
 	logger logr.Logger,
-	reportName, ns, msgFormat string, filters ...ReportsFilter) EventIface[Req] {
+	reportName, ns, msgFormat string, redactor *RequestRedactor, filters ...ReportsFilter) EventIface[Req] {
 	o := &openreportsEventSubscriber[Req]{
 		client:     orClient,
 		results:    NewRingBuffer[openreportsv1alpha1.ReportResult](bufferSize),
 		namespace:  ns,
 		reportName: reportName,
 		msgFormat:  msgFormat,
+		redactor:   redactor,
 		logger:     logger,
 		eventChan:  make(chan event[Req], 50), // we can buffer up to 50 events
 	}
@@ -128,10 +129,6 @@ func (o *openreportsEventSubscriber[Req]) newReportResult(t time.Time, r Req, re
 		Seconds: t.Unix(),
 		Nanos:   int32(t.Nanosecond()),
 	}
-	jsonStr, err := json.Marshal(r)
-	if err != nil {
-		return nil, err
-	}
 
 	var resultStr string
 	if resultErr != nil {
@@ -142,7 +139,7 @@ func (o *openreportsEventSubscriber[Req]) newReportResult(t time.Time, r Req, re
 
 	reportResult.Description = fmt.Sprintf(o.msgFormat,
 		t.Format(time.RFC3339),
-		string(jsonStr),
+		o.redactor.JSON(r),
 		resultStr,
 	)
 	return reportResult, nil

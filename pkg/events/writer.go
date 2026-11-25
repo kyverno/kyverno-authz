@@ -2,7 +2,6 @@ package events
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"time"
@@ -14,24 +13,22 @@ type writerEventSubscriber[Req any] struct {
 	logger    logr.Logger
 	msgFormat string
 	writer    io.Writer
+	redactor  *RequestRedactor
 }
 
 // ammar: also provide the option for file writing
-func NewWriterEventSubscriber[Req any](w io.Writer, l logr.Logger, msgFormat string) EventIface[Req] {
+// The redactor selects the request properties to write; a nil redactor records no headers.
+func NewWriterEventSubscriber[Req any](w io.Writer, l logr.Logger, msgFormat string, redactor *RequestRedactor) EventIface[Req] {
 	return &writerEventSubscriber[Req]{
 		writer:    w,
 		logger:    l,
 		msgFormat: msgFormat,
+		redactor:  redactor,
 	}
 }
 
 func (s *writerEventSubscriber[Req]) Push(_ context.Context, t time.Time, req Req, res ResultAccessor) {
 	// it's ok for the standard output writer to be synchronous
-	jsonStr, err := json.Marshal(req)
-	if err != nil {
-		s.logger.Error(err, "error unmarshalling request")
-		return
-	}
 	result, resultErr := res.MustGet()
 
 	// if the result is an error we will print in the result log placeholder ResultErrored: <the_actual_error>
@@ -42,12 +39,12 @@ func (s *writerEventSubscriber[Req]) Push(_ context.Context, t time.Time, req Re
 		resultStr = fmt.Sprintf("%v", result)
 	}
 
-	_, err = fmt.Fprintf(s.writer, s.msgFormat,
+	_, err := fmt.Fprintf(s.writer, s.msgFormat,
 		t.Format(time.RFC3339),
-		string(jsonStr),
+		s.redactor.JSON(req),
 		resultStr,
 	)
 	if err != nil {
-		s.logger.Error(err, "error unmarshalling request")
+		s.logger.Error(err, "error writing decision log")
 	}
 }

@@ -10,6 +10,7 @@ kyverno-authz serve http authz-server [flags]
 ```
       --allow-insecure-registry              Allow insecure registry
       --cert-file string                     File containing tls certificate
+      --decision-logs-enabled                Write a log line for every authorization decision to stdout
       --events-enabled                       Enable k8s events on authz, if not running in k8s this flag won't take effect
       --external-policy-source stringArray   External policy sources
   -h, --help                                 help for authz-server
@@ -43,6 +44,7 @@ kyverno-authz serve http authz-server [flags]
       --output-expression string             CEL expression for transforming responses before being sent to clients
       --probes-address string                Address to listen on for health checks
       --report-flush-interval string         how often do results get flushed into the openreports report (if active)
+      --report-headers strings               Request headers to include in decision logs, Kubernetes Events, and OpenReports results (the server rejects credential headers such as authorization, cookie, proxy-authorization, and x-api-key) (default [user-agent,x-request-id])
       --reports-filter string                Comma-separated OpenReports results to store: pass,fail,error,warn,skip (does not filter logs or metrics) (default "fail,error")
       --result-buffer-size int               Event buffer size for openreports, note that if the total exceeded the 1MB etcd limit, report flushing will error (default 500)
       --server-address string                Address to serve the http authorization server on (default ":9081")

@@ -62,6 +62,16 @@ config:
   imagePullSecrets: []
   # - secret-name
 
+  decisionLogs:
+    # -- Write a log line for every authorization decision to stdout
+    enabled: false
+
+  # -- Request headers to include in decision logs, Kubernetes Events, and OpenReports results.
+  # The server rejects credential headers such as `authorization`, `cookie`, `proxy-authorization`, and `x-api-key`.
+  reportHeaders:
+  - user-agent
+  - x-request-id
+
 authzServer:
   deployment:
     # -- (int) Desired number of pods

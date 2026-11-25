@@ -57,6 +57,8 @@ func Command() *cobra.Command {
 		reportFlushInterval   string
 		resultBufSize         int
 		reportsFilter         string
+		decisionLogsEnabled   bool
+		reportHeaders         []string
 	)
 
 	command := &cobra.Command{
@@ -64,6 +66,10 @@ func Command() *cobra.Command {
 		Short: "Start the Kyverno Authz Server",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			filter, err := events.ParseReportsFilter(reportsFilter)
+			if err != nil {
+				return err
+			}
+			redactor, err := events.NewRequestRedactor(reportHeaders)
 			if err != nil {
 				return err
 			}
@@ -94,11 +100,14 @@ func Command() *cobra.Command {
 					defer group.Wait()
 
 					httpEventHandlers := []events.EventIface[httplib.CheckRequest]{}
-					httpEventHandlers = append(httpEventHandlers, events.NewWriterEventSubscriber[httplib.CheckRequest](
-						os.Stdout,
-						logger,
-						msgFormat,
-					))
+					if decisionLogsEnabled {
+						httpEventHandlers = append(httpEventHandlers, events.NewWriterEventSubscriber[httplib.CheckRequest](
+							os.Stdout,
+							logger,
+							msgFormat,
+							redactor,
+						))
+					}
 
 					// load sources
 					var source engine.HTTPSource
@@ -134,6 +143,7 @@ func Command() *cobra.Command {
 								namespace,
 								logger,
 								msgFormat,
+								redactor,
 							))
 						}
 
@@ -165,7 +175,7 @@ func Command() *cobra.Command {
 									httpEventHandlers = append(httpEventHandlers, events.NewOpenreportsSubscriber[httplib.CheckRequest](
 										ctx, resultBufSize,
 										orClient, intervalPtr, logger,
-										reportName, namespace, msgFormat, filter))
+										reportName, namespace, msgFormat, redactor, filter))
 								}
 							}
 						}
@@ -279,6 +289,8 @@ func Command() *cobra.Command {
 	command.Flags().StringVar(&reportFlushInterval, "report-flush-interval", "", "how often do results get flushed into the openreports report (if active)")
 	command.Flags().StringVar(&reportsFilter, "reports-filter", "fail,error", "Comma-separated OpenReports results to store: pass,fail,error,warn,skip (does not filter logs or metrics)")
 	command.Flags().IntVar(&resultBufSize, "result-buffer-size", 500, "Event buffer size for openreports, note that if the total exceeded the 1MB etcd limit, report flushing will error")
+	command.Flags().BoolVar(&decisionLogsEnabled, "decision-logs-enabled", false, "Write a log line for every authorization decision to stdout")
+	command.Flags().StringSliceVar(&reportHeaders, "report-headers", events.DefaultReportHeaders, "Request headers to include in decision logs, Kubernetes Events, and OpenReports results (the server rejects credential headers such as authorization, cookie, proxy-authorization, and x-api-key)")
 	clientcmd.BindOverrideFlags(&kubeConfigOverrides, command.Flags(), clientcmd.RecommendedConfigOverrideFlags("kube-"))
 	return command
 }
